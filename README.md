@@ -133,10 +133,22 @@ If you don't have uv installed you can run the following:
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
+### Install from PyPI with uv
+```bash
+uv tool install par-storygen
+storygen
+```
+
+### Install from PyPI with pip
+```bash
+pip install par-storygen
+storygen
+```
+
 ### Source install from GitHub
 ```bash
-git clone https://github.com/paulrobello/storygen
-cd storygen
+git clone https://github.com/paulrobello/par-storygen
+cd par-storygen
 make setup
 ```
 
@@ -344,8 +356,8 @@ The main (base) portrait is preserved. Press **Revert to base** (visible only wh
 
 Clone the repo and run the setup make target. Note `uv` is required.
 ```bash
-git clone https://github.com/paulrobello/storygen
-cd storygen
+git clone https://github.com/paulrobello/par-storygen
+cd par-storygen
 make setup
 ```
 
