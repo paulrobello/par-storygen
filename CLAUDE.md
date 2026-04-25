@@ -1,0 +1,87 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+par-storygen is a Python 3.13 Textual TUI choose-your-own-adventure. A configurable LLM (via pydantic-ai → OpenAI-compatible endpoints) drives theme, characters, narration, and choices; image providers render portraits + scene illustrations. Game state is a content-addressed tree persisted as JSON; revisiting a sequence of choices replays cached content byte-for-byte. Original v1.0 design spec (historical): `docs/superpowers/specs/2026-04-18-storygen-design.md`. Architecture details: `docs/ARCHITECTURE.md`.
+
+## Commands
+
+All targets are defined in the `Makefile`:
+
+```sh
+make build            # uv sync
+make run              # uv run storygen
+make resume           # uv run storygen run --resume
+make test             # uv run pytest
+make lint             # uv run ruff check .
+make fmt              # uv run ruff format .
+make typecheck        # uv run pyright
+make checkall         # fmt + lint + typecheck + test  (run before committing)
+make clean            # Remove .pytest_cache, .ruff_cache, .pyright, build, dist, *.egg-info, __pycache__
+```
+
+Single test or pattern:
+```sh
+uv run pytest tests/unit/test_pipeline.py -v
+uv run pytest -k "test_walk_branch_reload_replay"
+```
+
+The CLI: `uv run storygen run [--resume|-r]`. Bare `uv run storygen` is equivalent to `run` with no flags.
+
+## Toolchain
+
+- **Python 3.13**, `uv` for everything (no pip/poetry/pipenv).
+- **pyright strict mode** — ground truth. Run `uv run pyright src/ tests/`. IDE `reportMissingImports` for storygen/textual/pydantic are false positives from missing venv — ignore IDE noise, trust `uv run pyright`.
+- **ruff** for format + lint (E/F/I/B/UP/SIM/RUF; line length 100; `E501` ignored).
+- **pytest** with `asyncio_mode = "auto"` (per-test timeout 10 s).
+- **pyfiglet** for ASCII art titles. Font "blocky" for intro, "big" for endings.
+
+## Provider configuration
+
+Configured via environment variables (see `.env.example`) or in-app Settings. **Priority:** env vars > `.env` file > Settings prefs > hardcoded defaults.
+
+**Text** (all OpenAI-compatible): OpenAI (`OPENAI_API_KEY`, default `gpt-4o-mini`), OpenRouter (`OPENROUTER_API_KEY` + `STORYGEN_TEXT_PROVIDER=openrouter`), Ollama (local, no key). Config via `STORYGEN_TEXT_MODEL` and optional `STORYGEN_TEXT_BASE_URL`.
+
+**Image**: OpenAI (`gpt-image-2`, ref-portrait aware), Gemini (ref-aware), Z.AI (text-to-image only), Ollama (local, no refs). Config via `STORYGEN_IMAGE_MODEL`, `STORYGEN_IMAGE_BASE_URL`, `STORYGEN_IMAGE_API_KEY`. Settings supports a fallback provider.
+
+## Architecture
+
+```
+storage  →  llm + images  →  widgets  →  screens  →  app
+```
+
+Lower layers never import higher ones. `app.py` wires concrete providers/agents/pipelines into screens. See `docs/ARCHITECTURE.md` for full implementation details.
+
+Key concepts: **3-stage beat pipeline** (cache → beat gen → concurrent illustration + portraits), **choice schema split** (`Choice` for LLM vs `StoredChoice` for storage), **tree graph** (not DAG, frozen nodes), **branch prefetch** (background-generates pending choices), **cross-game character library** (export/import with optional backstory adaptation).
+
+## Testing patterns
+
+- Screen tests use a `_Harness(App[None])` that pushes the screen-under-test in `on_mount` — see existing tests for the shape.
+- LLM-dependent code uses a `_Result` wrapper with an `output` attribute and Fake agent classes returning canned data. See `tests/unit/test_wizard_flow.py` and `tests/unit/test_pipeline.py`.
+- Image-provider tests pass `AsyncMock`-equipped `client=` directly to `OpenAIImageProvider(...)`.
+- Filesystem tests: `monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))` and/or `XDG_CONFIG_HOME`.
+- Smoke test:
+  ```sh
+  OPENAI_API_KEY=sk-test uv run python -c "
+  import asyncio
+  from storygen.app import StoryGenApp
+  async def t():
+      app = StoryGenApp()
+      async with app.run_test() as pilot:
+          await pilot.pause()
+          print('OK:', type(app.screen).__name__)
+  asyncio.run(t())
+  "
+  ```
+
+## Conventions
+
+- Pydantic models in strict pyright: use `Field(default_factory=list[Character])` (parameterized) instead of bare `list`.
+- Loose-typed pydantic-ai adapters in `app.py` carry `# type: ignore[no-untyped-def]` — preserve that style.
+- `Header` on every screen: set title/sub_title via `_apply_header()`, call from both `on_mount` and state-change methods. PlayScreen sub_title: `"$X.XXXX  ·  N↑/N↓ tok"`.
+- During beat generation: `PlayScreen._loading=True` blocks all actions except `menu`. Call `self._image.show_generating()` and `self._choices.clear()` on pick.
+- Long-running LLM/image work: `@work(exit_on_error=False)`, `notify(...)` for progress (60–120s), errors with `severity="error", timeout=10-15`.
+- Footer binding labels: short, verb-first. `check_action` returns False to hide irrelevant bindings.
+- Prefer `Sequence[Choice]` over `list[Choice]` for covariance with `StoredChoice`.

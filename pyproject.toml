@@ -1,0 +1,89 @@
+[project]
+name = "par-storygen"
+version = "0.1.0"
+description = "AI-driven TUI choose-your-own-adventure"
+readme = "README.md"
+requires-python = ">=3.13"
+authors = [
+    { name = "Paul Robello", email = "probello@gmail.com" },
+]
+dependencies = [
+    "textual>=8.2.3",
+    "pydantic>=2.9",
+    "pydantic-ai>=1.84.1",
+    "openai>=2.32.0",
+    "rich>=15.0.0",
+    "rich-pixels>=3.0.1",
+    "typer>=0.24.1",
+    "xdg-base-dirs>=6.0.2",
+    "httpx>=0.28.1",
+    "pillow>=12.2.0",
+    "tenacity>=9.1.4",
+    "python-dotenv>=1.2.2",
+    "google-genai>=1.73.1",
+    "textual-pyfiglet>=1.0.0",
+]
+
+[project.license]
+text = "MIT"
+
+[project.scripts]
+storygen = "storygen.main:app"
+
+[build-system]
+requires = [
+    "hatchling",
+]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = [
+    "src/storygen",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "B",
+    "UP",
+    "SIM",
+    "RUF",
+]
+ignore = [
+    "E501",
+]
+
+[tool.pyright]
+pythonVersion = "3.13"
+typeCheckingMode = "strict"
+include = [
+    "src",
+    "tests",
+]
+reportMissingTypeStubs = false
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests",
+]
+addopts = "-v --strict-markers"
+asyncio_mode = "auto"
+timeout = 10
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.3.0",
+    "pytest-cov>=7.1.0",
+    "pytest-mock>=3.15.1",
+    "pytest-timeout>=2.4.0",
+    "ruff>=0.15.11",
+    "pyright>=1.1.408",
+    "pre-commit>=4.6.0",
+]
