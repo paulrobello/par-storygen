@@ -1,58 +1,168 @@
-name: Release distribution
+name: Build, Test, and Release
 
 on:
   workflow_dispatch:
-  workflow_call:
 
 jobs:
-  github-release:
-    name: Create GitHub Release
+  build:
+    name: Build and Test
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: write
-      id-token: write
-
+    timeout-minutes: 30
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Lint and Typecheck
+        run: make checkall
+
+      - name: Package
+        run: make package
+
+      - name: Get version
+        id: get_version
+        run: |
+          version=$(uv run python -c "from storygen import __version__; print(__version__)")
+          echo "VERSION=$version" >> $GITHUB_ENV
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  tag:
+    name: Tag Version
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: build
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
-      - name: Install dependencies
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Get version
         run: |
           uv sync --all-extras --dev
-
-      - name: Get version from __init__.py
-        id: get_version
-        run: |
           version=$(uv run python -c "from storygen import __version__; print(__version__)")
-          echo "Raw version output: $version"
           echo "VERSION=$version" >> $GITHUB_ENV
 
-      - name: Check version
-        id: check_version
+      - name: Configure Git
         run: |
-          echo "Version in env: ${{ env.VERSION }}"
-          if [ -z "${{ env.VERSION }}" ]; then
-            echo "Error: VERSION is empty"
-            exit 1
-          fi
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Restore cached build artifacts
-        uses: actions/cache@v4
+      - name: Create or update tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git fetch --tags
+          git tag -d "v$VERSION" 2>/dev/null || true
+          git push --delete origin "v$VERSION" 2>/dev/null || true
+          git tag -a "v$VERSION" -m "Version $VERSION"
+          git push origin "v$VERSION"
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: build
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/par-storygen
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          path: dist
-          key: ${{ runner.os }}-3.13-x64-${{ hashFiles('**/pyproject.toml') }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-3.13-x64-${{ hashFiles('**/pyproject.toml') }}-
-            ${{ runner.os }}-3.13-x64-
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Get version
+        run: |
+          version=$(uv run python -c "from storygen import __version__; print(__version__)")
+          echo "VERSION=$version" >> $GITHUB_ENV
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+
+      - name: Discord notification
+        if: success()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        uses: Ilshidur/action-discord@master
+        with:
+          args: 'The project {{ EVENT_PAYLOAD.repository.full_name }} ${{ env.VERSION }} has been published to TestPyPI.'
+        continue-on-error: true
+
+  github-release:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [build, tag]
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Get version
+        run: |
+          version=$(uv run python -c "from storygen import __version__; print(__version__)")
+          echo "VERSION=$version" >> $GITHUB_ENV
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
 
       - name: Sign the dists with Sigstore
         uses: sigstore/gh-action-sigstore-python@v3.0.0
@@ -67,24 +177,18 @@ jobs:
         run: |
           gh release create \
           'release-v${{ env.VERSION }}' \
+          dist/** \
           --repo '${{ github.repository }}' \
           --generate-notes \
           --latest
 
-      - name: Upload artifact signatures to GitHub Release
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          gh release upload \
-          'release-v${{ env.VERSION }}' dist/** \
-          --repo '${{ github.repository }}'
-
       - name: Discord notification
+        if: success()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         uses: Ilshidur/action-discord@master
         with:
-          args: 'A new release ${{ github.ref_name }} has been created for {{ EVENT_PAYLOAD.repository.full_name }}.'
+          args: 'A new release v${{ env.VERSION }} has been created for {{ EVENT_PAYLOAD.repository.full_name }}.'
 
       - name: Cleanup on failure
         if: failure()
@@ -94,21 +198,49 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
-  trigger-publish:
+  publish-pypi:
+    name: Publish to PyPI
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    needs: github-release
-    if: success()
+    timeout-minutes: 20
+    needs: [publish-testpypi, github-release]
+    environment:
+      name: pypi
+      url: https://pypi.org/p/par-storygen
     permissions:
-      actions: write
-      contents: read
+      id-token: write
     steps:
-      - name: Trigger publish workflow
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Get version
         run: |
-          curl -L \
-            -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            https://api.github.com/repos/${{ github.repository }}/actions/workflows/publish.yml/dispatches \
-            -d '{"ref":"${{ github.ref }}"}'
+          version=$(uv run python -c "from storygen import __version__; print(__version__)")
+          echo "VERSION=$version" >> $GITHUB_ENV
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Discord notification
+        if: success()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        uses: Ilshidur/action-discord@master
+        with:
+          args: 'The project {{ EVENT_PAYLOAD.repository.full_name }} ${{ env.VERSION }} has been published to PyPI.'
+        continue-on-error: true
