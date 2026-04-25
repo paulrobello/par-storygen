@@ -22,6 +22,6 @@ def test_cli_help_lists_commands() -> None:
 
 
 def test_cli_run_help_documents_resume() -> None:
-    result = runner.invoke(app, ["run", "--help"])
+    result = runner.invoke(app, ["run", "--help"], color=False)
     assert result.exit_code == 0
     assert "--resume" in result.stdout
