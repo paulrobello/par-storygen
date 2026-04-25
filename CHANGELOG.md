@@ -78,4 +78,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings screen** — persisted in-app configuration for provider defaults, art toggle, streaming, prefetch options, and wizard defaults
 - **Save/resume** — `--resume` flag re-opens the last-played save; full game state persistence
 
-[0.1.0]: https://github.com/paulrobello/storygen/releases/tag/v0.1.0
+[0.1.0]: https://github.com/paulrobello/par-storygen/releases/tag/v0.1.0
