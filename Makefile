@@ -1,4 +1,4 @@
-.PHONY: build setup test lint fmt typecheck checkall Checkall precommit run resume clean
+.PHONY: build setup test lint fmt typecheck checkall Checkall precommit run resume clean package
 
 build:
 	uv sync
@@ -34,3 +34,6 @@ clean:
 
 precommit:
 	uv run pre-commit run --all-files
+
+package:
+	uv build
