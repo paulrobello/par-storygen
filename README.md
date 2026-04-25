@@ -75,42 +75,42 @@ A configurable LLM (via pydantic-ai) drives theme, characters, narration, and ch
 
 **Splash & Main Menu**
 
-![Splash screen](screenshots/sc_splash.png)
-![Main menu](screenshots/sc_main_menu.png)
+![Splash screen](https://raw.githubusercontent.com/paulrobello/par-storygen/main/screenshots/sc_splash.png)
+![Main menu](https://raw.githubusercontent.com/paulrobello/par-storygen/main/screenshots/sc_main_menu.png)
 
 **Settings** — Configure text and image providers, art toggles, streaming, and prefetch options. Preferences persist across sessions.
 
-![Settings screen](screenshots/sc_settings.png)
+![Settings screen](https://raw.githubusercontent.com/paulrobello/par-storygen/main/screenshots/sc_settings.png)
 
 **New Story Wizard** — An 8-step guided setup for theme, tone, narration style, art style, length, reader level, and characters (with library import). See the [full wizard walkthrough](docs/NEW_STORY_WIZARD.md).
 
-![Wizard theme step](screenshots/sc_wizard_1_theme.png)
+![Wizard theme step](https://raw.githubusercontent.com/paulrobello/par-storygen/main/screenshots/sc_wizard_1_theme.png)
 
 **Load Story** — Browse and resume existing saves.
 
-![Load story screen](screenshots/sc_load_story.png)
+![Load story screen](https://raw.githubusercontent.com/paulrobello/par-storygen/main/screenshots/sc_load_story.png)
 
 **Gameplay** — The main play screen shows the scene illustration (half-block inline art) on the left, narrative text in the center, and the character roster on the right. Numbered choices appear at the bottom.
 
-![Story play screen](screenshots/sc_story_panel.png)
-![Beat generation](screenshots/sc_story_generate.png)
+![Story play screen](https://raw.githubusercontent.com/paulrobello/par-storygen/main/screenshots/sc_story_panel.png)
+![Beat generation](https://raw.githubusercontent.com/paulrobello/par-storygen/main/screenshots/sc_story_generate.png)
 
 **Character Portraits** — Press `p` to view full portraits for every character in the current scene. High-res zoom available for ref-aware providers.
 
-![Character roster](screenshots/sc_story_roster.png)
+![Character roster](https://raw.githubusercontent.com/paulrobello/par-storygen/main/screenshots/sc_story_roster.png)
 
 
 **Story Graph** — Press `g` for a full tree view with marker legend, current-node arrow, and unexplored-choice leaves. Press `r` on any node for branch replay.
 
-![Story graph](screenshots/sc_story_graph.png)
+![Story graph](https://raw.githubusercontent.com/paulrobello/par-storygen/main/screenshots/sc_story_graph.png)
 
 **Character Catalog** — A scrollable grid of exported characters from across all your stories. Each card shows the portrait thumbnail, name, and source story. Import any character into a new story (keep as-is or adapt backstory to the new theme).
 
-![Character catalog](screenshots/sc_char_catalog.png)
+![Character catalog](https://raw.githubusercontent.com/paulrobello/par-storygen/main/screenshots/sc_char_catalog.png)
 
 **High-res** versions of images are available
 
-![High-res portrait](screenshots/sc_char_highres.png)
+![High-res portrait](https://raw.githubusercontent.com/paulrobello/par-storygen/main/screenshots/sc_char_highres.png)
 
 ## Prerequisites
 
