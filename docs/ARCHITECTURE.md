@@ -180,7 +180,7 @@ Characters accept an optional `reference_image_path: str | None` (relative to th
 
 `PlayScreen` integrates TTS at two levels:
 
-1. **Auto-read** (`app_state.tts_prefs.auto_read`, togglable in Settings) — after every beat commit, `_maybe_auto_read()` launches `_speak_current_node()` as a named worker. The worker computes a per-node cache path via `paths.tts_audio_path(game_id, node_id)` and passes it to `player.speak()` so subsequent visits to the same node replay from disk with zero API cost.
+1. **Auto-read** (`app_state.tts_prefs.auto_read`, togglable in Settings) — after every beat commit, `_maybe_auto_read()` launches `_speak_current_node()` as a named worker. Audio files are cached per node, provider, and voice in the save's `audio/` directory. The cache file extension follows the active TTS provider's preferred output format, so changing provider or voice generates a separate cache entry instead of replaying stale narration.
 2. **Manual controls** — `t` (pause/resume), `T` (restart), `s` (stop). Action handlers are kept synchronous (pause/resume/stop are fast calls; speak uses `run_worker`) so Textual's message pump never blocks and all key bindings stay responsive during generation.
 
 Settings stores `tts_provider`, `tts_api_key`, `tts_voice`, and `auto_read` via `TTSPrefs` in `app_state`. The `t` binding label toggles between "Pause speech" / "Resume speech" based on `player.state`.

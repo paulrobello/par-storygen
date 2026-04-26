@@ -56,7 +56,7 @@ A configurable LLM (via pydantic-ai) drives theme, characters, narration, and ch
 
 ### Advanced Features
 - **Branch Prefetch**: Background-generates pending choices while you read, for instant picks
-- **Text-to-Speech**: Read narration aloud via OpenAI, ElevenLabs, Deepgram, Gemini, or Kokoro with per-node audio caching
+- **Text-to-Speech**: Read narration aloud via OpenAI, ElevenLabs, Deepgram, Gemini, or Kokoro with provider/voice-aware audio caching
 - **Auto-Play**: Press `a` to auto-advance with random choices, waiting for images and TTS before continuing
 - **Character Library**: Export characters from finished stories and re-import with optional AI-powered backstory adaptation
 - **Character Outfits**: Define multiple looks per character and switch between them mid-story
@@ -375,7 +375,7 @@ par-storygen can read narration aloud using the [par-cli-tts](https://github.com
 | `T` | Restart narration from the beginning |
 | `s` | Stop playback immediately |
 
-Audio files are cached per-node in the save's `audio/` directory — replaying a previously-read beat uses the cached file with no API call.
+Audio files are cached per node, provider, and voice in the save's `audio/` directory. The cache file extension follows the active TTS provider's preferred output format, so changing provider or voice generates a separate cache entry instead of replaying stale narration.
 
 ## Auto-play
 
@@ -429,7 +429,7 @@ As of v0.1.0. See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
 * **Navigation** — Story graph, endings gallery, branch replay
 * **Branch Prefetch** — Background beat generation for instant picks
 * **Reader Levels** — Vocabulary and complexity controls for different age ranges
-* **Text-to-Speech** — Multi-provider narration with per-node audio caching and auto-read
+* **Text-to-Speech** — Multi-provider narration with provider/voice-aware audio caching and auto-read
 * **Auto-Play** — Random-choice auto-advance with image and TTS wait gating
 
 ### Where we're going
