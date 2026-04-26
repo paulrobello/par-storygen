@@ -145,10 +145,10 @@ def test_tts_audio_path_changes_when_provider_changes(
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
 
     first = paths.tts_audio_path("abc", "node-1", provider="openai", voice="nova", ext="mp3")
-    second = paths.tts_audio_path("abc", "node-1", provider="gemini", voice="nova", ext="wav")
+    second = paths.tts_audio_path("abc", "node-1", provider="gemini", voice="nova", ext="mp3")
 
     assert first != second
-    assert second.suffix == ".wav"
+    assert first.suffix == second.suffix == ".mp3"
 
 
 def test_relative_tts_audio_path_matches_absolute_filename() -> None:
