@@ -34,7 +34,13 @@ from storygen.screens.wizard import (
     valid_tone_preset_values,
 )
 from storygen.storage import app_state
-from storygen.storage.app_state import ImageProviderPrefs, ProviderPrefs, coerce_reader_level
+from storygen.storage.app_state import (
+    ImageProviderPrefs,
+    ProviderPrefs,
+    TTSPrefs,
+    coerce_reader_level,
+)
+from storygen.tts.player import TTSPlayer
 
 
 class TextProviderChanged(Message):
@@ -59,6 +65,17 @@ class ImageProviderChanged(Message):
     """
 
     def __init__(self, prefs: ImageProviderPrefs) -> None:
+        super().__init__()
+        self.prefs = prefs
+
+
+class TTSPrefsChanged(Message):
+    """Emitted by SettingsScreen after a successful TTS save.
+
+    StoryGenApp rebuilds the TTS player in response.
+    """
+
+    def __init__(self, prefs: TTSPrefs) -> None:
         super().__init__()
         self.prefs = prefs
 
@@ -126,10 +143,13 @@ class SettingsScreen(Screen[None]):
     # Sentinel Select value meaning "the user typed a custom model in the Input".
     # Stays selected whenever the Input value is not in the provider's curated list.
     _CUSTOM_MODEL: ClassVar[str] = "__custom__"
+    # Sentinel for the voice Select "(none)" entry.
+    _VOICE_NONE: ClassVar[str] = "__voice_none__"
 
-    def __init__(self, config: AppConfig) -> None:
+    def __init__(self, config: AppConfig, tts_player: TTSPlayer | None = None) -> None:
         super().__init__()
         self._config = config
+        self._tts_player = tts_player
         # When True, Select.Changed / Input.Changed handlers are no-ops. Cleared
         # via call_after_refresh so the construction-time Changed messages
         # queued by allow_blank=False Selects drain harmlessly. See the long
@@ -266,6 +286,29 @@ class SettingsScreen(Screen[None]):
         self._prefetch_images_switch = Switch(value=False, id="prefetch-images-switch")
         self._llm_cache_switch = Switch(value=False, id="llm-cache-switch")
 
+        # --- TTS widgets ---
+        self._suppress_tts_handler: bool = False
+        self._tts_provider_select: Select[str] = Select(
+            list(app_state.TTS_PROVIDER_CHOICES),
+            value=app_state.DEFAULT_TTS_PROVIDER,
+            allow_blank=False,
+            id="tts-provider-select",
+        )
+        self._tts_api_key_input = Input(
+            value="",
+            placeholder="Leave blank to use env var",
+            id="tts-api-key",
+            password=True,
+        )
+        self._tts_voice_select: Select[str] = Select(
+            [],
+            prompt="Select a voice",
+            allow_blank=True,
+            id="tts-voice-select",
+        )
+        self._tts_api_key_status = Static("", id="tts-api-key-status")
+        self._tts_auto_read_switch = Switch(value=False, id="tts-auto-read-switch")
+
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
         with VerticalScroll(id="settings-body"):
@@ -349,6 +392,23 @@ class SettingsScreen(Screen[None]):
                     classes="switch-label",
                 )
 
+            yield Static("Text-to-speech", classes="section")
+            yield Label("Provider")
+            yield self._tts_provider_select
+            yield Label("API key (blank = use provider env var)")
+            yield self._tts_api_key_input
+            yield self._tts_api_key_status
+            yield Label("Voice")
+            with Horizontal(classes="switch-row"):
+                yield self._tts_voice_select
+                yield Button("Refresh", id="btn-refresh-tts-voices", variant="default")
+            with Horizontal(classes="switch-row"):
+                yield self._tts_auto_read_switch
+                yield Static(
+                    "Auto-read story beats aloud when generated",
+                    classes="switch-label",
+                )
+
             with Horizontal(id="settings-buttons"):
                 yield Button("Save", id="btn-save", variant="primary")
                 yield Button("Reset to defaults", id="btn-reset")
@@ -357,12 +417,16 @@ class SettingsScreen(Screen[None]):
     def on_mount(self) -> None:
         self._suppress_provider_handler = True
         self._suppress_image_provider_handler = True
+        self._suppress_tts_handler = True
         self._populate_from_state()
         self.call_after_refresh(self._clear_suppress_flag)
+        # Auto-fetch TTS voices in the background so the saved voice is pre-selected.
+        self.run_worker(self._auto_fetch_tts_voices(), exclusive=False, name="tts-voice-prefetch")
 
     def _clear_suppress_flag(self) -> None:
         self._suppress_provider_handler = False
         self._suppress_image_provider_handler = False
+        self._suppress_tts_handler = False
 
     # ------------------------------------------------------------------
     # Populate / refresh helpers
@@ -540,6 +604,19 @@ class SettingsScreen(Screen[None]):
             self._llm_cache_switch.value = app_state.llm_cache_enabled()
             self._refresh_image_gating()
 
+        # TTS
+        tts_prefs = app_state.read_tts_prefs()
+        with (
+            self._tts_provider_select.prevent(Select.Changed),
+            self._tts_api_key_input.prevent(Input.Changed),
+            self._tts_auto_read_switch.prevent(Switch.Changed),
+        ):
+            self._tts_provider_select.value = tts_prefs.provider
+            self._tts_api_key_input.value = tts_prefs.api_key
+            self._tts_auto_read_switch.value = tts_prefs.auto_read
+        self._refresh_tts_api_key_status(tts_prefs.provider)
+        self._populate_tts_voices(tts_prefs.voice)
+
     # ------------------------------------------------------------------
     # Event handlers
     # ------------------------------------------------------------------
@@ -659,6 +736,84 @@ class SettingsScreen(Screen[None]):
         del event
         self._refresh_image_gating()
 
+    # ------------------------------------------------------------------
+    # TTS helpers and handlers
+    # ------------------------------------------------------------------
+
+    def _refresh_tts_api_key_status(self, provider: str) -> None:
+        env_name = app_state.TTS_API_KEY_ENV.get(provider)
+        if env_name is None:
+            self._tts_api_key_status.update("API key: not required (local)")
+            return
+        present = bool(os.environ.get(env_name))
+        mark = "present" if present else "missing"
+        self._tts_api_key_status.update(f"API key ({env_name}): {mark}")
+
+    def _populate_tts_voices(self, current_voice: str = "") -> None:
+        """Populate the voice Select from the TTSPlayer's cached voices."""
+        if self._tts_player is None:
+            return
+        voices = self._tts_player.voices
+        if not voices:
+            return
+        options = [(v.name, v.id) for v in voices]
+        with self._tts_voice_select.prevent(Select.Changed):
+            self._tts_voice_select.set_options(options)
+            # Select current voice if it's in the list, otherwise leave blank.
+            if current_voice:
+                voice_ids = {v.id for v in voices}
+                if current_voice in voice_ids:
+                    self._tts_voice_select.value = current_voice  # type: ignore[assignment]
+
+    @on(Select.Changed, "#tts-provider-select")
+    def _on_tts_provider_changed(self, event: Select.Changed) -> None:
+        if self._suppress_tts_handler:
+            return
+        value_obj = event.value
+        if not isinstance(value_obj, str):
+            return
+        provider = value_obj
+        self._refresh_tts_api_key_status(provider)
+        # Clear voices — user must refresh for new provider.
+        with self._tts_api_key_input.prevent(Input.Changed):
+            self._tts_api_key_input.value = ""
+        self._populate_tts_voices("")
+
+    async def _auto_fetch_tts_voices(self) -> None:
+        """Fetch voices on mount so the saved voice can be pre-selected."""
+        if self._tts_player is None:
+            return
+        tts_prefs = app_state.read_tts_prefs()
+        if not tts_prefs.voice and not self._tts_player.voices:
+            return
+        # Configure the player with current settings so it can fetch voices.
+        self._tts_player.configure(
+            tts_prefs.provider,
+            api_key=tts_prefs.api_key,
+            voice=tts_prefs.voice,
+        )
+        if not self._tts_player.voices:
+            await self._tts_player.refresh_voices()
+        if self._tts_player.voices:
+            self._populate_tts_voices(tts_prefs.voice)
+
+    @on(Button.Pressed, "#btn-refresh-tts-voices")
+    async def _on_refresh_tts_voices(self, event: Button.Pressed) -> None:
+        del event
+        if self._tts_player is None:
+            self.notify("TTS player not available.", severity="warning", timeout=3)
+            return
+        provider = cast(str, self._tts_provider_select.value)
+        api_key = self._tts_api_key_input.value.strip()
+        self._tts_player.configure(provider, api_key=api_key)
+        voices = await self._tts_player.refresh_voices()
+        if voices:
+            self._populate_tts_voices()
+            self.notify(f"Loaded {len(voices)} voices.", timeout=3)
+        else:
+            self._populate_tts_voices()
+            self.notify("No voices found.", severity="warning", timeout=3)
+
     @on(Switch.Changed, "#prefetch-enabled-switch")
     def _on_prefetch_switch_changed(self, event: Switch.Changed) -> None:
         """Re-evaluate prefetch-images gating when prefetch is toggled."""
@@ -771,6 +926,19 @@ class SettingsScreen(Screen[None]):
             characters=self._char_area.text,
         )
 
+        # --- TTS prefs ---
+        tts_provider = cast(str, self._tts_provider_select.value)
+        tts_api_key = self._tts_api_key_input.value.strip()
+        tts_voice_raw = self._tts_voice_select.value
+        tts_voice = tts_voice_raw if isinstance(tts_voice_raw, str) else ""
+        tts_auto_read = self._tts_auto_read_switch.value
+        tts_prefs = TTSPrefs(
+            provider=tts_provider,
+            api_key=tts_api_key,
+            voice=tts_voice,
+            auto_read=tts_auto_read,
+        )
+
         # Single atomic write so a crash mid-save can't leave partial persistence.
         # Both provider Changed messages fire afterwards; each app-level handler
         # rebuilds only its own provider so the double-fire is harmless.
@@ -778,6 +946,7 @@ class SettingsScreen(Screen[None]):
             image_prefs=image_prefs,
             text_prefs=prefs,
             wizard_defaults=defaults,
+            tts_prefs=tts_prefs,
             art_enabled_value=self._art_switch.value,
             prefetch_enabled_value=self._prefetch_switch.value,
             prefetch_images_enabled_value=self._prefetch_images_switch.value,
@@ -786,12 +955,14 @@ class SettingsScreen(Screen[None]):
         )
         self.post_message(ImageProviderChanged(image_prefs))
         self.post_message(TextProviderChanged(prefs))
+        self.post_message(TTSPrefsChanged(tts_prefs))
         self.notify("Settings saved.", timeout=3)
 
     def _reset_widgets(self) -> None:
         """Reset widgets to constants without persisting (user must press Save)."""
         self._suppress_provider_handler = True
         self._suppress_image_provider_handler = True
+        self._suppress_tts_handler = True
         with (
             self._provider_select.prevent(Select.Changed),
             self._tone_select.prevent(Select.Changed),
@@ -799,6 +970,8 @@ class SettingsScreen(Screen[None]):
             self._reader_level_select.prevent(Select.Changed),
             self._image_provider_select.prevent(Select.Changed),
             self._fallback_select.prevent(Select.Changed),
+            self._tts_provider_select.prevent(Select.Changed),
+            self._tts_auto_read_switch.prevent(Switch.Changed),
         ):
             # Text-provider section.
             self._provider_select.value = app_state.DEFAULT_TEXT_PROVIDER
@@ -832,6 +1005,10 @@ class SettingsScreen(Screen[None]):
             self._prefetch_images_switch.value = False
             self._llm_cache_switch.value = False
             self._refresh_image_gating()
+            # TTS section.
+            self._tts_provider_select.value = app_state.DEFAULT_TTS_PROVIDER
+            self._tts_api_key_input.value = ""
+            self._tts_auto_read_switch.value = False
         self._refresh_api_key_status(app_state.DEFAULT_TEXT_PROVIDER)
         self._refresh_suggested(app_state.DEFAULT_TEXT_PROVIDER)
         self._refresh_image_api_key_status(app_state.DEFAULT_IMAGE_PROVIDER)
@@ -841,5 +1018,7 @@ class SettingsScreen(Screen[None]):
         )
         self._ref_warning.display = False
         self._ollama_warning.display = False
+        self._refresh_tts_api_key_status(app_state.DEFAULT_TTS_PROVIDER)
+        self._populate_tts_voices("")
         self.call_after_refresh(self._clear_suppress_flag)
         self.notify("Reset to defaults — press Save to persist.", timeout=3)

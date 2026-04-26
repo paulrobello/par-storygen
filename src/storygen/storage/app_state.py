@@ -107,6 +107,30 @@ IMAGE_API_KEY_ENV: MappingProxyType[str, str | None] = MappingProxyType(
 
 _ALLOWED_IMAGE_PROVIDERS: frozenset[str] = frozenset(pid for _, pid in IMAGE_PROVIDER_CHOICES)
 
+DEFAULT_TTS_PROVIDER: str = "openai"
+DEFAULT_TTS_VOICE: str = ""
+DEFAULT_TTS_AUTO_READ: bool = False
+
+TTS_PROVIDER_CHOICES: tuple[tuple[str, str], ...] = (
+    ("OpenAI", "openai"),
+    ("ElevenLabs", "elevenlabs"),
+    ("Deepgram", "deepgram"),
+    ("Google Gemini", "gemini"),
+    ("Kokoro (local)", "kokoro-onnx"),
+)
+
+TTS_API_KEY_ENV: MappingProxyType[str, str | None] = MappingProxyType(
+    {
+        "openai": "OPENAI_API_KEY",
+        "elevenlabs": "ELEVENLABS_API_KEY",
+        "deepgram": "DEEPGRAM_API_KEY",
+        "gemini": "GEMINI_API_KEY",
+        "kokoro-onnx": None,
+    }
+)
+
+_ALLOWED_TTS_PROVIDERS: frozenset[str] = frozenset(pid for _, pid in TTS_PROVIDER_CHOICES)
+
 
 def _clamp_target_beats(value: object) -> int:
     """Coerce ``value`` to an int and clamp into [MIN, MAX].
@@ -158,6 +182,16 @@ class WizardDefaults:
     reader_level: ReaderLevel = DEFAULT_READER_LEVEL
     characters: str = ""
     save_to_catalog: bool = True
+
+
+@dataclass(frozen=True)
+class TTSPrefs:
+    """Persisted TTS preferences (Settings screen → state.json)."""
+
+    provider: str = DEFAULT_TTS_PROVIDER  # one of TTS_PROVIDER_CHOICES ids
+    api_key: str = ""  # blank → fall back to provider env var
+    voice: str = ""  # blank → use provider default
+    auto_read: bool = DEFAULT_TTS_AUTO_READ
 
 
 def _state_file() -> Path:
@@ -448,6 +482,33 @@ def _serialize_text_prefs(prefs: ProviderPrefs) -> dict[str, Any]:
     }
 
 
+def read_tts_prefs() -> TTSPrefs:
+    """Load persisted TTS prefs; fall back to defaults on any problem."""
+    raw_obj: object = read_app_state().get("tts_prefs")
+    if not isinstance(raw_obj, dict):
+        return TTSPrefs()
+    raw: dict[str, Any] = {str(k): v for k, v in raw_obj.items()}  # type: ignore[redundant-cast]
+    provider = str(raw.get("provider", DEFAULT_TTS_PROVIDER))
+    if provider not in _ALLOWED_TTS_PROVIDERS:
+        return TTSPrefs()
+    return TTSPrefs(
+        provider=provider,
+        api_key=str(raw.get("api_key", "")),
+        voice=str(raw.get("voice", "")),
+        auto_read=bool(raw.get("auto_read", DEFAULT_TTS_AUTO_READ)),
+    )
+
+
+def _serialize_tts_prefs(prefs: TTSPrefs) -> dict[str, Any]:
+    """Serialization shape for TTSPrefs."""
+    return {
+        "provider": prefs.provider,
+        "api_key": prefs.api_key,
+        "voice": prefs.voice,
+        "auto_read": prefs.auto_read,
+    }
+
+
 def _serialize_wizard_defaults(defaults: WizardDefaults) -> dict[str, Any]:
     """Serialization shape used by both ``write_wizard_defaults`` and
     ``write_all_settings`` — must stay byte-identical between them."""
@@ -469,6 +530,7 @@ def write_all_settings(
     image_prefs: ImageProviderPrefs,
     text_prefs: ProviderPrefs,
     wizard_defaults: WizardDefaults,
+    tts_prefs: TTSPrefs | None = None,
     art_enabled_value: bool,
     prefetch_enabled_value: bool,
     prefetch_images_enabled_value: bool,
@@ -488,6 +550,8 @@ def write_all_settings(
     state["image_provider_prefs"] = _serialize_image_prefs(image_prefs)
     state["provider_prefs"] = _serialize_text_prefs(text_prefs)
     state["wizard_defaults"] = _serialize_wizard_defaults(wizard_defaults)
+    if tts_prefs is not None:
+        state["tts_prefs"] = _serialize_tts_prefs(tts_prefs)
     state["art_enabled"] = bool(art_enabled_value)
     state["prefetch_enabled"] = bool(prefetch_enabled_value)
     state["prefetch_images"] = bool(prefetch_images_enabled_value)

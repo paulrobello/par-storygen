@@ -171,6 +171,16 @@ def node_image_path(game_id: str, node_id: str) -> Path:
     return game_dir(game_id) / "images" / "nodes" / f"{node_id}.png"
 
 
+def tts_audio_path(game_id: str, node_id: str) -> Path:
+    """Absolute path to a story node TTS audio file."""
+    return game_dir(game_id) / "audio" / f"{node_id}.mp3"
+
+
+def relative_tts_audio_path(node_id: str) -> str:
+    """Relative TTS audio path as stored on StoryNode.tts_audio_path."""
+    return f"audio/{node_id}.mp3"
+
+
 def ensure_game_dirs(game_id: str) -> None:
     """Create every subdirectory a game save needs, idempotent.
 
@@ -184,4 +194,5 @@ def ensure_game_dirs(game_id: str) -> None:
     gd = game_dir(game_id)
     (gd / "images" / "characters").mkdir(parents=True, exist_ok=True)
     (gd / "images" / "nodes").mkdir(parents=True, exist_ok=True)
+    (gd / "audio").mkdir(parents=True, exist_ok=True)
     os.chmod(gd, 0o700)

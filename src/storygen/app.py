@@ -33,11 +33,17 @@ from storygen.screens.library_browser import CharacterCatalogScreen
 from storygen.screens.load import LoadGameScreen
 from storygen.screens.menu import MenuScreen
 from storygen.screens.play import PlayScreen
-from storygen.screens.settings import ImageProviderChanged, SettingsScreen, TextProviderChanged
+from storygen.screens.settings import (
+    ImageProviderChanged,
+    SettingsScreen,
+    TextProviderChanged,
+    TTSPrefsChanged,
+)
 from storygen.screens.wizard import WizardFlow, WizardScreen
 from storygen.storage import app_state, paths
 from storygen.storage.llm_cache import dump_llm_exchange
 from storygen.storage.save import GameSave, load_game, save_game
+from storygen.tts.player import TTSPlayer
 
 
 @runtime_checkable
@@ -160,12 +166,19 @@ class StoryGenApp(App[None]):
         self._ref_loss_warned: set[str] = set()
         self._image_provider: RoutedImageProvider = self._build_app_image_provider()
         self._resume_last = resume_last
+        self._tts_player = TTSPlayer()
+        tts_prefs = app_state.read_tts_prefs()
+        self._tts_player.configure(
+            tts_prefs.provider,
+            api_key=tts_prefs.api_key,
+            voice=tts_prefs.voice,
+        )
 
     def on_mount(self) -> None:
         self.install_screen(MenuScreen(), name="menu")  # pyright: ignore[reportUnknownMemberType]
         self.install_screen(self._make_wizard, name="wizard")  # pyright: ignore[reportUnknownMemberType,reportArgumentType]
         self.install_screen(self._make_load, name="load")  # pyright: ignore[reportUnknownMemberType,reportArgumentType]
-        self.install_screen(lambda: SettingsScreen(self._config), name="settings")  # pyright: ignore[reportUnknownMemberType,reportArgumentType]
+        self.install_screen(lambda: SettingsScreen(self._config, self._tts_player), name="settings")  # pyright: ignore[reportUnknownMemberType,reportArgumentType]
         self.install_screen(self._make_catalog, name="catalog")  # pyright: ignore[reportUnknownMemberType,reportArgumentType]
         self.push_screen("menu")  # pyright: ignore[reportUnknownMemberType]
         if self._resume_last:
@@ -205,6 +218,19 @@ class StoryGenApp(App[None]):
         prefs = event.prefs
         self.notify(
             f"Image provider saved — new stories will use {prefs.provider}/{prefs.model}.",
+            timeout=5,
+        )
+
+    def on_tts_prefs_changed(self, event: TTSPrefsChanged) -> None:
+        """Reconfigure the TTS player on Settings save."""
+        prefs = event.prefs
+        self._tts_player.configure(
+            prefs.provider,
+            api_key=prefs.api_key,
+            voice=prefs.voice,
+        )
+        self.notify(
+            f"TTS saved — {prefs.provider}/{prefs.voice or 'default voice'}.",
             timeout=5,
         )
 
@@ -537,5 +563,10 @@ class StoryGenApp(App[None]):
         # switch_screen replaces the caller (wizard or load) with the play screen,
         # so ESC from play returns to the menu rather than back to the source screen.
         self.switch_screen(  # pyright: ignore[reportUnknownMemberType]
-            PlayScreen(save, pipeline=pipeline, image_provider=save_image_provider)
+            PlayScreen(
+                save,
+                pipeline=pipeline,
+                image_provider=save_image_provider,
+                tts_player=self._tts_player,
+            )
         )

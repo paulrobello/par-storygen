@@ -256,6 +256,7 @@ class BeatPipeline:
                 save.updated_at = datetime.now(UTC)
                 save_game(save)
                 await cb.on_beat_committed(prefetched)
+                await self._maybe_deferred_illustration(save, prefetched, callbacks=cb)
                 return prefetched
 
         parent = save.nodes[from_node_id]
@@ -275,6 +276,7 @@ class BeatPipeline:
                     save.updated_at = datetime.now(UTC)
                     save_game(save)
                     await cb.on_beat_committed(existing)
+                    await self._maybe_deferred_illustration(save, existing, callbacks=cb)
                 return existing
             # Bogus link — clear it so we don't repeatedly hit the same miss
             # and persist the cleanup once we re-write the parent below.
@@ -617,6 +619,40 @@ class BeatPipeline:
         save.nodes[node.id] = updated
         save_game(save)
 
+        task: asyncio.Task[None] = asyncio.create_task(
+            self._stage_3_scene(save, node.id, plan, callbacks=cb)
+        )
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
+
+    async def _maybe_deferred_illustration(
+        self,
+        save: GameSave,
+        node: StoryNode,
+        *,
+        callbacks: PipelineCallbacks | None = None,
+    ) -> None:
+        """If *node* has an illustration plan but no image, generate it now.
+
+        Handles the case where a node was prefetched with ``skip_image=True``
+        (so the illustration agent ran and saved a prompt, but image generation
+        was deferred).  When the player later picks that cached choice, this
+        method kicks off the scene render so the node gets its image.
+        """
+        if not app_state.art_enabled():
+            return
+        if node.image_status != "not_planned" or not node.image_prompt:
+            return
+        plan = IllustrationPlan(
+            should_illustrate=True,
+            image_prompt=node.image_prompt,
+            featured_character_ids=node.featured_character_ids,
+            reasoning=node.illustration_reasoning or "",
+        )
+        updated = node.model_copy(update={"image_status": "generating"})
+        save.nodes[node.id] = updated
+        save_game(save)
+        cb = callbacks if callbacks is not None else self._callbacks
         task: asyncio.Task[None] = asyncio.create_task(
             self._stage_3_scene(save, node.id, plan, callbacks=cb)
         )

@@ -210,6 +210,7 @@ class StoryNode(BaseModel):
     illustration_reasoning: str | None
     featured_character_ids: list[CharacterId]
     summary_to_here: str | None
+    tts_audio_path: str | None = None
     created_at: datetime
 
 

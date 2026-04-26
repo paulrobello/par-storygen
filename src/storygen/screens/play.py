@@ -18,6 +18,7 @@ from storygen.screens.graph import GraphScreen
 from storygen.screens.portraits import PortraitsScreen
 from storygen.storage import app_state, paths
 from storygen.storage.save import GameSave, save_game
+from storygen.tts.player import TTSPlayer, TTSState
 from storygen.widgets._header_util import format_cost_subtitle
 from storygen.widgets.choice_list import ChoiceList
 from storygen.widgets.image_panel import ImagePanel
@@ -97,6 +98,9 @@ class PlayScreen(Screen[None]):
         ("p", "portraits", "Portraits"),
         ("g", "graph", "Graph"),
         ("e", "endings", "Endings"),
+        ("t", "tts_toggle", "Read aloud"),
+        ("T", "tts_restart", "Restart TTS"),
+        ("s", "tts_stop", "Stop TTS"),
         ("m", "menu", "Main menu"),
         ("escape", "menu", "Main menu"),
         ("1", "pick(1)", "Pick 1"),
@@ -116,11 +120,13 @@ class PlayScreen(Screen[None]):
         *,
         pipeline: BeatPipeline | None,
         image_provider: object | None = None,
+        tts_player: TTSPlayer | None = None,
     ) -> None:
         super().__init__()
         self._save = save
         self._pipeline = pipeline
         self._image_provider = image_provider
+        self._tts_player = tts_player
         self._image = ImagePanel()
         self._story = StoryPanel()
         self._choices = ChoiceList()
@@ -152,7 +158,7 @@ class PlayScreen(Screen[None]):
         self._apply_header()
 
     async def on_unmount(self) -> None:
-        """Cancel any in-flight prefetch tasks before the screen tears down.
+        """Cancel any in-flight prefetch tasks and TTS before the screen tears down.
 
         Avoids asyncio cancelling a prefetch mid-``save_game`` (or mid-portrait
         write) at app shutdown. ``cancel_all_prefetches`` is a no-op when
@@ -160,6 +166,8 @@ class PlayScreen(Screen[None]):
         """
         if self._pipeline is not None:
             await self._pipeline.cancel_all_prefetches()
+        if self._tts_player is not None:
+            await self._tts_player.stop()
 
     def _apply_header(self) -> None:
         """Set the screen title to the story theme + cumulative image cost + tokens."""
@@ -249,6 +257,7 @@ class PlayScreen(Screen[None]):
             return node.image_prompt is not None and node.image_status in (
                 "failed",
                 "done",
+                "not_planned",
             )
         if action == "portraits":
             return bool(self._save.characters)
@@ -268,6 +277,20 @@ class PlayScreen(Screen[None]):
             if node.parent_id is None:
                 return False
             return not any(c.child_node_id for c in node.choices)
+        if action == "tts_toggle":
+            return self._tts_player is not None and self._tts_player.is_configured
+        if action == "tts_restart":
+            if self._tts_player is None:
+                return False
+            return self._tts_player.state in (TTSState.PLAYING, TTSState.PAUSED)
+        if action == "tts_stop":
+            if self._tts_player is None:
+                return False
+            return self._tts_player.state in (
+                TTSState.PLAYING,
+                TTSState.PAUSED,
+                TTSState.GENERATING,
+            )
         if action == "menu":
             return True
         return None
@@ -334,6 +357,14 @@ class PlayScreen(Screen[None]):
             self._loading = False
             self._throbber.stop()
             self._render_current()
+            # Auto-read the newly generated narration if TTS is configured.
+            current_node = self._save.nodes.get(self._save.current_node_id)
+            if current_node and current_node.narration:
+                self.run_worker(
+                    self._maybe_auto_read(current_node.narration),
+                    exclusive=False,
+                    name="auto-read",
+                )
 
     async def _on_narration_delta(self, delta: str) -> None:
         if getattr(self, "_awaiting_first_delta", False):
@@ -500,3 +531,77 @@ class PlayScreen(Screen[None]):
     async def action_pick(self, n: int) -> None:
         """Pick choice number n (1-indexed). Bound to number keys 1-9."""
         await self._pick(n)
+
+    def action_tts_toggle(self) -> None:
+        """Read aloud / pause / resume based on current TTS state."""
+        if self._tts_player is None:
+            return
+        if self._tts_player.state == TTSState.GENERATING:
+            self.notify("TTS is generating, please wait…", severity="warning", timeout=5)
+            return
+        if self._tts_player.state == TTSState.PLAYING:
+            self.run_worker(self._tts_player.pause(), name="tts-pause")
+        elif self._tts_player.state == TTSState.PAUSED:
+            self.run_worker(self._tts_player.resume(), name="tts-resume")
+        else:
+            node = self._save.nodes.get(self._save.current_node_id)
+            if node and node.narration:
+                cache = paths.tts_audio_path(str(self._save.id), node.id)
+                if not cache.exists():
+                    self.notify("Generating speech…", timeout=15)
+            self.run_worker(self._speak_current_node(), exclusive=True, name="tts-speak")
+        self.refresh_bindings()
+
+    async def action_tts_restart(self) -> None:
+        """Restart TTS playback from the beginning."""
+        if self._tts_player is None:
+            return
+        await self._tts_player.stop()
+        node = self._save.nodes.get(self._save.current_node_id)
+        if node and node.narration:
+            cache = paths.tts_audio_path(str(self._save.id), node.id)
+            if not cache.exists():
+                self.notify("Generating speech…", timeout=15)
+        self.run_worker(self._speak_current_node(), exclusive=True, name="tts-speak")
+        self.refresh_bindings()
+
+    async def action_tts_stop(self) -> None:
+        """Stop TTS playback."""
+        if self._tts_player is not None:
+            await self._tts_player.stop()
+            self.refresh_bindings()
+
+    async def _speak_current_node(self) -> None:
+        """Generate/play TTS for the current node, with caching."""
+        if self._tts_player is None:
+            return
+        tts_prefs = app_state.read_tts_prefs()
+        node = self._save.nodes.get(self._save.current_node_id)
+        if not node or not node.narration:
+            return
+        self._tts_player.configure(
+            tts_prefs.provider,
+            api_key=tts_prefs.api_key,
+            voice=tts_prefs.voice,
+        )
+        cache = paths.tts_audio_path(str(self._save.id), node.id)
+        already_cached = cache.exists()
+        ok = await self._tts_player.speak(node.narration, cache_path=cache)
+        if ok and not already_cached and not node.tts_audio_path:
+            node.tts_audio_path = paths.relative_tts_audio_path(node.id)
+            save_game(self._save)
+        self.refresh_bindings()
+
+    async def _maybe_auto_read(self, text: str) -> None:
+        """If auto-read is enabled, speak the narration text."""
+        if self._tts_player is None:
+            return
+        tts_prefs = app_state.read_tts_prefs()
+        if not tts_prefs.auto_read:
+            return
+        node = self._save.nodes.get(self._save.current_node_id)
+        if node and node.narration:
+            cache = paths.tts_audio_path(str(self._save.id), node.id)
+            if not cache.exists():
+                self.notify("Generating speech…", timeout=15)
+        await self._speak_current_node()
