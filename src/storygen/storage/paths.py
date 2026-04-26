@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from pathlib import Path
 
@@ -171,14 +172,53 @@ def node_image_path(game_id: str, node_id: str) -> Path:
     return game_dir(game_id) / "images" / "nodes" / f"{node_id}.png"
 
 
-def tts_audio_path(game_id: str, node_id: str) -> Path:
-    """Absolute path to a story node TTS audio file."""
-    return game_dir(game_id) / "audio" / f"{node_id}.mp3"
+def _safe_tts_component(value: str) -> str:
+    """Return a filesystem-safe TTS cache filename component."""
+    cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "-", value.strip())
+    return cleaned.strip(".-") or "default"
 
 
-def relative_tts_audio_path(node_id: str) -> str:
+def _voice_cache_hash(voice: str) -> str:
+    """Return a short stable cache hash for a configured TTS voice."""
+    key = voice or "__default__"
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()[:8]
+
+
+def _normalize_audio_ext(ext: str) -> str:
+    """Return a safe extension without a leading dot."""
+    cleaned = _safe_tts_component(ext.lstrip("."))
+    return cleaned or "mp3"
+
+
+def relative_tts_audio_path(
+    node_id: str,
+    *,
+    provider: str = "legacy",
+    voice: str = "",
+    ext: str = "mp3",
+) -> str:
     """Relative TTS audio path as stored on StoryNode.tts_audio_path."""
-    return f"audio/{node_id}.mp3"
+    safe_provider = _safe_tts_component(provider)
+    voice_hash = _voice_cache_hash(voice)
+    safe_ext = _normalize_audio_ext(ext)
+    return f"audio/{node_id}-{safe_provider}-{voice_hash}.{safe_ext}"
+
+
+def tts_audio_path(
+    game_id: str,
+    node_id: str,
+    *,
+    provider: str = "legacy",
+    voice: str = "",
+    ext: str = "mp3",
+) -> Path:
+    """Absolute path to a story node TTS audio file."""
+    return game_dir(game_id) / relative_tts_audio_path(
+        node_id,
+        provider=provider,
+        voice=voice,
+        ext=ext,
+    )
 
 
 def ensure_game_dirs(game_id: str) -> None:

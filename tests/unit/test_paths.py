@@ -114,3 +114,56 @@ def test_ensure_game_dirs_creates_subdirs(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert (tmp_path / "storygen" / "games" / "abc").is_dir()
     assert (tmp_path / "storygen" / "games" / "abc" / "images" / "characters").is_dir()
     assert (tmp_path / "storygen" / "games" / "abc" / "images" / "nodes").is_dir()
+
+
+def test_tts_audio_path_includes_provider_voice_and_format(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+
+    p = paths.tts_audio_path("abc", "node-1", provider="openai", voice="nova", ext="mp3")
+
+    assert p.parent == tmp_path / "storygen" / "games" / "abc" / "audio"
+    assert p.name.startswith("node-1-openai-")
+    assert p.suffix == ".mp3"
+
+
+def test_tts_audio_path_changes_when_voice_changes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+
+    first = paths.tts_audio_path("abc", "node-1", provider="openai", voice="nova", ext="mp3")
+    second = paths.tts_audio_path("abc", "node-1", provider="openai", voice="alloy", ext="mp3")
+
+    assert first != second
+
+
+def test_tts_audio_path_changes_when_provider_changes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+
+    first = paths.tts_audio_path("abc", "node-1", provider="openai", voice="nova", ext="mp3")
+    second = paths.tts_audio_path("abc", "node-1", provider="gemini", voice="nova", ext="wav")
+
+    assert first != second
+    assert second.suffix == ".wav"
+
+
+def test_relative_tts_audio_path_matches_absolute_filename() -> None:
+    rel = paths.relative_tts_audio_path("node-1", provider="openai", voice="nova", ext="mp3")
+
+    assert rel.startswith("audio/node-1-openai-")
+    assert rel.endswith(".mp3")
+
+
+def test_tts_audio_path_sanitizes_provider_and_extension(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+
+    p = paths.tts_audio_path("abc", "node-1", provider="custom/provider", voice="", ext=".wav")
+
+    assert p.name.startswith("node-1-custom-provider-")
+    assert p.suffix == ".wav"
