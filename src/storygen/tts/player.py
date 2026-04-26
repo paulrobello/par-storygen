@@ -12,13 +12,17 @@ import contextlib
 import logging
 import signal
 import tempfile
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from enum import Enum
 from pathlib import Path
+from typing import cast
 
 from par_tts import Voice, get_provider
 from par_tts.providers.base import TTSProvider
 
 _logger = logging.getLogger(__name__)
+
+AudioResult = bytes | Iterator[bytes] | AsyncIterator[bytes]
 
 
 class TTSState(Enum):
@@ -80,6 +84,13 @@ class TTSPlayer:
     def is_configured(self) -> bool:
         return self._provider is not None
 
+    @property
+    def preferred_extension(self) -> str:
+        """Preferred audio file extension for the configured provider."""
+        if self._provider is None or not self._provider.supported_formats:
+            return "mp3"
+        return self._provider.supported_formats[0].lstrip(".") or "mp3"
+
     # ------------------------------------------------------------------
     # Configuration
     # ------------------------------------------------------------------
@@ -114,14 +125,18 @@ class TTSPlayer:
     # ------------------------------------------------------------------
 
     async def refresh_voices(self) -> list[Voice]:
-        """Fetch voices from the current provider (runs in a thread).
+        """Fetch voices from the current provider.
 
         Returns the fetched list and caches it on this instance.
         """
         if self._provider is None:
             return []
         try:
-            voices = await asyncio.to_thread(self._provider.list_voices)
+            list_async = getattr(self._provider, "list_voices_async", None)
+            if callable(list_async):
+                voices = await cast(Callable[[], Awaitable[list[Voice]]], list_async)()
+            else:
+                voices = await asyncio.to_thread(self._provider.list_voices)
             self._voices = voices
             return list(voices)
         except Exception as exc:
@@ -171,7 +186,7 @@ class TTSPlayer:
         self._state = TTSState.GENERATING
 
         try:
-            audio_data = await asyncio.to_thread(self._provider.generate_speech, text, self._voice)
+            audio_data = await self._generate_speech(text)
         except Exception as exc:
             _logger.warning("TTS generation failed: %s", exc)
             self._state = TTSState.IDLE
@@ -186,24 +201,14 @@ class TTSPlayer:
         if save_path:
             save_path.parent.mkdir(parents=True, exist_ok=True)
         else:
-            suffix = (
-                f".{self._provider.supported_formats[0]}"
-                if self._provider.supported_formats
-                else ".mp3"
-            )
+            suffix = f".{self.preferred_extension}"
             with tempfile.NamedTemporaryFile(
                 suffix=suffix, delete=False, prefix="storygen_tts_"
             ) as tmp:
                 save_path = Path(tmp.name)
 
         try:
-            if isinstance(audio_data, bytes):
-                save_path.write_bytes(audio_data)
-            else:
-                # Iterator[bytes] — drain into the file.
-                with open(save_path, "wb") as f:
-                    for chunk in audio_data:
-                        f.write(chunk)
+            await self._write_audio_data(audio_data, save_path)
         except Exception:
             self._state = TTSState.IDLE
             save_path.unlink(missing_ok=True)
@@ -292,6 +297,30 @@ class TTSPlayer:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    async def _generate_speech(self, text: str) -> AudioResult | None:
+        """Generate speech using the provider's async API when available."""
+        if self._provider is None:
+            return None
+        generate_async = getattr(self._provider, "generate_speech_async", None)
+        if callable(generate_async):
+            generate = cast(Callable[[str, str], Awaitable[AudioResult]], generate_async)
+            return await generate(text, self._voice)
+        return await asyncio.to_thread(self._provider.generate_speech, text, self._voice)
+
+    async def _write_audio_data(self, audio_data: AudioResult, save_path: Path) -> None:
+        """Write bytes, sync byte iterators, or async byte iterators to disk."""
+        if isinstance(audio_data, bytes):
+            save_path.write_bytes(audio_data)
+            return
+        if isinstance(audio_data, AsyncIterator):
+            with save_path.open("wb") as f:
+                async for chunk in audio_data:
+                    f.write(chunk)
+            return
+        with save_path.open("wb") as f:
+            for chunk in audio_data:
+                f.write(chunk)
 
     async def _play_file(self, path: Path) -> None:
         """Start ``afplay`` as an async subprocess and await completion."""
