@@ -628,10 +628,10 @@ class PlayScreen(Screen[None]):
             voice=tts_prefs.voice,
         )
         cache = self._tts_cache_path(node.id, tts_prefs)
-        already_cached = cache.exists()
+        relative_cache = self._relative_tts_cache_path(node.id, tts_prefs)
         ok = await self._tts_player.speak(node.narration, cache_path=cache)
-        if ok and not already_cached and not node.tts_audio_path:
-            node.tts_audio_path = self._relative_tts_cache_path(node.id, tts_prefs)
+        if ok and node.tts_audio_path != relative_cache:
+            node.tts_audio_path = relative_cache
             save_game(self._save)
         self.refresh_bindings()
 

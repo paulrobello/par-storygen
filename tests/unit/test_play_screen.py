@@ -19,7 +19,7 @@ from storygen.llm.models import (
 )
 from storygen.screens.endings import EndingsScreen
 from storygen.screens.play import PlayScreen
-from storygen.storage import app_state
+from storygen.storage import app_state, paths
 from storygen.storage.save import GameSave
 from storygen.tts.player import TTSPlayer
 from storygen.widgets.choice_list import ChoiceList
@@ -69,6 +69,24 @@ class _WavTTSPlayer(TTSPlayer):
         return "wav"
 
 
+class _SuccessfulTTSPlayer(TTSPlayer):
+    @property
+    def preferred_extension(self) -> str:
+        return "wav"
+
+    def configure(
+        self,
+        provider: str,
+        *,
+        api_key: str = "",
+        voice: str = "",
+    ) -> None:
+        return
+
+    async def speak(self, text: str, cache_path: Path | None = None) -> bool:
+        return True
+
+
 class _Harness(App[None]):
     def __init__(self) -> None:
         super().__init__()
@@ -110,6 +128,31 @@ def test_play_screen_tts_cache_path_uses_current_provider_voice_and_extension(
     assert path.name.startswith("node-1-gemini-")
     assert path.suffix == ".wav"
     assert rel == f"audio/{path.name}"
+
+
+@pytest.mark.asyncio
+async def test_speak_current_node_refreshes_stale_tts_audio_path_after_success(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    save = _minimal_save()
+    node = save.nodes["root"]
+    node.tts_audio_path = "audio/root-openai-legacy.wav"
+    player = _SuccessfulTTSPlayer()
+    screen = PlayScreen(save, pipeline=None, tts_player=player)
+    prefs = app_state.TTSPrefs(provider="gemini", voice="Kore")
+    cache = screen._tts_cache_path(node.id, prefs)  # pyright: ignore[reportPrivateUsage]
+    relative_cache = screen._relative_tts_cache_path(  # pyright: ignore[reportPrivateUsage]
+        node.id, prefs
+    )
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_bytes(b"cached audio")
+    monkeypatch.setattr(app_state, "read_tts_prefs", lambda: prefs)
+
+    await screen._speak_current_node()  # pyright: ignore[reportPrivateUsage]
+
+    assert node.tts_audio_path == relative_cache
+    assert relative_cache in paths.game_save_file(str(save.id)).read_text(encoding="utf-8")
 
 
 @pytest.mark.asyncio
