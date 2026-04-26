@@ -70,6 +70,7 @@ Thumbs.db
 /games/
 /.pi/extensions/discord-relay/state.json
 /.superpowers
+/.worktrees/
 /docs/superpowers/
 TODO.md
 ideas.md
