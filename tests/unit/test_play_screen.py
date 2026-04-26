@@ -19,7 +19,9 @@ from storygen.llm.models import (
 )
 from storygen.screens.endings import EndingsScreen
 from storygen.screens.play import PlayScreen
+from storygen.storage import app_state
 from storygen.storage.save import GameSave
+from storygen.tts.player import TTSPlayer
 from storygen.widgets.choice_list import ChoiceList
 from storygen.widgets.image_panel import ImagePanel
 from storygen.widgets.story_panel import StoryPanel
@@ -61,6 +63,12 @@ def _minimal_save() -> GameSave:
     )
 
 
+class _WavTTSPlayer(TTSPlayer):
+    @property
+    def preferred_extension(self) -> str:
+        return "wav"
+
+
 class _Harness(App[None]):
     def __init__(self) -> None:
         super().__init__()
@@ -85,6 +93,23 @@ async def test_play_screen_composes_three_panels() -> None:
         # and cumulative input/output token counters.
         assert app.screen.title == "t"
         assert app.screen.sub_title == "$0.0000  ·  0↑/0↓ tok"
+
+
+def test_play_screen_tts_cache_path_uses_current_provider_voice_and_extension(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    save = _minimal_save()
+    screen = PlayScreen(save, pipeline=None, tts_player=_WavTTSPlayer())
+    prefs = app_state.TTSPrefs(provider="gemini", voice="Kore")
+
+    path = screen._tts_cache_path("node-1", prefs)  # pyright: ignore[reportPrivateUsage]
+    rel = screen._relative_tts_cache_path("node-1", prefs)  # pyright: ignore[reportPrivateUsage]
+
+    assert path.parent == tmp_path / "storygen" / "games" / str(save.id) / "audio"
+    assert path.name.startswith("node-1-gemini-")
+    assert path.suffix == ".wav"
+    assert rel == f"audio/{path.name}"
 
 
 @pytest.mark.asyncio

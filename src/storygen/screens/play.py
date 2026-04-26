@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import random
 import time
+from pathlib import Path
 from typing import ClassVar
 
 from pyfiglet import Figlet
@@ -565,7 +566,8 @@ class PlayScreen(Screen[None]):
         else:
             node = self._save.nodes.get(self._save.current_node_id)
             if node and node.narration:
-                cache = paths.tts_audio_path(str(self._save.id), node.id)
+                tts_prefs = app_state.read_tts_prefs()
+                cache = self._tts_cache_path(node.id, tts_prefs)
                 if not cache.exists():
                     self.notify("Generating speech…", timeout=15)
             self.run_worker(self._speak_current_node(), exclusive=True, name="tts-speak")
@@ -578,7 +580,8 @@ class PlayScreen(Screen[None]):
         await self._tts_player.stop()
         node = self._save.nodes.get(self._save.current_node_id)
         if node and node.narration:
-            cache = paths.tts_audio_path(str(self._save.id), node.id)
+            tts_prefs = app_state.read_tts_prefs()
+            cache = self._tts_cache_path(node.id, tts_prefs)
             if not cache.exists():
                 self.notify("Generating speech…", timeout=15)
         self.run_worker(self._speak_current_node(), exclusive=True, name="tts-speak")
@@ -589,6 +592,27 @@ class PlayScreen(Screen[None]):
         if self._tts_player is not None:
             await self._tts_player.stop()
             self.refresh_bindings()
+
+    def _tts_cache_path(self, node_id: str, prefs: app_state.TTSPrefs) -> Path:
+        """Return the current provider/voice-aware TTS cache path for a node."""
+        ext = self._tts_player.preferred_extension if self._tts_player is not None else "mp3"
+        return paths.tts_audio_path(
+            str(self._save.id),
+            node_id,
+            provider=prefs.provider,
+            voice=prefs.voice,
+            ext=ext,
+        )
+
+    def _relative_tts_cache_path(self, node_id: str, prefs: app_state.TTSPrefs) -> str:
+        """Return the relative current provider/voice-aware TTS cache path for a node."""
+        ext = self._tts_player.preferred_extension if self._tts_player is not None else "mp3"
+        return paths.relative_tts_audio_path(
+            node_id,
+            provider=prefs.provider,
+            voice=prefs.voice,
+            ext=ext,
+        )
 
     async def _speak_current_node(self) -> None:
         """Generate/play TTS for the current node, with caching."""
@@ -603,11 +627,11 @@ class PlayScreen(Screen[None]):
             api_key=tts_prefs.api_key,
             voice=tts_prefs.voice,
         )
-        cache = paths.tts_audio_path(str(self._save.id), node.id)
+        cache = self._tts_cache_path(node.id, tts_prefs)
         already_cached = cache.exists()
         ok = await self._tts_player.speak(node.narration, cache_path=cache)
         if ok and not already_cached and not node.tts_audio_path:
-            node.tts_audio_path = paths.relative_tts_audio_path(node.id)
+            node.tts_audio_path = self._relative_tts_cache_path(node.id, tts_prefs)
             save_game(self._save)
         self.refresh_bindings()
 
@@ -620,7 +644,7 @@ class PlayScreen(Screen[None]):
             return
         node = self._save.nodes.get(self._save.current_node_id)
         if node and node.narration:
-            cache = paths.tts_audio_path(str(self._save.id), node.id)
+            cache = self._tts_cache_path(node.id, tts_prefs)
             if not cache.exists():
                 self.notify("Generating speech…", timeout=15)
         await self._speak_current_node()
