@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from typing import Any
@@ -91,6 +93,56 @@ class _NoFormatsProvider(_FakeProvider):
         return []
 
 
+class _BlockingStreamingProvider(_FakeProvider):
+    def __init__(self, chunk_written: asyncio.Event, release: asyncio.Event) -> None:
+        super().__init__()
+        self.chunk_written = chunk_written
+        self.release = release
+
+    async def generate_speech_async(
+        self,
+        text: str,
+        voice: str,
+        model: str | None = None,
+        callbacks: SpeechCallbacks | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[bytes]:
+        self.generated.append((text, voice))
+
+        async def _chunks() -> AsyncIterator[bytes]:
+            yield b"PARTIAL"
+            self.chunk_written.set()
+            await self.release.wait()
+            yield b"REST"
+
+        return _chunks()
+
+
+class _BlockingGenerationProvider(_FakeProvider):
+    def __init__(self, started: asyncio.Event, release: asyncio.Event) -> None:
+        super().__init__()
+        self.started = started
+        self.release = release
+        self.cancelled = False
+
+    async def generate_speech_async(
+        self,
+        text: str,
+        voice: str,
+        model: str | None = None,
+        callbacks: SpeechCallbacks | None = None,
+        **kwargs: Any,
+    ) -> bytes:
+        self.generated.append((text, voice))
+        self.started.set()
+        try:
+            await self.release.wait()
+        except asyncio.CancelledError:
+            self.cancelled = True
+            raise
+        return b"AUDIO"
+
+
 @pytest.mark.asyncio
 async def test_refresh_voices_uses_async_provider() -> None:
     player = TTSPlayer()
@@ -148,6 +200,68 @@ async def test_speak_writes_async_stream_to_cache(
     assert ok is True
     assert cache.read_bytes() == b"AB"
     assert played == [cache]
+
+
+@pytest.mark.asyncio
+async def test_cancelling_speak_during_async_stream_cache_write_removes_partial_cache(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    player = TTSPlayer()
+    chunk_written = asyncio.Event()
+    release = asyncio.Event()
+    provider = _BlockingStreamingProvider(chunk_written, release)
+    player._provider = provider  # pyright: ignore[reportPrivateUsage]
+    played: list[Path] = []
+
+    async def fake_play(path: Path) -> None:
+        played.append(path)
+        player._state = TTSState.IDLE  # pyright: ignore[reportPrivateUsage]
+
+    monkeypatch.setattr(player, "_play_file", fake_play)
+    cache = tmp_path / "node.wav"
+
+    task = asyncio.create_task(player.speak("hello", cache_path=cache))
+    await asyncio.wait_for(chunk_written.wait(), timeout=1.0)
+
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
+
+    assert cache.exists() is False
+    assert list(tmp_path.iterdir()) == []
+    assert played == []
+
+
+@pytest.mark.asyncio
+async def test_stop_during_async_generation_prevents_cache_write_and_playback(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    player = TTSPlayer()
+    started = asyncio.Event()
+    release = asyncio.Event()
+    provider = _BlockingGenerationProvider(started, release)
+    player._provider = provider  # pyright: ignore[reportPrivateUsage]
+    played: list[Path] = []
+
+    async def fake_play(path: Path) -> None:
+        played.append(path)
+        player._state = TTSState.IDLE  # pyright: ignore[reportPrivateUsage]
+
+    monkeypatch.setattr(player, "_play_file", fake_play)
+    cache = tmp_path / "node.wav"
+
+    task = asyncio.create_task(player.speak("hello", cache_path=cache))
+    await asyncio.wait_for(started.wait(), timeout=1.0)
+
+    await player.stop()
+    release.set()
+    ok = await asyncio.wait_for(task, timeout=1.0)
+
+    assert ok is False
+    assert provider.cancelled is True
+    assert cache.exists() is False
+    assert played == []
+    assert player.state == TTSState.IDLE
 
 
 @pytest.mark.asyncio

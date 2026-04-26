@@ -58,7 +58,7 @@ class TTSPlayer:
         self._volume: float = 1.0
         self._voices: list[Voice] = []
         self._api_key: str = ""
-        self._generation_task: asyncio.Task[None] | None = None
+        self._generation_task: asyncio.Task[bool] | None = None
 
     # ------------------------------------------------------------------
     # Properties
@@ -185,18 +185,8 @@ class TTSPlayer:
         self._current_text = text
         self._state = TTSState.GENERATING
 
-        try:
-            audio_data = await self._generate_speech(text)
-        except Exception as exc:
-            _logger.warning("TTS generation failed: %s", exc)
-            self._state = TTSState.IDLE
-            return False
-
-        if not audio_data:
-            self._state = TTSState.IDLE
-            return False
-
-        # Determine save location.
+        # Determine save location before starting generation so stop() can
+        # cancel the full generate/write phase via _generation_task.
         save_path = cache_path
         if save_path:
             save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -207,9 +197,27 @@ class TTSPlayer:
             ) as tmp:
                 save_path = Path(tmp.name)
 
+        generation_task = asyncio.create_task(self._generate_and_write(text, save_path))
+        self._generation_task = generation_task
         try:
-            await self._write_audio_data(audio_data, save_path)
-        except Exception:
+            wrote_audio = await generation_task
+        except asyncio.CancelledError:
+            self._state = TTSState.IDLE
+            save_path.unlink(missing_ok=True)
+            current_task = asyncio.current_task()
+            if current_task is not None and current_task.cancelling():
+                raise
+            return False
+        except Exception as exc:
+            _logger.warning("TTS generation failed: %s", exc)
+            self._state = TTSState.IDLE
+            save_path.unlink(missing_ok=True)
+            return False
+        finally:
+            if self._generation_task is generation_task:
+                self._generation_task = None
+
+        if not wrote_audio:
             self._state = TTSState.IDLE
             save_path.unlink(missing_ok=True)
             return False
@@ -308,7 +316,32 @@ class TTSPlayer:
             return await generate(text, self._voice)
         return await asyncio.to_thread(self._provider.generate_speech, text, self._voice)
 
+    async def _generate_and_write(self, text: str, save_path: Path) -> bool:
+        """Generate speech and write it to *save_path* while cancellable by stop()."""
+        audio_data = await self._generate_speech(text)
+        if not audio_data:
+            return False
+        await self._write_audio_data(audio_data, save_path)
+        return True
+
     async def _write_audio_data(self, audio_data: AudioResult, save_path: Path) -> None:
+        """Write bytes, sync byte iterators, or async byte iterators to disk atomically."""
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            dir=save_path.parent,
+            prefix=f".{save_path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as tmp:
+            tmp_path = Path(tmp.name)
+        try:
+            await self._write_audio_data_direct(audio_data, tmp_path)
+            tmp_path.replace(save_path)
+        except (Exception, asyncio.CancelledError):
+            tmp_path.unlink(missing_ok=True)
+            raise
+
+    async def _write_audio_data_direct(self, audio_data: AudioResult, save_path: Path) -> None:
         """Write bytes, sync byte iterators, or async byte iterators to disk."""
         if isinstance(audio_data, bytes):
             save_path.write_bytes(audio_data)
