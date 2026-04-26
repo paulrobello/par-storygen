@@ -61,7 +61,7 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "google-genai>=1.73.1",
     "textual-pyfiglet>=1.0.0",
-    "par-cli-tts>=0.5.0",
+    "par-cli-tts>=0.5.1",
 ]
 packages = [
     "src/storygen",

@@ -1859,7 +1859,7 @@ wheels = [
 
 [[package]]
 name = "par-cli-tts"
-version = "0.5.0"
+version = "0.5.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "elevenlabs" },
@@ -1873,9 +1873,9 @@ dependencies = [
     { name = "soundfile" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/78/59/6733e0c608ac61d92a83b7fb47fb44a60d24cf14b81e1cca38df56eba7c4/par_cli_tts-0.5.0.tar.gz", hash = "sha256:2f13894c10fabb96f2e5eb2937653ae2137d7d026f81dc61fc47ecb8e3903526", size = 62289, upload-time = "2026-04-25T23:45:23.367Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/35/1a/699daefff9677b609f0d087bafc35c0dc45b03838b62edb8e19190fb733b/par_cli_tts-0.5.1.tar.gz", hash = "sha256:1cea417d5acf937c47a937ba3a3308a357330c9996d1dd71068a52c559e66653", size = 105644, upload-time = "2026-04-26T22:06:04.419Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/25/da/a741256911cf938aed4e2563f95b154a492f7e0c6a3069b8cd7af734111f/par_cli_tts-0.5.0-py3-none-any.whl", hash = "sha256:d0acb1508f2661855ffff74fc3db1a5254b586f93aa34bd557121425cedba4c7", size = 62447, upload-time = "2026-04-25T23:45:21.764Z" },
+    { url = "https://files.pythonhosted.org/packages/6e/86/d455e1d4f3135c63ad33919dfc912ca9a9211a2924da71aa839c81283e09/par_cli_tts-0.5.1-py3-none-any.whl", hash = "sha256:eeb10e39633a01cec1ee88948cd6c650c1c73a43c23fdc0eb6ccfe83fe2864a4", size = 105646, upload-time = "2026-04-26T22:06:02.625Z" },
 ]
 
 [[package]]
@@ -1917,7 +1917,7 @@ requires-dist = [
     { name = "google-genai", specifier = ">=1.73.1" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "openai", specifier = ">=2.32.0" },
-    { name = "par-cli-tts", specifier = ">=0.5.0" },
+    { name = "par-cli-tts", specifier = ">=0.5.1" },
     { name = "pillow", specifier = ">=12.2.0" },
     { name = "pydantic", specifier = ">=2.9" },
     { name = "pydantic-ai", specifier = ">=1.84.1" },
