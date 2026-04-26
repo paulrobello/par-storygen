@@ -514,6 +514,7 @@ def test_write_all_settings_matches_individual_writers_byte_for_byte(
     app_state.set_prefetch_images_enabled(False)
     app_state.set_image_streaming_enabled(True)
     app_state.set_llm_cache_enabled(False)
+    app_state.set_auto_select_enabled(False)
     bytes_a = (path_a / "storygen" / "state.json").read_bytes()
 
     # Path B: single atomic write.
@@ -528,6 +529,7 @@ def test_write_all_settings_matches_individual_writers_byte_for_byte(
         prefetch_images_enabled_value=False,
         image_streaming_enabled_value=True,
         llm_cache_enabled_value=False,
+        auto_select_value=False,
     )
     bytes_b = (path_b / "storygen" / "state.json").read_bytes()
 

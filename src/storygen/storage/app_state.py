@@ -335,6 +335,12 @@ def prefetch_enabled() -> bool:
     return bool(state.get("prefetch_enabled", False))
 
 
+def auto_select_enabled() -> bool:
+    """Return whether auto-select story choices is enabled. Defaults to False."""
+    state = read_app_state()
+    return bool(state.get("auto_select", False))
+
+
 def set_prefetch_enabled(value: bool) -> None:
     """Persist the prefetch-enabled flag."""
     state = read_app_state()
@@ -390,6 +396,13 @@ def set_llm_cache_enabled(value: bool) -> None:
     """Persist the LLM cache flag."""
     state = read_app_state()
     state["llm_cache"] = bool(value)
+    write_app_state(state)
+
+
+def set_auto_select_enabled(value: bool) -> None:
+    """Persist the auto-select flag."""
+    state = read_app_state()
+    state["auto_select"] = bool(value)
     write_app_state(state)
 
 
@@ -536,6 +549,7 @@ def write_all_settings(
     prefetch_images_enabled_value: bool,
     image_streaming_enabled_value: bool,
     llm_cache_enabled_value: bool = False,
+    auto_select_value: bool = False,
 ) -> None:
     """Atomic write of all Settings-screen-owned state in a single JSON rewrite.
 
@@ -557,4 +571,5 @@ def write_all_settings(
     state["prefetch_images"] = bool(prefetch_images_enabled_value)
     state["image_streaming"] = bool(image_streaming_enabled_value)
     state["llm_cache"] = bool(llm_cache_enabled_value)
+    state["auto_select"] = bool(auto_select_value)
     write_app_state(state)

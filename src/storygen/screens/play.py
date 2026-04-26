@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
+import random
+import time
 from typing import ClassVar
 
 from pyfiglet import Figlet
@@ -98,6 +101,7 @@ class PlayScreen(Screen[None]):
         ("p", "portraits", "Portraits"),
         ("g", "graph", "Graph"),
         ("e", "endings", "Endings"),
+        ("a", "auto_select", "Auto play"),
         ("t", "tts_toggle", "Read aloud"),
         ("T", "tts_restart", "Restart TTS"),
         ("s", "tts_stop", "Stop TTS"),
@@ -134,6 +138,8 @@ class PlayScreen(Screen[None]):
         # True while a beat is being generated — disables all bindings so the
         # previous beat's choices/back/regen don't fire on the wrong state.
         self._loading: bool = False
+        self._auto_selecting: bool = False
+        self._image_displayed_at: float | None = None
         # Last node id we kicked off prefetch FROM. _maybe_start_prefetch
         # short-circuits when current_node_id matches this — the comparison
         # IS the reset, so picks/jumps that change current_node_id naturally
@@ -164,6 +170,7 @@ class PlayScreen(Screen[None]):
         write) at app shutdown. ``cancel_all_prefetches`` is a no-op when
         nothing is in flight.
         """
+        self._auto_selecting = False
         if self._pipeline is not None:
             await self._pipeline.cancel_all_prefetches()
         if self._tts_player is not None:
@@ -237,7 +244,16 @@ class PlayScreen(Screen[None]):
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         # While a beat is generating, only "menu" (escape) stays available so
         # the user can bail out; everything else would act on stale state.
-        if self._loading and action != "menu":
+        if self._loading and action not in ("menu", "auto_select"):
+            return False
+        # During auto-select, only menu, auto_select, and TTS controls are available.
+        if self._auto_selecting and action not in (
+            "menu",
+            "auto_select",
+            "tts_toggle",
+            "tts_stop",
+            "tts_restart",
+        ):
             return False
         node = self._save.nodes.get(self._save.current_node_id)
         if node is None:
@@ -291,6 +307,8 @@ class PlayScreen(Screen[None]):
                 TTSState.PAUSED,
                 TTSState.GENERATING,
             )
+        if action == "auto_select":
+            return self._pipeline is not None
         if action == "menu":
             return True
         return None
@@ -380,6 +398,7 @@ class PlayScreen(Screen[None]):
         from storygen.llm.models import StoryNode
 
         if isinstance(node, StoryNode) and node.id == self._save.current_node_id:
+            self._image_displayed_at = time.monotonic()
             self._render_image_for(node.image_status, node.image_path)
         # Cost may have changed even if the image isn't for the current node.
         self._apply_header()
@@ -605,3 +624,52 @@ class PlayScreen(Screen[None]):
             if not cache.exists():
                 self.notify("Generating speech…", timeout=15)
         await self._speak_current_node()
+
+    def action_auto_select(self) -> None:
+        """Toggle auto-select on/off."""
+        self._auto_selecting = not self._auto_selecting
+        if self._auto_selecting:
+            self.notify("Auto-play started", timeout=3)
+            self.run_worker(self._auto_select_next(), exclusive=True, name="auto-select")
+        else:
+            self.notify("Auto-play stopped", timeout=3)
+        self.refresh_bindings()
+
+    async def _auto_select_next(self) -> None:
+        """One cycle: wait for image+TTS, pick a random choice, schedule next."""
+        if not self._auto_selecting:
+            return
+        node = self._save.nodes.get(self._save.current_node_id)
+        if not node or node.is_ending or not node.choices:
+            self._auto_selecting = False
+            if node and node.is_ending:
+                self.notify("Auto-play: story ended", timeout=5)
+            self.refresh_bindings()
+            return
+
+        # Wait for image viewing delay (5s after image was displayed).
+        if app_state.art_enabled() and self._image_displayed_at:
+            elapsed = time.monotonic() - self._image_displayed_at
+            if elapsed < 5.0:
+                await asyncio.sleep(5.0 - elapsed)
+
+        # Wait for TTS playback to finish if auto-read is active.
+        if self._tts_player and app_state.read_tts_prefs().auto_read:
+            while self._tts_player.state in (
+                TTSState.GENERATING,
+                TTSState.PLAYING,
+                TTSState.PAUSED,
+            ):
+                await asyncio.sleep(0.5)
+
+        # Abort if toggled off while waiting.
+        if not self._auto_selecting:
+            return
+
+        # Pick a random choice.
+        n = random.randint(1, len(node.choices))
+        await self._pick(n)
+
+        # Schedule next cycle if still active.
+        if self._auto_selecting:
+            self.run_worker(self._auto_select_next(), exclusive=True, name="auto-select")

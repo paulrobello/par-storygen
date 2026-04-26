@@ -285,6 +285,7 @@ class SettingsScreen(Screen[None]):
         self._prefetch_switch = Switch(value=False, id="prefetch-enabled-switch")
         self._prefetch_images_switch = Switch(value=False, id="prefetch-images-switch")
         self._llm_cache_switch = Switch(value=False, id="llm-cache-switch")
+        self._auto_select_switch = Switch(value=False, id="auto-select-switch")
 
         # --- TTS widgets ---
         self._suppress_tts_handler: bool = False
@@ -389,6 +390,12 @@ class SettingsScreen(Screen[None]):
                 yield self._llm_cache_switch
                 yield Static(
                     "Cache raw LLM exchanges for debugging (no gameplay effect)",
+                    classes="switch-label",
+                )
+            with Horizontal(classes="switch-row"):
+                yield self._auto_select_switch
+                yield Static(
+                    "Auto-select choices (random, waits for image + TTS)",
                     classes="switch-label",
                 )
 
@@ -588,6 +595,7 @@ class SettingsScreen(Screen[None]):
             self._prefetch_switch.prevent(Switch.Changed),
             self._prefetch_images_switch.prevent(Switch.Changed),
             self._llm_cache_switch.prevent(Switch.Changed),
+            self._auto_select_switch.prevent(Switch.Changed),
         ):
             self._theme_area.text = defaults.theme
             self._tone_select.value = tone_preset
@@ -602,6 +610,7 @@ class SettingsScreen(Screen[None]):
             self._prefetch_switch.value = app_state.prefetch_enabled()
             self._prefetch_images_switch.value = app_state.prefetch_images_enabled()
             self._llm_cache_switch.value = app_state.llm_cache_enabled()
+            self._auto_select_switch.value = app_state.auto_select_enabled()
             self._refresh_image_gating()
 
         # TTS
@@ -952,6 +961,7 @@ class SettingsScreen(Screen[None]):
             prefetch_images_enabled_value=self._prefetch_images_switch.value,
             image_streaming_enabled_value=self._streaming_switch.value,
             llm_cache_enabled_value=self._llm_cache_switch.value,
+            auto_select_value=self._auto_select_switch.value,
         )
         self.post_message(ImageProviderChanged(image_prefs))
         self.post_message(TextProviderChanged(prefs))
@@ -1004,6 +1014,7 @@ class SettingsScreen(Screen[None]):
             self._prefetch_switch.value = False
             self._prefetch_images_switch.value = False
             self._llm_cache_switch.value = False
+            self._auto_select_switch.value = False
             self._refresh_image_gating()
             # TTS section.
             self._tts_provider_select.value = app_state.DEFAULT_TTS_PROVIDER

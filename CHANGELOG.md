@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Text-to-speech** — Read story narration aloud via `par-cli-tts` (OpenAI, ElevenLabs, Deepgram, Gemini, Kokoro). Settings: provider, API key, voice selection with refresh, auto-read toggle. Play screen: `t` pause/resume, `T` restart, `s` stop. Per-node audio caching in `audio/` directory avoids redundant API calls.
+- **Auto-select** — Press `a` to auto-play the story with random choices. Waits for image display (5s viewing delay) and TTS playback to finish before advancing. Stops at endings or when toggled off with `a`.
+- **Deferred illustration fix** — Prefetched nodes that have an illustration plan but no image now trigger scene generation when picked. The `i` (retry image) key also works for `not_planned` nodes with prompts.
+
 ### Security
 
 - Exclude `api_key` from `GameSave` serialization (`Field(exclude=True)` on `ImageProviderConfig.api_key`); keys are re-resolved from env on load. Tighten permissions on saved games and library/cache files (`0o600` files, `0o700` directories).

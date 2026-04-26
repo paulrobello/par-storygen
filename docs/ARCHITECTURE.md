@@ -169,6 +169,40 @@ Characters accept an optional `reference_image_path: str | None` (relative to th
 
 `CharacterOutfit(id, name, description, portrait_path, portrait_prompt, created_at)` lives on `Character.outfits`; `Character.current_outfit_id` marks the active one. PortraitsScreen's outfits sub-row renders mini half-block thumbnails via `rich_pixels`; `OutfitCreateModal` (`screens/_outfit_modals.py`) drives name+description → background `generate_portrait` worker (art style from save, prompt is `physical_description + ". Outfit: " + outfit_description`). PNG is atomic-written to `paths.character_outfit_path(save_id, char_id, outfit_id)`. `OutfitActionModal` yields `"set" | "delete" | None`. **Setting** copies the outfit's `portrait_path` + `portrait_prompt` into `Character.portrait_path` + `Character.portrait_prompt` so the existing scene-gen path (which reads `Character.portrait_path`) picks it up without code change. **Deleting** the active outfit auto-reverts to base v1 first so there's no window with a dangling active reference. **Revert-to-base** restores `portrait_path = relative_character_portrait_path(char_id, 1)` and `portrait_prompt = physical_description`. Outfit gen reuses the existing portrait cost accounting (no new surcharge paths); streaming is intentionally skipped because portraits are too fast to benefit. Library export captures only the currently-active outfit; imported characters start with an empty `outfits` list.
 
+## Text-to-speech (`src/storygen/tts/player.py`)
+
+`TTSPlayer` wraps the `par_tts` library for async use inside Textual's event loop. A four-state machine (`IDLE → GENERATING → PLAYING → PAUSED → PLAYING → IDLE`) drives all controls:
+
+- **`speak(text, *, cache_path=None)`** — resolves the provider from persisted prefs (`app_state.read_tts_prefs()`), generates audio via `par_tts.get_provider()`, then plays it back through `asyncio.create_subprocess_exec` (`afplay` on macOS). If `cache_path` is given and the file exists, skips generation and plays the cached file directly. If the file doesn't exist, generates and writes to `cache_path` (persistent) instead of a temp file. Returns `bool` indicating success.
+- **`pause()` / `resume()`** — sends `SIGSTOP` / `SIGCONT` to the `afplay` subprocess.
+- **`stop()`** — sends `SIGTERM`; cleans up temp files but not persistent cache paths.
+- **`restart()`** — convenience: `stop()` then re-speak.
+
+`PlayScreen` integrates TTS at two levels:
+
+1. **Auto-read** (`app_state.tts_prefs.auto_read`, togglable in Settings) — after every beat commit, `_maybe_auto_read()` launches `_speak_current_node()` as a named worker. The worker computes a per-node cache path via `paths.tts_audio_path(game_id, node_id)` and passes it to `player.speak()` so subsequent visits to the same node replay from disk with zero API cost.
+2. **Manual controls** — `t` (pause/resume), `T` (restart), `s` (stop). Action handlers are kept synchronous (pause/resume/stop are fast calls; speak uses `run_worker`) so Textual's message pump never blocks and all key bindings stay responsive during generation.
+
+Settings stores `tts_provider`, `tts_api_key`, `tts_voice`, and `auto_read` via `TTSPrefs` in `app_state`. The `t` binding label toggles between "Pause speech" / "Resume speech" based on `player.state`.
+
+## Auto-select
+
+Pressing `a` on `PlayScreen` toggles an automatic story-play mode that picks random choices and advances until an ending is reached. The implementation is a chain of exclusive workers rather than a continuous loop:
+
+1. **`action_auto_select()`** — toggles `_auto_selecting` and kicks off `_auto_select_next()` as an `exclusive=True` worker named `"auto-select-next"`.
+2. **`_auto_select_next()`** — one cycle: waits for the image viewing delay (5 seconds after `_image_displayed_at` if art is enabled), waits for TTS completion (polls `_tts_player.state` until `IDLE`, including `PAUSED` so paused speech must finish before advancing), picks a random `n` in `[1, len(choices)]`, calls `await self._pick(n)`, then schedules the next cycle via another `run_worker(..., exclusive=True, name="auto-select-next")`.
+3. **Termination** — the cycle stops when `_auto_selecting` is `False`, the current node `is_ending`, or there are no choices. `on_unmount` sets `_auto_selecting = False` to clean up.
+
+**Action gating** during auto-select (`check_action`): only `menu`, `auto_select`, `tts_toggle`, `tts_stop`, and `tts_restart` are allowed. This lets the user pause/restart speech or stop auto-play at any point without accidental navigation. The `_loading` guard also permits `auto_select` so the user can toggle it off mid-pipeline.
+
+The `auto_select_enabled` setting in `app_state` (persisted as `state["auto_select"]`, exposed as a Switch in the Settings "Developer" section) is a default only — the hotkey toggles it live regardless of the persisted value.
+
+## Deferred illustration fix
+
+`BeatPipeline._maybe_deferred_illustration(save, node, callbacks)` retroactively triggers scene generation for nodes that have an illustration plan but no image. This handles the case where branch prefetch generates a node with `skip_image=True` (or `prefetch_images_enabled` is off), leaving `image_status="not_planned"` even though the beat's illustration plan requested an image.
+
+Called at both the prefetch fast-path return and the cache-hit return in `advance()`, it reconstructs an `IllustrationPlan` from the node's stored `image_prompt`, `image_reasoning`, and `featured_character_ids`, sets `image_status="generating"`, and spawns `_stage_3_scene` as a background task. The `i` (retry image) key on PlayScreen is also enabled for `not_planned` nodes with an existing prompt, giving manual recovery if the deferred attempt failed.
+
 ## Textual quirk: Header startup race
 
 `src/storygen/_textual_patches.py` monkey-patches `textual.widgets.Header._on_mount` to also catch `NoMatches`. Textual's `set_title` watcher fires synchronously on registration to seed the title, but at that point Header's `HeaderTitle` child hasn't mounted yet — upstream catches `NoScreen` but not `NoMatches`, so the exception leaks as a "coroutine never awaited" traceback at startup. The patch is imported for side effects from `app.py` and **must be applied before any Header is constructed**.

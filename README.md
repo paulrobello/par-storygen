@@ -28,6 +28,8 @@
 * [Replay and endings](#replay-and-endings)
 * [Branch prefetch](#branch-prefetch)
 * [Character outfits](#character-outfits)
+* [Text-to-speech](#text-to-speech)
+* [Auto-play](#auto-play)
 * [Contributing](#contributing)
 * [Roadmap](#roadmap)
 
@@ -54,6 +56,8 @@ A configurable LLM (via pydantic-ai) drives theme, characters, narration, and ch
 
 ### Advanced Features
 - **Branch Prefetch**: Background-generates pending choices while you read, for instant picks
+- **Text-to-Speech**: Read narration aloud via OpenAI, ElevenLabs, Deepgram, Gemini, or Kokoro with per-node audio caching
+- **Auto-Play**: Press `a` to auto-advance with random choices, waiting for images and TTS before continuing
 - **Character Library**: Export characters from finished stories and re-import with optional AI-powered backstory adaptation
 - **Character Outfits**: Define multiple looks per character and switch between them mid-story
 - **Endings Gallery**: Card-based view of every ending reached, with jump-to-node navigation
@@ -61,7 +65,7 @@ A configurable LLM (via pydantic-ai) drives theme, characters, narration, and ch
 - **Story Graph**: Full tree view with marker legend, current-node arrow, and unexplored-choice leaves
 - **Reference Images**: Supply your own character images as portrait anchors for ref-aware providers
 - **Reader Levels**: Vocabulary and complexity controls for ages 0-5, 6-10, 11-15, or 15+
-- **Settings Persistence**: In-app Settings screen for provider defaults, art toggle, streaming, and prefetch options
+- **Settings Persistence**: In-app Settings screen for provider defaults, art toggle, streaming, prefetch, TTS, and auto-play options
 
 ### Technical Excellence
 - **Async Architecture**: Non-blocking pipeline with concurrent illustration and portrait generation
@@ -352,6 +356,38 @@ The main (base) portrait is preserved. Press **Revert to base** (visible only wh
 - Image streaming is intentionally OFF for outfit generation (portraits are 5-10s — too fast for streaming to pay off).
 - Library export captures only the currently-active outfit. Imported characters start with an empty `outfits` list.
 
+## Text-to-speech
+
+par-storygen can read narration aloud using the [par-cli-tts](https://github.com/paulrobello/par-cli-tts) library, which supports five providers: OpenAI, ElevenLabs, Deepgram, Google Gemini, and Kokoro (local).
+
+### Setup
+1. Open **Settings** from the main menu.
+2. Scroll to the **Text-to-speech** section.
+3. Select a provider and enter your API key.
+4. Press **Refresh voices** to populate the voice dropdown, then pick a voice.
+5. Optionally toggle **Auto-read** to have narration read aloud automatically after each beat.
+
+### Playback controls (PlayScreen)
+
+| Key | Action |
+|-----|--------|
+| `t` | Read aloud / pause / resume (context-dependent) |
+| `T` | Restart narration from the beginning |
+| `s` | Stop playback immediately |
+
+Audio files are cached per-node in the save's `audio/` directory — replaying a previously-read beat uses the cached file with no API call.
+
+## Auto-play
+
+Press `a` from the play screen to auto-advance the story with random choices. Auto-play:
+
+- **Waits for the scene image** — 5 second viewing delay after the image is displayed (if art is enabled).
+- **Waits for TTS** — if auto-read is on, waits for narration playback to finish (including through pauses) before advancing.
+- **Stops at endings** — auto-play halts when an ending node is reached.
+- **Toggle off** — press `a` again to stop at any time.
+
+During auto-play, only `menu`, `a` (stop auto), and TTS controls (`t`/`T`/`s`) are available.
+
 ## Contributing
 
 Clone the repo and run the setup make target. Note `uv` is required.
@@ -393,6 +429,8 @@ As of v0.1.0. See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
 * **Navigation** — Story graph, endings gallery, branch replay
 * **Branch Prefetch** — Background beat generation for instant picks
 * **Reader Levels** — Vocabulary and complexity controls for different age ranges
+* **Text-to-Speech** — Multi-provider narration with per-node audio caching and auto-read
+* **Auto-Play** — Random-choice auto-advance with image and TTS wait gating
 
 ### Where we're going
 * Sound effects and music per scene
