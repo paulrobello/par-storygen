@@ -9,6 +9,7 @@ from uuid import uuid4
 import pytest
 
 from storygen.app import StoryGenApp
+from storygen.images.split_provider import SplitImageProvider
 from storygen.llm.models import (
     Character,
     ImageProviderConfig,
@@ -75,6 +76,74 @@ async def test_text_provider_changed_rebuilds_clients(
         # Fresh client instances.
         assert app._text_model is not original_text_model  # pyright: ignore[reportPrivateUsage]
         assert app._image_provider is not original_image_provider  # pyright: ignore[reportPrivateUsage]
+
+
+@pytest.mark.asyncio
+async def test_make_wizard_uses_app_split_provider_and_current_image_configs(
+    xdg_tmp,  # type: ignore[no-untyped-def]
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.chdir(str(xdg_tmp))  # type: ignore[no-untyped-call]  # pyright: ignore[reportUnknownArgumentType]
+    for name in (
+        "STORYGEN_IMAGE_PROVIDER",
+        "STORYGEN_IMAGE_MODEL",
+        "STORYGEN_IMAGE_BASE_URL",
+        "STORYGEN_IMAGE_API_KEY",
+        "STORYGEN_CHARACTER_IMAGE_PROVIDER",
+        "STORYGEN_CHARACTER_IMAGE_MODEL",
+        "STORYGEN_CHARACTER_IMAGE_BASE_URL",
+        "STORYGEN_CHARACTER_IMAGE_API_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    from storygen.config import reset_dotenv_cache_for_tests
+
+    reset_dotenv_cache_for_tests()
+
+    app_state.write_image_provider_prefs(
+        app_state.ImageProviderPrefs(provider="gemini", model="gemini-3.1-flash-image-preview")
+    )
+    app_state.write_character_image_provider_prefs(
+        app_state.CharacterImageProviderPrefs(provider="zai", model="glm-image")
+    )
+
+    calls: list[ImageProviderConfig] = []
+
+    def spy_build_routed_image_provider(
+        primary_cfg: ImageProviderConfig,
+        *,
+        fallback_cfg: ImageProviderConfig | None = None,
+        on_ref_loss: object = None,
+        on_fallback: object = None,
+    ) -> _FakeStartImageProvider:
+        del fallback_cfg, on_ref_loss, on_fallback
+        calls.append(primary_cfg)
+        return _FakeStartImageProvider()
+
+    monkeypatch.setattr(
+        "storygen.app.build_routed_image_provider",
+        spy_build_routed_image_provider,
+    )
+
+    def fake_theme_agent(_model: object) -> object:
+        return object()
+
+    monkeypatch.setattr("storygen.app.agent_mod.build_theme_agent", fake_theme_agent)
+
+    app = StoryGenApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app._make_wizard()  # pyright: ignore[reportPrivateUsage]
+        flow = screen._flow  # pyright: ignore[reportPrivateUsage]
+
+        art_cfg = ImageProviderConfig(provider="gemini", model="gemini-3.1-flash-image-preview")
+        character_cfg = ImageProviderConfig(provider="zai", model="glm-image")
+        assert calls == [art_cfg, character_cfg]
+        assert isinstance(app._image_provider, SplitImageProvider)  # pyright: ignore[reportPrivateUsage]
+        assert flow is not None
+        assert flow.image_provider is app._image_provider  # pyright: ignore[reportPrivateUsage]
+        assert flow._image_config == art_cfg  # pyright: ignore[reportPrivateUsage]
+        assert flow._character_image_config == character_cfg  # pyright: ignore[reportPrivateUsage]
 
 
 def _make_pinned_save(provider: str, model: str) -> GameSave:
@@ -254,6 +323,70 @@ async def test_start_game_builds_art_and_character_routers_from_save_configs(
         await app._start_game(save)  # pyright: ignore[reportPrivateUsage]
 
     assert calls == [art_cfg, character_cfg]
+
+
+@pytest.mark.asyncio
+async def test_start_game_passes_fallback_cfg_to_art_and_character_routers(
+    xdg_tmp,  # type: ignore[no-untyped-def]
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.chdir(str(xdg_tmp))  # type: ignore[no-untyped-call]  # pyright: ignore[reportUnknownArgumentType]
+    from storygen.config import reset_dotenv_cache_for_tests
+
+    reset_dotenv_cache_for_tests()
+
+    app_state.write_image_provider_prefs(
+        app_state.ImageProviderPrefs(
+            provider="openai",
+            model="gpt-image-2",
+            fallback_provider="gemini",
+            fallback_model="gemini-3-pro-image-preview",
+        )
+    )
+    calls: list[tuple[ImageProviderConfig, ImageProviderConfig | None]] = []
+
+    def spy_build_routed_image_provider(
+        primary_cfg: ImageProviderConfig,
+        *,
+        fallback_cfg: ImageProviderConfig | None = None,
+        on_ref_loss: object = None,
+        on_fallback: object = None,
+    ) -> _FakeStartImageProvider:
+        del on_ref_loss, on_fallback
+        calls.append((primary_cfg, fallback_cfg))
+        return _FakeStartImageProvider()
+
+    monkeypatch.setattr(
+        "storygen.app.build_routed_image_provider",
+        spy_build_routed_image_provider,
+    )
+    monkeypatch.setattr(app_state, "art_enabled", lambda: False)
+
+    app = StoryGenApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        calls.clear()
+
+        def _no_switch(*_args: object, **_kwargs: object) -> None:
+            return None
+
+        monkeypatch.setattr(app, "switch_screen", _no_switch)
+        save = _make_pinned_save(provider="ollama", model="llama3.3:70b")
+        art_cfg = ImageProviderConfig(provider="openai", model="gpt-image-1")
+        character_cfg = ImageProviderConfig(provider="zai", model="glm-image")
+        save.image_config = art_cfg
+        save.character_image_config = character_cfg
+
+        await app._start_game(save)  # pyright: ignore[reportPrivateUsage]
+
+    expected_fallback = ImageProviderConfig(
+        provider="gemini",
+        model="gemini-3-pro-image-preview",
+        base_url=None,
+        api_key=None,
+    )
+    assert calls == [(art_cfg, expected_fallback), (character_cfg, expected_fallback)]
 
 
 # ----- Phase 4: ref-loss + fallback wiring -----------------------------------
