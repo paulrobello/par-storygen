@@ -298,6 +298,40 @@ async def test_autoplay_pick_waits_for_auto_read_to_finish(
 
 
 @pytest.mark.asyncio
+async def test_manual_pick_auto_reads_in_background(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setattr(app_state, "read_tts_prefs", lambda: app_state.TTSPrefs(auto_read=True))
+    save = _minimal_save()
+    pipeline = _AdvancingPipeline()
+    player = _BlockingTTSPlayer()
+    app = _PlayHarnessWithDeps(save, pipeline, tts_player=player)
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, PlayScreen)
+        task = asyncio.create_task(
+            screen._pick(1, auto_read_inline=False)  # pyright: ignore[reportPrivateUsage]
+        )
+        try:
+            await asyncio.wait_for(player.started.wait(), timeout=1.0)
+            assert player.spoken == ["The path continues."]
+            assert not player.release.is_set()
+            await asyncio.wait_for(task, timeout=1.0)
+            assert not player.release.is_set()
+        finally:
+            player.release.set()
+            await pilot.pause()
+            if not task.done():
+                task.cancel()
+            else:
+                task.exception()
+
+
+@pytest.mark.asyncio
 async def test_auto_select_waits_for_current_image_terminal_state(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -331,6 +365,94 @@ async def test_auto_select_waits_for_current_image_terminal_state(
                 task.exception()
 
     assert pipeline.advance_calls == [("root", "c1")]
+
+
+@pytest.mark.asyncio
+async def test_auto_select_aborts_when_toggled_off_while_current_image_generates(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setattr(app_state, "art_enabled", lambda: True)
+    monkeypatch.setattr(app_state, "read_tts_prefs", lambda: app_state.TTSPrefs(auto_read=False))
+    save = _minimal_save()
+    save.nodes[save.current_node_id].image_status = "generating"
+    pipeline = _AdvancingPipeline()
+    app = _PlayHarnessWithDeps(save, pipeline)
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, PlayScreen)
+        screen._auto_selecting = True  # pyright: ignore[reportPrivateUsage]
+        task = asyncio.create_task(screen._auto_select_next())  # pyright: ignore[reportPrivateUsage]
+        try:
+            await asyncio.sleep(0.1)
+            assert pipeline.advance_calls == []
+            assert not task.done()
+            screen._auto_selecting = False  # pyright: ignore[reportPrivateUsage]
+            await asyncio.wait_for(task, timeout=1.0)
+        finally:
+            if not task.done():
+                task.cancel()
+            else:
+                task.exception()
+
+    assert pipeline.advance_calls == []
+
+
+@pytest.mark.asyncio
+async def test_auto_select_aborts_when_current_node_changes_while_current_image_generates(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setattr(app_state, "art_enabled", lambda: True)
+    monkeypatch.setattr(app_state, "read_tts_prefs", lambda: app_state.TTSPrefs(auto_read=False))
+    save = _minimal_save()
+    root = save.nodes[save.current_node_id]
+    root.image_status = "generating"
+    save.nodes["other"] = StoryNode(
+        id="other",
+        parent_id=None,
+        chosen_choice_id=None,
+        chosen_at=None,
+        narration="Elsewhere.",
+        choices=[StoredChoice(id="other-choice", text="wait")],
+        is_major=True,
+        is_ending=False,
+        image_prompt=None,
+        image_path=None,
+        image_status="not_planned",
+        illustration_reasoning=None,
+        featured_character_ids=[],
+        summary_to_here=None,
+        created_at=datetime.now(UTC),
+    )
+    pipeline = _AdvancingPipeline()
+    app = _PlayHarnessWithDeps(save, pipeline)
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, PlayScreen)
+        screen._auto_selecting = True  # pyright: ignore[reportPrivateUsage]
+        task = asyncio.create_task(screen._auto_select_next())  # pyright: ignore[reportPrivateUsage]
+        try:
+            await asyncio.sleep(0.1)
+            assert pipeline.advance_calls == []
+            assert not task.done()
+            assert root.image_status == "generating"
+            save.current_node_id = "other"
+            await asyncio.wait_for(task, timeout=1.0)
+        finally:
+            screen._auto_selecting = False  # pyright: ignore[reportPrivateUsage]
+            if not task.done():
+                task.cancel()
+            else:
+                task.exception()
+
+    assert pipeline.advance_calls == []
 
 
 def test_play_screen_tts_cache_path_uses_current_provider_voice_and_extension(
