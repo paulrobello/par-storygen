@@ -21,6 +21,9 @@ def test_loads_defaults_when_no_env(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     monkeypatch.delenv("STORYGEN_IMAGE_PROVIDER", raising=False)
     monkeypatch.delenv("STORYGEN_IMAGE_MODEL", raising=False)
     monkeypatch.delenv("STORYGEN_IMAGE_BASE_URL", raising=False)
+    monkeypatch.delenv("STORYGEN_CHARACTER_IMAGE_PROVIDER", raising=False)
+    monkeypatch.delenv("STORYGEN_CHARACTER_IMAGE_MODEL", raising=False)
+    monkeypatch.delenv("STORYGEN_CHARACTER_IMAGE_BASE_URL", raising=False)
     reset_dotenv_cache_for_tests()
 
     cfg = load_config()
@@ -29,6 +32,8 @@ def test_loads_defaults_when_no_env(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     assert cfg.text_config.model == "gpt-4o-mini"
     assert cfg.image_config.provider == "openai"
     assert cfg.image_config.model == "gpt-image-2"
+    assert cfg.character_image_config.provider == "openai"
+    assert cfg.character_image_config.model == "gpt-image-1.5"
     assert cfg.openai_api_key == ""
 
 
@@ -74,6 +79,25 @@ def test_image_provider_overrides_honored(monkeypatch: pytest.MonkeyPatch, tmp_p
 
     assert cfg.image_config.base_url == "https://images.example.com/v1"
     assert cfg.image_config.api_key == "sk-image-only"
+
+
+def test_character_image_env_does_not_change_art_config(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.delenv("STORYGEN_IMAGE_PROVIDER", raising=False)
+    monkeypatch.delenv("STORYGEN_IMAGE_MODEL", raising=False)
+    monkeypatch.delenv("STORYGEN_IMAGE_BASE_URL", raising=False)
+    monkeypatch.setenv("STORYGEN_CHARACTER_IMAGE_MODEL", "gpt-image-1")
+    reset_dotenv_cache_for_tests()
+
+    cfg = load_config()
+
+    assert cfg.image_config.provider == "openai"
+    assert cfg.image_config.model == "gpt-image-2"
+    assert cfg.character_image_config.provider == "openai"
+    assert cfg.character_image_config.model == "gpt-image-1"
 
 
 def test_provider_env_honored(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -412,6 +436,7 @@ def test_app_config_is_frozen() -> None:
         openai_api_key="k",
         text_config=...,  # type: ignore[arg-type]
         image_config=...,  # type: ignore[arg-type]
+        character_image_config=...,  # type: ignore[arg-type]
     )
     try:
         cfg.openai_api_key = "mutated"  # type: ignore[misc]

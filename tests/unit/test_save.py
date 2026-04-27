@@ -167,6 +167,26 @@ def test_art_style_defaults_to_childrens_story_book(
     assert save.art_style == "children's story book"
 
 
+def test_character_image_config_defaults_to_openai_v15_on_legacy_save(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A raw save JSON without character_image_config gets the portrait default."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    save = _make_save()
+    save_game(save)
+    file = paths.game_save_file(str(save.id))
+    import json
+
+    data = json.loads(file.read_text(encoding="utf-8"))
+    data.pop("character_image_config", None)
+    file.write_text(json.dumps(data), encoding="utf-8")
+
+    restored = load_game(str(save.id))
+
+    assert restored.character_image_config.provider == "openai"
+    assert restored.character_image_config.model == "gpt-image-1.5"
+
+
 def test_art_style_round_trip(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     save = _make_save()

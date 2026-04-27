@@ -71,6 +71,8 @@ _ALLOWED_PROVIDERS: frozenset[str] = frozenset(pid for _, pid in PROVIDER_CHOICE
 
 DEFAULT_IMAGE_PROVIDER: str = "openai"
 DEFAULT_IMAGE_MODEL: str = "gpt-image-2"
+DEFAULT_CHARACTER_IMAGE_PROVIDER: str = "openai"
+DEFAULT_CHARACTER_IMAGE_MODEL: str = "gpt-image-1.5"
 
 # UI-facing (label, provider-id) pairs — consumed by the Settings screen Select widget.
 IMAGE_PROVIDER_CHOICES: tuple[tuple[str, str], ...] = (
@@ -167,6 +169,15 @@ class ImageProviderPrefs:
     base_url: str = ""  # empty → factory picks the provider's default URL
     fallback_provider: str = ""  # "" = no fallback
     fallback_model: str = ""  # "" = use SUGGESTED_IMAGE_MODELS[fallback_provider][0]
+
+
+@dataclass(frozen=True)
+class CharacterImageProviderPrefs:
+    """Persisted character-portrait image-provider preferences."""
+
+    provider: str = DEFAULT_CHARACTER_IMAGE_PROVIDER  # one of IMAGE_PROVIDER_CHOICES ids
+    model: str = DEFAULT_CHARACTER_IMAGE_MODEL
+    base_url: str = ""  # empty → factory picks the provider's default URL
 
 
 @dataclass(frozen=True)
@@ -473,6 +484,36 @@ def write_image_provider_prefs(prefs: ImageProviderPrefs) -> None:
     write_app_state(state)
 
 
+def read_character_image_provider_prefs() -> CharacterImageProviderPrefs:
+    """Load persisted character-image prefs; fall back to defaults on any problem."""
+    raw_obj: object = read_app_state().get("character_image_provider_prefs")
+    if not isinstance(raw_obj, dict):
+        return CharacterImageProviderPrefs()
+    raw: dict[str, Any] = {str(k): v for k, v in raw_obj.items()}  # type: ignore[redundant-cast]
+    provider = str(raw.get("provider", DEFAULT_CHARACTER_IMAGE_PROVIDER))
+    if provider not in _ALLOWED_IMAGE_PROVIDERS:
+        return CharacterImageProviderPrefs()
+    model = str(raw.get("model", DEFAULT_CHARACTER_IMAGE_MODEL))
+    base_url = str(raw.get("base_url", ""))
+    return CharacterImageProviderPrefs(provider=provider, model=model, base_url=base_url)
+
+
+def write_character_image_provider_prefs(prefs: CharacterImageProviderPrefs) -> None:
+    """Persist character-image prefs to app state for future ``load_config()`` calls."""
+    state = read_app_state()
+    state["character_image_provider_prefs"] = _serialize_character_image_prefs(prefs)
+    write_app_state(state)
+
+
+def _serialize_character_image_prefs(prefs: CharacterImageProviderPrefs) -> dict[str, Any]:
+    """Serialization shape used by character-image prefs writers."""
+    return {
+        "provider": prefs.provider,
+        "model": prefs.model,
+        "base_url": prefs.base_url,
+    }
+
+
 def _serialize_image_prefs(prefs: ImageProviderPrefs) -> dict[str, Any]:
     """Serialization shape used by both ``write_image_provider_prefs`` and
     ``write_all_settings`` — must stay byte-identical between them."""
@@ -543,6 +584,7 @@ def write_all_settings(
     image_prefs: ImageProviderPrefs,
     text_prefs: ProviderPrefs,
     wizard_defaults: WizardDefaults,
+    character_image_prefs: CharacterImageProviderPrefs | None = None,
     tts_prefs: TTSPrefs | None = None,
     art_enabled_value: bool,
     prefetch_enabled_value: bool,
@@ -562,6 +604,10 @@ def write_all_settings(
     """
     state = read_app_state()
     state["image_provider_prefs"] = _serialize_image_prefs(image_prefs)
+    if character_image_prefs is not None:
+        state["character_image_provider_prefs"] = _serialize_character_image_prefs(
+            character_image_prefs
+        )
     state["provider_prefs"] = _serialize_text_prefs(text_prefs)
     state["wizard_defaults"] = _serialize_wizard_defaults(wizard_defaults)
     if tts_prefs is not None:

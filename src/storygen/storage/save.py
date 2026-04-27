@@ -48,6 +48,9 @@ class GameSave(BaseModel):
     reader_level: ReaderLevel = "ages_11_15"
     text_config: TextProviderConfig
     image_config: ImageProviderConfig
+    character_image_config: ImageProviderConfig = Field(
+        default_factory=lambda: ImageProviderConfig(provider="openai", model="gpt-image-1.5")
+    )
     characters: list[Character]
     nodes: dict[NodeId, StoryNode]
     root_node_id: NodeId

@@ -57,6 +57,7 @@ class AppConfig:
     openai_api_key: str
     text_config: TextProviderConfig
     image_config: ImageProviderConfig
+    character_image_config: ImageProviderConfig
 
 
 def _env_or_none(key: str) -> str | None:
@@ -106,6 +107,13 @@ def _resolve_text_config() -> TextProviderConfig:
         _logger.warning("falling back to default text config (%s)", err)
         return TextProviderConfig()
     return candidate
+
+
+def _image_config_from_character_defaults() -> ImageProviderConfig:
+    return ImageProviderConfig(
+        provider=cast(ImageProviderName, app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER),
+        model=app_state.DEFAULT_CHARACTER_IMAGE_MODEL,
+    )
 
 
 def _resolve_image_config() -> ImageProviderConfig:
@@ -158,14 +166,57 @@ def _resolve_image_config() -> ImageProviderConfig:
     return candidate
 
 
+def _resolve_character_image_config() -> ImageProviderConfig:
+    """Merge character-image env vars over character-image prefs/defaults.
+
+    Character portrait config is intentionally independent from scene/cover art
+    config: absent ``STORYGEN_CHARACTER_IMAGE_*`` vars never inherit
+    ``STORYGEN_IMAGE_*`` values or art image prefs.
+    """
+    prefs = app_state.read_character_image_provider_prefs()
+
+    env_provider_raw = _env_or_none("STORYGEN_CHARACTER_IMAGE_PROVIDER")
+    if env_provider_raw is not None and env_provider_raw in _ALLOWED_IMAGE_PROVIDERS:
+        provider = env_provider_raw
+    else:
+        if env_provider_raw is not None:
+            _logger.warning(
+                "ignoring invalid STORYGEN_CHARACTER_IMAGE_PROVIDER=%r",
+                env_provider_raw,
+            )
+        provider = prefs.provider
+
+    model = _env_or_none("STORYGEN_CHARACTER_IMAGE_MODEL") or prefs.model
+
+    env_base_url = _env_or_none("STORYGEN_CHARACTER_IMAGE_BASE_URL")
+    base_url_raw = env_base_url if env_base_url is not None else prefs.base_url
+    base_url: str | None = base_url_raw if base_url_raw else None
+
+    api_key = os.environ.get("STORYGEN_CHARACTER_IMAGE_API_KEY")
+
+    candidate = ImageProviderConfig(
+        provider=cast(ImageProviderName, provider),
+        model=model,
+        base_url=base_url,
+        api_key=api_key,
+    )
+    ok, err = validate_image_config(candidate)
+    if not ok:
+        _logger.warning("falling back to default character image config (%s)", err)
+        return _image_config_from_character_defaults()
+    return candidate
+
+
 def load_config() -> AppConfig:
     """Resolve config from (real env union .env file) using real env on conflicts."""
     _load_dotenv_once()
 
     text_config = _resolve_text_config()
     image_config = _resolve_image_config()
+    character_image_config = _resolve_character_image_config()
     return AppConfig(
         openai_api_key=os.environ.get("OPENAI_API_KEY", ""),
         text_config=text_config,
         image_config=image_config,
+        character_image_config=character_image_config,
     )

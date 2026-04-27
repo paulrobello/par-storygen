@@ -410,6 +410,74 @@ def test_image_provider_choices_and_suggested_models_shape() -> None:
     assert set(app_state.IMAGE_API_KEY_ENV.keys()) == provider_ids
 
 
+def test_character_image_provider_prefs_empty_state_returns_defaults(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    prefs = app_state.read_character_image_provider_prefs()
+    assert prefs.provider == "openai"
+    assert prefs.model == "gpt-image-1.5"
+    assert prefs.base_url == ""
+
+
+def test_character_image_provider_prefs_round_trip(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    prefs = app_state.CharacterImageProviderPrefs(
+        provider="gemini",
+        model="gemini-3-pro-image-preview",
+        base_url="https://generativelanguage.googleapis.com/v1",
+    )
+    app_state.write_character_image_provider_prefs(prefs)
+    restored = app_state.read_character_image_provider_prefs()
+    assert restored == prefs
+
+
+def test_character_image_provider_prefs_invalid_provider_falls_back(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    cfg_dir = tmp_path / "storygen"
+    cfg_dir.mkdir(parents=True)
+    (cfg_dir / "state.json").write_text(
+        json.dumps(
+            {
+                "character_image_provider_prefs": {
+                    "provider": "mystery-provider",
+                    "model": "anything",
+                    "base_url": "https://example.invalid",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    prefs = app_state.read_character_image_provider_prefs()
+    assert prefs == app_state.CharacterImageProviderPrefs()
+
+
+def test_write_all_settings_persists_character_image_provider_prefs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    prefs = app_state.CharacterImageProviderPrefs(
+        provider="zai",
+        model="glm-image",
+        base_url="https://api.z.ai/v1",
+    )
+    app_state.write_all_settings(
+        image_prefs=app_state.ImageProviderPrefs(),
+        character_image_prefs=prefs,
+        text_prefs=app_state.ProviderPrefs(),
+        wizard_defaults=app_state.WizardDefaults(),
+        art_enabled_value=True,
+        prefetch_enabled_value=False,
+        prefetch_images_enabled_value=False,
+        image_streaming_enabled_value=False,
+    )
+    assert app_state.read_character_image_provider_prefs() == prefs
+
+
 def test_wizard_defaults_does_not_clobber_other_state(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
