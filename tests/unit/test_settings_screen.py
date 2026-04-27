@@ -680,7 +680,7 @@ async def test_scene_cover_and_character_image_provider_sections_render(
         screen = app.screen
         assert isinstance(screen, SettingsScreen)
         headings = [str(static.content) for static in screen.query(Static)]
-        assert "Scene/cover art provider" in headings
+        assert "Art generation provider (scenes + covers)" in headings
         assert "Character portrait provider" in headings
         assert "Image provider" not in headings
 
