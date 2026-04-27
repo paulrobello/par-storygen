@@ -126,6 +126,8 @@ class _AdvancingPipeline:
     def __init__(self) -> None:
         self.advance_calls: list[tuple[str, str]] = []
         self.advance_started = asyncio.Event()
+        self.allow_advance_return = asyncio.Event()
+        self.block_after_commit = False
 
     def start_prefetch(self, save: GameSave, *, from_node_id: str, with_images: bool) -> None:
         return None
@@ -172,6 +174,8 @@ class _AdvancingPipeline:
         save.current_node_id = child_id
         if callbacks is not None and not suppress_side_effects:
             await callbacks.on_beat_committed(child)
+        if self.block_after_commit:
+            await self.allow_advance_return.wait()
         return child
 
 
@@ -289,6 +293,40 @@ async def test_autoplay_pick_waits_for_auto_read_to_finish(
             assert player.spoken == ["The path continues."]
             assert not task.done()
             player.release.set()
+            await asyncio.wait_for(task, timeout=1.0)
+        finally:
+            if not task.done():
+                task.cancel()
+            else:
+                task.exception()
+
+
+@pytest.mark.asyncio
+async def test_auto_read_starts_after_beat_commit_before_image_work_finishes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setattr(app_state, "read_tts_prefs", lambda: app_state.TTSPrefs(auto_read=True))
+    save = _minimal_save()
+    pipeline = _AdvancingPipeline()
+    pipeline.block_after_commit = True
+    player = _BlockingTTSPlayer()
+    app = _PlayHarnessWithDeps(save, pipeline, tts_player=player)
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, PlayScreen)
+        task = asyncio.create_task(
+            screen._pick(1, auto_read_inline=False)  # pyright: ignore[reportPrivateUsage]
+        )
+        try:
+            await asyncio.wait_for(player.started.wait(), timeout=1.0)
+            assert pipeline.allow_advance_return.is_set() is False
+            assert not task.done()
+            player.release.set()
+            pipeline.allow_advance_return.set()
             await asyncio.wait_for(task, timeout=1.0)
         finally:
             if not task.done():

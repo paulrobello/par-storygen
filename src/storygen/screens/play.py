@@ -15,7 +15,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Footer, Header
 
-from storygen.llm.models import NodeId
+from storygen.llm.models import NodeId, StoryNode
 from storygen.pipeline import BeatPipeline, PipelineCallbacks
 from storygen.screens.endings import EndingsScreen
 from storygen.screens.graph import GraphScreen
@@ -358,9 +358,24 @@ class PlayScreen(Screen[None]):
         self.refresh_bindings()
         # Clear when the first delta arrives (the streamed text replaces this).
         self._awaiting_first_delta = True
+        auto_read_task: asyncio.Task[None] | None = None
+
+        async def on_beat_committed(committed: object) -> None:
+            nonlocal auto_read_task
+            await self._on_beat_committed(committed)
+            if isinstance(committed, StoryNode) and committed.narration:
+                if auto_read_inline:
+                    auto_read_task = asyncio.create_task(self._maybe_auto_read(committed.narration))
+                else:
+                    self.run_worker(
+                        self._maybe_auto_read(committed.narration),
+                        exclusive=False,
+                        name="auto-read",
+                    )
+
         cb = PipelineCallbacks(
             on_narration_delta=self._on_narration_delta,
-            on_beat_committed=self._on_beat_committed,
+            on_beat_committed=on_beat_committed,
             on_image_committed=self._on_image_committed,
             on_image_failed=self._on_image_failed,
             on_new_characters=self._on_new_characters,
@@ -376,17 +391,8 @@ class PlayScreen(Screen[None]):
             self._loading = False
             self._throbber.stop()
             self._render_current()
-            # Auto-read the newly generated narration if TTS is configured.
-            current_node = self._save.nodes.get(self._save.current_node_id)
-            if current_node and current_node.narration:
-                if auto_read_inline:
-                    await self._maybe_auto_read(current_node.narration)
-                else:
-                    self.run_worker(
-                        self._maybe_auto_read(current_node.narration),
-                        exclusive=False,
-                        name="auto-read",
-                    )
+            if auto_read_inline and auto_read_task is not None:
+                await auto_read_task
 
     async def _on_narration_delta(self, delta: str) -> None:
         if getattr(self, "_awaiting_first_delta", False):
