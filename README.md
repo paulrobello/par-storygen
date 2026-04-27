@@ -183,10 +183,14 @@ options:
 ### Image provider variables
 * `GEMINI_API_KEY` — Google Gemini API key
 * `ZAI_API_KEY` — Z.AI API key
-* `STORYGEN_IMAGE_PROVIDER` — `openai` (default), `gemini`, `zai`, or `ollama`
-* `STORYGEN_IMAGE_MODEL` — Model identifier (default: `gpt-image-2`)
-* `STORYGEN_IMAGE_BASE_URL` — Override base URL for the image provider
-* `STORYGEN_IMAGE_API_KEY` — Override API key for the image provider
+* `STORYGEN_IMAGE_PROVIDER` — Scene/cover art provider: `openai` (default), `gemini`, `zai`, or `ollama`
+* `STORYGEN_IMAGE_MODEL` — Scene/cover art model identifier (default: `gpt-image-2`)
+* `STORYGEN_IMAGE_BASE_URL` — Override base URL for the scene/cover art provider
+* `STORYGEN_IMAGE_API_KEY` — Override API key for the scene/cover art provider
+* `STORYGEN_CHARACTER_IMAGE_PROVIDER` — Character portrait provider: `openai` (default), `gemini`, `zai`, or `ollama`
+* `STORYGEN_CHARACTER_IMAGE_MODEL` — Character portrait model identifier (default: `gpt-image-1.5` for transparent-background support)
+* `STORYGEN_CHARACTER_IMAGE_BASE_URL` — Override base URL for the character portrait provider
+* `STORYGEN_CHARACTER_IMAGE_API_KEY` — Override API key for the character portrait provider
 
 See [`.env.example`](./.env.example) for the full list.
 
@@ -259,15 +263,20 @@ Set `STORYGEN_TEXT_PROVIDER=ollama` and run `ollama serve` locally (default: `ht
 
 par-storygen supports four image-gen providers. Only OpenAI and Gemini support *reference images* — the pattern used to keep characters visually consistent across scenes. Z.AI and Ollama are text-to-image only, so character consistency will drift.
 
-There are two ways to select the image provider and model:
+Scene/cover art and character portraits are configured separately:
 
-1. **Environment variables** — `STORYGEN_IMAGE_PROVIDER`, `STORYGEN_IMAGE_MODEL`, `STORYGEN_IMAGE_BASE_URL`, and `STORYGEN_IMAGE_API_KEY`. See [`.env.example`](./.env.example).
-2. **Settings screen** (persisted across sessions) — edit the "Image provider" block in Settings.
+- **Scene/cover art** uses `STORYGEN_IMAGE_PROVIDER`, `STORYGEN_IMAGE_MODEL`, `STORYGEN_IMAGE_BASE_URL`, and `STORYGEN_IMAGE_API_KEY`. The hardcoded default is OpenAI **`gpt-image-2`**.
+- **Character portraits** use `STORYGEN_CHARACTER_IMAGE_PROVIDER`, `STORYGEN_CHARACTER_IMAGE_MODEL`, `STORYGEN_CHARACTER_IMAGE_BASE_URL`, and `STORYGEN_CHARACTER_IMAGE_API_KEY`. The hardcoded default is OpenAI **`gpt-image-1.5`**, chosen because portrait generation requests transparent backgrounds.
 
-**Priority order:** real environment variables > `.env` file > Settings-saved prefs > hardcoded default (`openai` / `gpt-image-2`).
+There are two ways to select image providers and models:
+
+1. **Environment variables** — use the scene/cover `STORYGEN_IMAGE_*` variables and/or the portrait-specific `STORYGEN_CHARACTER_IMAGE_*` variables. See [`.env.example`](./.env.example).
+2. **Settings screen** (persisted across sessions) — edit the "Image provider" block for scene/cover art and the "Character portrait provider" block for portraits.
+
+**Priority order for each image config:** real environment variables > `.env` file > Settings-saved prefs > hardcoded defaults (`openai` / `gpt-image-2` for scene/cover art, `openai` / `gpt-image-1.5` for character portraits).
 
 ### OpenAI
-Set `OPENAI_API_KEY`. Supports reference images natively via `images.edit` — each scene folds in the featured characters' portraits so faces stay consistent. Known-good models: **`gpt-image-2`** (default), **`gpt-image-1.5`** (previous gen), **`gpt-image-1`** (older, cheaper — untested with current `gpt-image-2`-tuned prompts). Docs: [platform.openai.com/docs/guides/images](https://platform.openai.com/docs/guides/images).
+Set `OPENAI_API_KEY`. Supports reference images natively via `images.edit` — each scene folds in the featured characters' portraits so faces stay consistent. Known-good models: **`gpt-image-2`** (default for scene/cover art), **`gpt-image-1.5`** (default for transparent-background character portraits), **`gpt-image-1`** (older, cheaper — untested with current `gpt-image-2`-tuned scene prompts). Docs: [platform.openai.com/docs/guides/images](https://platform.openai.com/docs/guides/images).
 
 ### Google Gemini
 Set `GEMINI_API_KEY` and `STORYGEN_IMAGE_PROVIDER=gemini`. Supports up to 14 reference images per call. Known-good models: **`gemini-3.1-flash-image-preview`** (Nano Banana 2, $0.067/1K image tokens), **`gemini-3-pro-image-preview`** (Nano Banana Pro, $0.134/image). Leave `STORYGEN_IMAGE_BASE_URL` blank for Gemini. Docs: [ai.google.dev/gemini-api/docs/image-generation](https://ai.google.dev/gemini-api/docs/image-generation).
@@ -281,7 +290,7 @@ Set `STORYGEN_IMAGE_PROVIDER=ollama` and run `ollama serve` locally. No API key 
 ### Fallback provider
 Settings lets you pick a secondary image provider that kicks in when the primary fails. Each fallback trip fires a toast. Useful combos: OpenAI primary + Gemini fallback (both ref-supporting). Same-provider fallbacks are ignored.
 
-**Note:** Each save pins its own `image_config`. Changing the primary image provider in Settings only affects new stories.
+**Note:** Each save pins both `image_config` (scene/cover art) and `character_image_config` (portraits). Changing either image provider in Settings only affects new stories.
 
 ## Character library: exporting and importing
 
@@ -352,7 +361,7 @@ Click any outfit thumbnail for a Set as current / Delete / Cancel menu. Setting 
 The main (base) portrait is preserved. Press **Revert to base** (visible only when an outfit is active) to switch back. Deleting the currently-active outfit auto-reverts to base first.
 
 ### Notes
-- Outfit generation uses the same image provider + model + cost as a regular portrait.
+- Outfit generation uses the character portrait image provider + model + cost, same as a regular portrait.
 - Image streaming is intentionally OFF for outfit generation (portraits are 5-10s — too fast for streaming to pay off).
 - Library export captures only the currently-active outfit. Imported characters start with an empty `outfits` list.
 
@@ -381,8 +390,8 @@ Audio files are cached per node, provider, and voice in the save's `audio/` dire
 
 Press `a` from the play screen to auto-advance the story with random choices. Auto-play:
 
-- **Waits for the scene image** — 5 second viewing delay after the image is displayed (if art is enabled).
-- **Waits for TTS** — if auto-read is on, waits for narration playback to finish (including through pauses) before advancing.
+- **Waits for the scene image** — waits until the current scene image reaches a terminal state (`done` or `failed`), then applies a 5 second viewing delay after the image is displayed (if art is enabled).
+- **Waits for TTS** — if auto-read is on, waits for narration playback to finish (including through pauses) before advancing to the next random choice.
 - **Stops at endings** — auto-play halts when an ending node is reached.
 - **Toggle off** — press `a` again to stop at any time.
 

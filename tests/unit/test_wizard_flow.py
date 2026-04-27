@@ -13,7 +13,9 @@ from storygen.screens.wizard import WizardFlow, WizardStep
 
 _TEXT_CONFIG = TextProviderConfig(provider="openai", model="gpt-4o-mini")
 _IMAGE_CONFIG = ImageProviderConfig(provider="openai", model="gpt-image-2")
-_CHARACTER_IMAGE_CONFIG = ImageProviderConfig(provider="gemini", model="gemini-3.1-flash-image-preview")
+_CHARACTER_IMAGE_CONFIG = ImageProviderConfig(
+    provider="gemini", model="gemini-3.1-flash-image-preview"
+)
 
 
 class FakeThemeAgent:

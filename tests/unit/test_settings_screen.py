@@ -715,12 +715,12 @@ async def test_save_persists_character_image_provider_prefs(
         char_sel = screen.query_one("#character-image-provider-select", Select)  # pyright: ignore[reportUnknownVariableType]
         char_sel.value = "gemini"  # pyright: ignore[reportUnknownMemberType]
         await pilot.pause()
-        screen.query_one("#character-image-provider-model", Input).value = (
-            "gemini-3-pro-image-preview"
-        )
-        screen.query_one("#character-image-provider-base-url", Input).value = (
-            "https://generativelanguage.googleapis.com/v1"
-        )
+        screen.query_one(
+            "#character-image-provider-model", Input
+        ).value = "gemini-3-pro-image-preview"
+        screen.query_one(
+            "#character-image-provider-base-url", Input
+        ).value = "https://generativelanguage.googleapis.com/v1"
         screen.query_one("#btn-save", Button).press()
         await pilot.pause()
 
