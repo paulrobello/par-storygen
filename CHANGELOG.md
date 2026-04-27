@@ -7,23 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-26
+
 ### Added
 
 - **Text-to-speech** — Read story narration aloud via `par-cli-tts` (OpenAI, ElevenLabs, Deepgram, Gemini, Kokoro). Settings: provider, API key, voice selection with refresh, auto-read toggle. Play screen: `t` pause/resume, `T` restart, `s` stop. Audio caching in `audio/` is keyed by node, provider, and voice, with provider-preferred file extensions to avoid stale narration after TTS setting changes.
 - **Auto-select** — Press `a` to auto-play the story with random choices. Waits for image display (5s viewing delay) and TTS playback to finish before advancing. Stops at endings or when toggled off with `a`.
 - **Deferred illustration fix** — Prefetched nodes that have an illustration plan but no image now trigger scene generation when picked. The `i` (retry image) key also works for `not_planned` nodes with prompts.
-
-### Security
-
-- Exclude `api_key` from `GameSave` serialization (`Field(exclude=True)` on `ImageProviderConfig.api_key`); keys are re-resolved from env on load. Tighten permissions on saved games and library/cache files (`0o600` files, `0o700` directories).
-- Disable Rich markup rendering on gameplay widgets (`StoryPanel`, `ChoiceList`, `CharacterSheet`) to prevent injection via LLM-authored narration or imported character fields.
-- Add `paths.safe_join` helper and apply at every join of `game_dir` + persisted `portrait_path` / `image_path` to block path traversal from crafted save files.
-- Log exception detail at DEBUG and present fixed user-facing messages in UI notifications (no more `str(exc)` leaking provider HTTP bodies).
-- Remove unused `pyyaml` dependency.
-- Resolve `.env` via `find_dotenv(usecwd=True)` instead of strict CWD-relative `Path(".env")`.
-
-### Added
-
 - New `storygen.core.models` package — canonical home for shared domain types (`Character`, `StoryNode`, `Choice`, `IllustrationPlan`, `TextProviderConfig`, `ImageProviderConfig`, `NarrationStyle`, `ReaderLevel`, …). Resolves the `storage`/`llm` circular import.
 - New `storygen.images.constants` module — provider-agnostic image-size / quality constants (`Final[Literal[...]]`).
 - New `storygen.widgets._image_util.render_image_thumbnail` helper with optional `on_click` callback (now used by `portraits`, `library_browser`, and `endings`).
@@ -62,6 +52,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `NarrationStyle = str` workaround in `llm/prompts.py`.
 - `.env~` vim backup file (gitignored, but was still on disk).
 
+### Security
+
+- Exclude `api_key` from `GameSave` serialization (`Field(exclude=True)` on `ImageProviderConfig.api_key`); keys are re-resolved from env on load. Tighten permissions on saved games and library/cache files (`0o600` files, `0o700` directories).
+- Disable Rich markup rendering on gameplay widgets (`StoryPanel`, `ChoiceList`, `CharacterSheet`) to prevent injection via LLM-authored narration or imported character fields.
+- Add `paths.safe_join` helper and apply at every join of `game_dir` + persisted `portrait_path` / `image_path` to block path traversal from crafted save files.
+- Log exception detail at DEBUG and present fixed user-facing messages in UI notifications (no more `str(exc)` leaking provider HTTP bodies).
+- Remove unused `pyyaml` dependency.
+- Resolve `.env` via `find_dotenv(usecwd=True)` instead of strict CWD-relative `Path(".env")`.
+
 ## [0.1.0] - 2026-04-23
 
 ### Added
@@ -85,4 +84,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings screen** — persisted in-app configuration for provider defaults, art toggle, streaming, prefetch options, and wizard defaults
 - **Save/resume** — `--resume` flag re-opens the last-played save; full game state persistence
 
+[Unreleased]: https://github.com/paulrobello/par-storygen/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/paulrobello/par-storygen/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/paulrobello/par-storygen/releases/tag/v0.1.0
