@@ -35,6 +35,7 @@ from storygen.screens.wizard import (
 )
 from storygen.storage import app_state
 from storygen.storage.app_state import (
+    CharacterImageProviderPrefs,
     ImageProviderPrefs,
     ProviderPrefs,
     TTSPrefs,
@@ -102,7 +103,9 @@ class SettingsScreen(Screen[None]):
     SettingsScreen #provider-api-key-status,
     SettingsScreen #provider-suggested,
     SettingsScreen #image-provider-api-key-status,
-    SettingsScreen #image-provider-suggested { color: $text-muted; }
+    SettingsScreen #image-provider-suggested,
+    SettingsScreen #character-image-provider-api-key-status,
+    SettingsScreen #character-image-provider-suggested { color: $text-muted; }
     SettingsScreen #image-ref-warning {
         text-style: bold;
         color: $warning;
@@ -245,6 +248,34 @@ class SettingsScreen(Screen[None]):
         )
         self._ollama_warning.display = False
 
+        # --- Character portrait image provider widgets ---
+        self._character_image_provider_select: Select[str] = Select(
+            list(app_state.IMAGE_PROVIDER_CHOICES),
+            value=app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER,
+            allow_blank=False,
+            id="character-image-provider-select",
+        )
+        self._character_image_model_select: Select[str] = Select(
+            self._character_image_model_options(app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER),
+            value=app_state.DEFAULT_CHARACTER_IMAGE_MODEL,
+            allow_blank=False,
+            id="character-image-provider-model-select",
+        )
+        self._character_image_model_input = Input(
+            value=app_state.DEFAULT_CHARACTER_IMAGE_MODEL,
+            placeholder="e.g. gpt-image-1.5",
+            id="character-image-provider-model",
+        )
+        self._character_image_base_url_input = Input(
+            value="",
+            placeholder=_image_base_url_placeholder(app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER),
+            id="character-image-provider-base-url",
+        )
+        self._character_image_api_key_status = Static(
+            "", id="character-image-provider-api-key-status"
+        )
+        self._character_image_suggested = Static("", id="character-image-provider-suggested")
+
         # --- Wizard defaults ---
         self._theme_area = TextArea(id="default-theme")
         self._tone_select = Select(
@@ -339,6 +370,17 @@ class SettingsScreen(Screen[None]):
             yield self._fallback_model_input
             yield self._ref_warning
             yield self._ollama_warning
+
+            yield Static("Character portrait provider", classes="section")
+            yield Label("Provider")
+            yield self._character_image_provider_select
+            yield Label("Model")
+            yield self._character_image_model_select
+            yield self._character_image_model_input
+            yield Label("Base URL (blank = use provider default)")
+            yield self._character_image_base_url_input
+            yield self._character_image_api_key_status
+            yield self._character_image_suggested
 
             yield Static("Wizard defaults", classes="section")
             yield Label("Default theme")
@@ -498,6 +540,37 @@ class SettingsScreen(Screen[None]):
             return
         self._image_suggested.update(f"Suggested: {', '.join(models)}")
 
+    def _refresh_character_image_api_key_status(self, provider: str) -> None:
+        env_name = app_state.IMAGE_API_KEY_ENV.get(provider)
+        if env_name is None:
+            self._character_image_api_key_status.update("No API key required (local)")
+            return
+        present = bool(os.environ.get(env_name))
+        mark = "present" if present else "missing"
+        self._character_image_api_key_status.update(f"API key ({env_name}): {mark}")
+
+    def _character_image_model_options(self, provider: str) -> list[tuple[str, str]]:
+        return self._image_model_options(provider)
+
+    def _sync_character_image_model_select(self, provider: str, model: str) -> None:
+        options = self._character_image_model_options(provider)
+        curated_values = {v for _, v in options if v != self._CUSTOM_MODEL}
+        target_value = model if model in curated_values else self._CUSTOM_MODEL
+        with self._character_image_model_select.prevent(Select.Changed):
+            self._character_image_model_select.set_options(options)
+            self._character_image_model_select.value = target_value
+        self._character_image_model_input.display = target_value == self._CUSTOM_MODEL
+
+    def _refresh_character_image_suggested(self, provider: str) -> None:
+        models = app_state.SUGGESTED_IMAGE_MODELS.get(provider, ())
+        if not models:
+            self._character_image_suggested.update("")
+            return
+        self._character_image_suggested.update(f"Suggested: {', '.join(models)}")
+
+    def _current_character_image_provider(self) -> str:
+        return cast(str, self._character_image_provider_select.value)
+
     def _current_primary_image_provider(self) -> str:
         return cast(str, self._image_provider_select.value)
 
@@ -568,6 +641,25 @@ class SettingsScreen(Screen[None]):
         self._refresh_image_suggested(img_prefs.provider)
         self._refresh_ref_warning()
         self._refresh_ollama_warning()
+
+        # Character portrait image provider
+        character_img_prefs = app_state.read_character_image_provider_prefs()
+        with (
+            self._character_image_provider_select.prevent(Select.Changed),
+            self._character_image_model_input.prevent(Input.Changed),
+            self._character_image_base_url_input.prevent(Input.Changed),
+        ):
+            self._character_image_provider_select.value = character_img_prefs.provider
+            self._character_image_model_input.value = character_img_prefs.model
+            self._character_image_base_url_input.value = character_img_prefs.base_url
+            self._character_image_base_url_input.placeholder = _image_base_url_placeholder(
+                character_img_prefs.provider
+            )
+        self._sync_character_image_model_select(
+            character_img_prefs.provider, character_img_prefs.model
+        )
+        self._refresh_character_image_api_key_status(character_img_prefs.provider)
+        self._refresh_character_image_suggested(character_img_prefs.provider)
 
         # Wizard defaults
         defaults = app_state.read_wizard_defaults()
@@ -704,6 +796,49 @@ class SettingsScreen(Screen[None]):
             return
         provider = self._current_primary_image_provider()
         self._sync_image_model_select(provider, event.value.strip())
+
+    @on(Select.Changed, "#character-image-provider-select")
+    def _on_character_image_provider_changed(self, event: Select.Changed) -> None:
+        """Mirror of image provider switching for character-portrait generation."""
+        if self._suppress_image_provider_handler:
+            return
+        value_obj = event.value
+        if not isinstance(value_obj, str):
+            return
+        provider = value_obj
+        suggested = app_state.SUGGESTED_IMAGE_MODELS.get(provider, ())
+        first_model = suggested[0] if suggested else app_state.DEFAULT_CHARACTER_IMAGE_MODEL
+        with (
+            self._character_image_model_input.prevent(Input.Changed),
+            self._character_image_base_url_input.prevent(Input.Changed),
+        ):
+            self._character_image_model_input.value = first_model
+            self._character_image_base_url_input.value = ""
+            self._character_image_base_url_input.placeholder = _image_base_url_placeholder(provider)
+        self._sync_character_image_model_select(provider, first_model)
+        self._refresh_character_image_api_key_status(provider)
+        self._refresh_character_image_suggested(provider)
+
+    @on(Select.Changed, "#character-image-provider-model-select")
+    def _on_character_image_model_selected(self, event: Select.Changed) -> None:
+        if self._suppress_image_provider_handler:
+            return
+        value_obj = event.value
+        if not isinstance(value_obj, str):
+            return
+        if value_obj == self._CUSTOM_MODEL:
+            self._character_image_model_input.display = True
+            return
+        with self._character_image_model_input.prevent(Input.Changed):
+            self._character_image_model_input.value = value_obj
+        self._character_image_model_input.display = False
+
+    @on(Input.Changed, "#character-image-provider-model")
+    def _on_character_image_model_input_changed(self, event: Input.Changed) -> None:
+        if self._suppress_image_provider_handler:
+            return
+        provider = self._current_character_image_provider()
+        self._sync_character_image_model_select(provider, event.value.strip())
 
     @on(Select.Changed, "#image-fallback-select")
     def _on_image_fallback_changed(self, event: Select.Changed) -> None:
@@ -884,6 +1019,29 @@ class SettingsScreen(Screen[None]):
                     timeout=5,
                 )
 
+        # --- Character image provider validation ---
+        character_image_provider = self._current_character_image_provider()
+        character_image_model = self._character_image_model_input.value.strip()
+        character_image_base_url = self._character_image_base_url_input.value.strip()
+
+        if not character_image_model:
+            self.notify(
+                "Character image model cannot be empty — settings not saved.",
+                severity="error",
+                timeout=5,
+            )
+            return
+        if character_image_base_url and not (
+            character_image_base_url.startswith("http://")
+            or character_image_base_url.startswith("https://")
+        ):
+            self.notify(
+                "Character image base URL must start with http:// or https:// — settings not saved.",
+                severity="error",
+                timeout=5,
+            )
+            return
+
         # --- Text provider validation ---
         provider = cast(str, self._provider_select.value)
         model = self._model_input.value.strip()
@@ -911,6 +1069,11 @@ class SettingsScreen(Screen[None]):
             base_url=image_base_url,
             fallback_provider=fallback_provider,
             fallback_model=fallback_model if fallback_provider else "",
+        )
+        character_image_prefs = CharacterImageProviderPrefs(
+            provider=character_image_provider,
+            model=character_image_model,
+            base_url=character_image_base_url,
         )
         prefs = ProviderPrefs(provider=provider, model=model, base_url=base_url)
 
@@ -953,6 +1116,7 @@ class SettingsScreen(Screen[None]):
         # rebuilds only its own provider so the double-fire is harmless.
         app_state.write_all_settings(
             image_prefs=image_prefs,
+            character_image_prefs=character_image_prefs,
             text_prefs=prefs,
             wizard_defaults=defaults,
             tts_prefs=tts_prefs,
@@ -979,6 +1143,7 @@ class SettingsScreen(Screen[None]):
             self._style_select.prevent(Select.Changed),
             self._reader_level_select.prevent(Select.Changed),
             self._image_provider_select.prevent(Select.Changed),
+            self._character_image_provider_select.prevent(Select.Changed),
             self._fallback_select.prevent(Select.Changed),
             self._tts_provider_select.prevent(Select.Changed),
             self._tts_auto_read_switch.prevent(Switch.Changed),
@@ -1000,6 +1165,13 @@ class SettingsScreen(Screen[None]):
             self._fallback_select.value = self._FALLBACK_NONE
             self._fallback_model_input.value = ""
             self._fallback_model_input.disabled = True
+            # Character portrait image-provider section.
+            self._character_image_provider_select.value = app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER
+            self._character_image_model_input.value = app_state.DEFAULT_CHARACTER_IMAGE_MODEL
+            self._character_image_base_url_input.value = ""
+            self._character_image_base_url_input.placeholder = _image_base_url_placeholder(
+                app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER
+            )
             # Wizard defaults.
             self._theme_area.text = ""
             self._tone_select.value = app_state.DEFAULT_TONE_PRESET
@@ -1026,6 +1198,11 @@ class SettingsScreen(Screen[None]):
         self._refresh_image_suggested(app_state.DEFAULT_IMAGE_PROVIDER)
         self._sync_image_model_select(
             app_state.DEFAULT_IMAGE_PROVIDER, app_state.DEFAULT_IMAGE_MODEL
+        )
+        self._refresh_character_image_api_key_status(app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER)
+        self._refresh_character_image_suggested(app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER)
+        self._sync_character_image_model_select(
+            app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER, app_state.DEFAULT_CHARACTER_IMAGE_MODEL
         )
         self._ref_warning.display = False
         self._ollama_warning.display = False

@@ -665,6 +665,108 @@ async def test_save_with_fallback_matching_primary_warns_but_persists(
 
 
 # ------------------------------------------------------------------
+# Character portrait provider widgets
+# ------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_character_image_provider_section_renders(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    app = _Harness()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, SettingsScreen)
+        headings = [str(static.content) for static in screen.query(Static)]
+        assert "Character portrait provider" in headings
+
+
+@pytest.mark.asyncio
+async def test_character_image_provider_defaults_show_openai_v15(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    app = _Harness()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, SettingsScreen)
+        char_sel = screen.query_one("#character-image-provider-select", Select)  # pyright: ignore[reportUnknownVariableType]
+        char_model_select = screen.query_one("#character-image-provider-model-select", Select)  # pyright: ignore[reportUnknownVariableType]
+        char_model_input = screen.query_one("#character-image-provider-model", Input)
+        assert char_sel.value == app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER  # pyright: ignore[reportUnknownMemberType]
+        assert char_model_select.value == app_state.DEFAULT_CHARACTER_IMAGE_MODEL  # pyright: ignore[reportUnknownMemberType]
+        assert char_model_input.value == app_state.DEFAULT_CHARACTER_IMAGE_MODEL
+
+
+@pytest.mark.asyncio
+async def test_save_persists_character_image_provider_prefs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    app = _Harness()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, SettingsScreen)
+
+        char_sel = screen.query_one("#character-image-provider-select", Select)  # pyright: ignore[reportUnknownVariableType]
+        char_sel.value = "gemini"  # pyright: ignore[reportUnknownMemberType]
+        await pilot.pause()
+        screen.query_one("#character-image-provider-model", Input).value = (
+            "gemini-3-pro-image-preview"
+        )
+        screen.query_one("#character-image-provider-base-url", Input).value = (
+            "https://generativelanguage.googleapis.com/v1"
+        )
+        screen.query_one("#btn-save", Button).press()
+        await pilot.pause()
+
+    prefs = app_state.read_character_image_provider_prefs()
+    assert prefs.provider == "gemini"
+    assert prefs.model == "gemini-3-pro-image-preview"
+    assert prefs.base_url == "https://generativelanguage.googleapis.com/v1"
+    assert len(app.received_image_messages) == 1
+
+
+@pytest.mark.asyncio
+async def test_reset_restores_character_image_provider_defaults_without_persisting(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    app_state.write_character_image_provider_prefs(
+        app_state.CharacterImageProviderPrefs(
+            provider="zai",
+            model="glm-image",
+            base_url="https://api.z.ai/v1",
+        )
+    )
+    app = _Harness()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, SettingsScreen)
+        screen.query_one("#btn-reset", Button).press()
+        await pilot.pause()
+
+        char_sel = screen.query_one("#character-image-provider-select", Select)  # pyright: ignore[reportUnknownVariableType]
+        char_model_select = screen.query_one("#character-image-provider-model-select", Select)  # pyright: ignore[reportUnknownVariableType]
+        assert char_sel.value == app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER  # pyright: ignore[reportUnknownMemberType]
+        assert char_model_select.value == app_state.DEFAULT_CHARACTER_IMAGE_MODEL  # pyright: ignore[reportUnknownMemberType]
+        assert (
+            screen.query_one("#character-image-provider-model", Input).value
+            == app_state.DEFAULT_CHARACTER_IMAGE_MODEL
+        )
+        assert screen.query_one("#character-image-provider-base-url", Input).value == ""
+
+    restored = app_state.read_character_image_provider_prefs()
+    assert restored.provider == "zai"
+    assert restored.model == "glm-image"
+
+
+# ------------------------------------------------------------------
 # Branch prefetch (v2 Phase 1)
 # ------------------------------------------------------------------
 
