@@ -2,13 +2,25 @@
 
 from __future__ import annotations
 
-from storygen.llm.models import Choice
+from storygen.llm.models import Choice, StoredChoice
 from storygen.widgets.choice_list import ChoiceList, format_choice_line
 
 
 def test_format_choice_line() -> None:
     choice = Choice(id="c1", text="Take the left path")
     assert format_choice_line(1, choice) == "1. Take the left path"
+
+
+def test_format_choice_line_marks_previously_selected_choice() -> None:
+    choice = StoredChoice(id="c1", text="open the door", child_node_id="child-1")
+
+    assert format_choice_line(1, choice) == "1. open the door [selected]"
+
+
+def test_format_choice_line_leaves_unselected_choice_plain() -> None:
+    choice = StoredChoice(id="c1", text="open the door", child_node_id=None)
+
+    assert format_choice_line(1, choice) == "1. open the door"
 
 
 def test_set_choices_renders() -> None:

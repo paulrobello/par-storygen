@@ -11,7 +11,8 @@ from storygen.llm.models import Choice
 
 
 def format_choice_line(n: int, choice: Choice) -> str:
-    return f"{n}. {choice.text}"
+    selected_marker = " [selected]" if getattr(choice, "child_node_id", None) else ""
+    return f"{n}. {choice.text}{selected_marker}"
 
 
 class ChoiceList(Static):

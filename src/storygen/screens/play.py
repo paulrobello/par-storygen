@@ -243,9 +243,16 @@ class PlayScreen(Screen[None]):
         )
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
-        # While a beat is generating, only "menu" (escape) stays available so
-        # the user can bail out; everything else would act on stale state.
-        if self._loading and action not in ("menu", "auto_select"):
+        # While a beat is generating, keep navigation disabled so actions don't
+        # apply to stale choices; TTS controls are safe and must remain available
+        # when auto-play is waiting on image generation while audio is playing.
+        if self._loading and action not in (
+            "menu",
+            "auto_select",
+            "tts_toggle",
+            "tts_stop",
+            "tts_restart",
+        ):
             return False
         # During auto-select, only menu, auto_select, and TTS controls are available.
         if self._auto_selecting and action not in (
@@ -344,7 +351,9 @@ class PlayScreen(Screen[None]):
         if self._pipeline is None:
             return
         self._story.reset()
-        self._story.set_renderable(Text("Generating next beat…", style="dim"))
+        self._story.set_renderable(
+            Text(f"You chose: {choice.text}\nGenerating next beat…", style="dim")
+        )
         # Hide the previous beat's choices and image while the new beat streams
         # in; _render_current() at the end repopulates them from the new node.
         # Show the spinner placeholder up front so the user gets immediate

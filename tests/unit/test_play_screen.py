@@ -5,10 +5,12 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 from uuid import uuid4
 
 import pytest
 from textual.app import App, ComposeResult
+from textual.content import Content
 
 from storygen.llm.models import (
     ImageProviderConfig,
@@ -23,7 +25,7 @@ from storygen.screens.endings import EndingsScreen
 from storygen.screens.play import PlayScreen
 from storygen.storage import app_state, paths
 from storygen.storage.save import GameSave
-from storygen.tts.player import TTSPlayer
+from storygen.tts.player import TTSPlayer, TTSState
 from storygen.widgets.choice_list import ChoiceList
 from storygen.widgets.image_panel import ImagePanel
 from storygen.widgets.story_panel import StoryPanel
@@ -99,6 +101,12 @@ class _RecordingTTSPlayer(TTSPlayer):
         return True
 
 
+class _ConfiguredTTSPlayer(TTSPlayer):
+    @property
+    def is_configured(self) -> bool:
+        return True
+
+
 class _BlockingTTSPlayer(TTSPlayer):
     def __init__(self) -> None:
         super().__init__()
@@ -127,7 +135,9 @@ class _AdvancingPipeline:
         self.advance_calls: list[tuple[str, str]] = []
         self.advance_started = asyncio.Event()
         self.allow_advance_return = asyncio.Event()
+        self.allow_before_commit_return = asyncio.Event()
         self.block_after_commit = False
+        self.block_before_commit = False
 
     def start_prefetch(self, save: GameSave, *, from_node_id: str, with_images: bool) -> None:
         return None
@@ -147,6 +157,8 @@ class _AdvancingPipeline:
     ) -> StoryNode:
         self.advance_calls.append((from_node_id, choice_id))
         self.advance_started.set()
+        if self.block_before_commit:
+            await self.allow_before_commit_return.wait()
         child_id = f"{choice_id}-child"
         parent = save.nodes[from_node_id]
         for choice in parent.choices:
@@ -265,6 +277,37 @@ async def test_play_screen_mount_does_not_auto_read_loaded_story(
         await pilot.pause()
 
     assert player.spoken == []
+
+
+@pytest.mark.asyncio
+async def test_pick_loading_status_includes_selected_choice(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    save = _minimal_save()
+    pipeline = _AdvancingPipeline()
+    pipeline.block_before_commit = True
+    app = _PlayHarnessWithDeps(save, pipeline)
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, PlayScreen)
+        task = asyncio.create_task(screen._pick(1))  # pyright: ignore[reportPrivateUsage]
+        try:
+            await asyncio.wait_for(pipeline.advance_started.wait(), timeout=1.0)
+            story = screen.query_one(StoryPanel)
+            status_text = cast(Content, story.render()).plain
+            assert "You chose: sit up" in status_text
+            assert "Generating next beat…" in status_text
+            pipeline.allow_before_commit_return.set()
+            await asyncio.wait_for(task, timeout=1.0)
+        finally:
+            if not task.done():
+                task.cancel()
+            else:
+                task.exception()
 
 
 @pytest.mark.asyncio
@@ -533,6 +576,26 @@ async def test_speak_current_node_refreshes_stale_tts_audio_path_after_success(
 
     assert node.tts_audio_path == relative_cache
     assert relative_cache in paths.game_save_file(str(save.id)).read_text(encoding="utf-8")
+
+
+@pytest.mark.asyncio
+async def test_tts_controls_available_while_autoplay_loading() -> None:
+    save = _minimal_save()
+    player = _ConfiguredTTSPlayer()
+    player._state = TTSState.PLAYING  # pyright: ignore[reportPrivateUsage]
+    app = _PlayHarnessWithDeps(save, _AdvancingPipeline(), tts_player=player)
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, PlayScreen)
+        screen._auto_selecting = True  # pyright: ignore[reportPrivateUsage]
+        screen._loading = True  # pyright: ignore[reportPrivateUsage]
+
+        assert screen.check_action("tts_toggle", ()) is True
+        assert screen.check_action("tts_stop", ()) is True
+        assert screen.check_action("tts_restart", ()) is True
+        assert screen.check_action("pick", (1,)) is False
 
 
 @pytest.mark.asyncio
