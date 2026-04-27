@@ -354,7 +354,7 @@ class SettingsScreen(Screen[None]):
             yield self._api_key_status
             yield self._suggested
 
-            yield Static("Image provider", classes="section")
+            yield Static("Scene/cover art provider", classes="section")
             yield Label("Provider")
             yield self._image_provider_select
             yield Label("Model")

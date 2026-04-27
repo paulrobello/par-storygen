@@ -670,7 +670,7 @@ async def test_save_with_fallback_matching_primary_warns_but_persists(
 
 
 @pytest.mark.asyncio
-async def test_character_image_provider_section_renders(
+async def test_scene_cover_and_character_image_provider_sections_render(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
@@ -680,7 +680,9 @@ async def test_character_image_provider_section_renders(
         screen = app.screen
         assert isinstance(screen, SettingsScreen)
         headings = [str(static.content) for static in screen.query(Static)]
+        assert "Scene/cover art provider" in headings
         assert "Character portrait provider" in headings
+        assert "Image provider" not in headings
 
 
 @pytest.mark.asyncio
