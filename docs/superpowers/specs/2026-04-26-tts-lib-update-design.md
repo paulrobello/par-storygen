@@ -27,36 +27,31 @@ Out of scope for this pass:
 
 ## Current state
 
-StoryGen already has TTS support centered on `src/storygen/tts/player.py` and wired through `src/storygen/screens/play.py`, `src/storygen/screens/settings.py`, and `src/storygen/storage/app_state.py`.
+StoryGen has TTS support centered on `src/storygen/tts/player.py` and wired through `src/storygen/screens/play.py`, `src/storygen/screens/settings.py`, and `src/storygen/storage/app_state.py`.
 
-Current limitations:
-
-- The lockfile currently resolves `par-cli-tts` to 0.5.0.
-- `TTSPlayer` manually calls synchronous provider methods inside `asyncio.to_thread(...)`.
-- Persistent audio cache paths are always `audio/{node_id}.mp3`, even for providers whose preferred output is WAV or another format.
-- Cache reuse is keyed only by node id, so switching provider or voice can replay stale narration generated with an earlier provider/voice.
+The lockfile resolves `par-cli-tts` to 0.5.1. `TTSPlayer` calls provider async methods (`list_voices_async`, `generate_speech_async`) with `asyncio.to_thread` fallback for providers that lack async variants. Persistent audio cache paths are provider-aware, voice-aware, and format-aware via `audio/{node_id}-{provider}-{voice_hash}.{ext}` (see `src/storygen/storage/paths.py`). Cache reuse is keyed by node id, provider, and voice hash, so switching provider or voice generates a fresh file rather than replaying stale narration.
 
 ## Architecture
 
 `TTSPlayer` remains StoryGen's adapter between Textual screens and `par_tts` providers. It owns provider configuration, voice listing, generation state, current audio file tracking, and playback subprocess control.
 
-The new integration should use `par_tts` 0.5.1 provider async methods:
+The integration uses `par_tts` 0.5.1 provider async methods:
 
-- `provider.list_voices_async()` for voice refresh.
-- `provider.generate_speech_async(...)` for synthesis.
+- `provider.list_voices_async()` for voice refresh (with `asyncio.to_thread` fallback to `list_voices`).
+- `provider.generate_speech_async(...)` for synthesis (with `asyncio.to_thread` fallback to `generate_speech`).
 
-StoryGen should not switch to `par_tts.audio.play_audio_with_player()` in this pass because that helper blocks in subprocess calls and does not expose StoryGen's current interactive pause/resume/stop controls. StoryGen keeps its own `asyncio.create_subprocess_exec(...)` playback path.
+StoryGen does not use `par_tts.audio.play_audio_with_player()` because that helper blocks in subprocess calls and does not expose StoryGen's current interactive pause/resume/stop controls. StoryGen keeps its own `asyncio.create_subprocess_exec(...)` playback path.
 
 ## Cache path design
 
-Persistent TTS cache paths should include:
+Persistent TTS cache paths include:
 
 - Story node id.
 - TTS provider id.
 - Effective voice id, or a stable sentinel for provider default voice.
 - Preferred file extension based on the active provider's `supported_formats`.
 
-Recommended shape:
+Shape:
 
 ```text
 audio/{node_id}-{provider}-{voice_hash}.{ext}
@@ -70,11 +65,11 @@ audio/root-gemini-93bd10.wav
 audio/root-kokoro-onnx-e91c2a.wav
 ```
 
-The voice component should be a short deterministic hash of the configured voice string. Blank voice should hash a sentinel such as `__default__`, so default-voice cache files are stable and do not collide with explicit custom voice names.
+The voice component is a short deterministic hash of the configured voice string (8 hex characters from SHA-256). Blank voice hashes a sentinel `__default__`, so default-voice cache files are stable and do not collide with explicit custom voice names.
 
-Provider ids should be sanitized to filesystem-safe characters before use. Current provider ids are already simple (`openai`, `elevenlabs`, `deepgram`, `gemini`, `kokoro-onnx`), but the helper should avoid assuming that forever.
+Provider ids are sanitized to filesystem-safe characters before use. Current provider ids are already simple (`openai`, `elevenlabs`, `deepgram`, `gemini`, `kokoro-onnx`), but the helper (`_safe_tts_component`) handles arbitrary input.
 
-The extension should come from the provider's first supported format when available. If the provider is unavailable or does not declare formats, fall back to `mp3` to preserve current behavior.
+The extension comes from the provider's first supported format when available. If the provider is unavailable or does not declare formats, the helper falls back to `mp3`.
 
 ## Data flow
 
@@ -82,32 +77,35 @@ Manual or auto-read flow:
 
 1. `PlayScreen` reads current TTS prefs with `app_state.read_tts_prefs()`.
 2. `PlayScreen` configures `TTSPlayer` with provider, API key, and voice.
-3. `PlayScreen` asks `TTSPlayer` or a storage helper for the active cache file extension and computes the persistent cache path using game id, node id, provider, and voice.
+3. `PlayScreen` asks `TTSPlayer` for the active cache file extension via `preferred_extension` and computes the persistent cache path using `paths.tts_audio_path(game_id, node_id, provider, voice, ext)`.
 4. If the cache file exists, `TTSPlayer.speak(...)` skips generation and plays that file.
-5. If no cache file exists, `TTSPlayer.speak(...)` generates speech through `provider.generate_speech_async(...)`, writes the resulting bytes or async stream to the cache path, then plays it.
+5. If no cache file exists, `TTSPlayer.speak(...)` generates speech through `provider.generate_speech_async(...)`, writes the resulting bytes or async stream to the cache path via atomic temp-file write, then plays it.
 6. After successful first generation, `PlayScreen` stores the relative cache path on `StoryNode.tts_audio_path` and saves the game.
 
 `StoryNode.tts_audio_path` remains a convenience pointer to the last generated TTS file for that node. Cache lookup should still be based on current prefs and path helpers, not blindly on the stored path, because the stored path may refer to a previous provider/voice.
 
 ## Error handling
 
-- Provider configuration failures leave `TTSPlayer.is_configured == False` and log a warning, matching current behavior.
-- Voice refresh failures log a warning and return an empty list, matching current behavior.
+- Provider configuration failures leave `TTSPlayer.is_configured == False` and log a warning.
+- Voice refresh failures log a warning and return an empty list.
 - Generation failures return `False`, reset state to `IDLE`, and do not create or preserve partial cache files.
 - Cache file write failures delete the partial target and return `False`.
-- Existing old cache files are left in place but no longer reused across provider/voice changes because new lookup paths include provider and voice.
+- Existing old cache files are left in place but are not reused across provider/voice changes because lookup paths include provider and voice.
 
 ## Testing strategy
 
-Add focused unit tests around the changed seams:
+Unit tests cover the following seams (see `tests/unit/test_tts_player.py`, `tests/unit/test_paths.py`, and `tests/unit/test_play_screen.py`):
 
 1. `TTSPlayer.refresh_voices()` uses provider async voice listing and preserves the returned voices.
-2. `TTSPlayer.speak()` can write generated byte responses to a cache path and play the cached file.
-3. `TTSPlayer.speak()` can write async iterator audio responses to a cache path.
+2. `TTSPlayer.speak()` writes generated byte responses to a cache path and plays the cached file.
+3. `TTSPlayer.speak()` writes async iterator audio responses to a cache path.
 4. Existing cache files skip provider generation.
 5. Cache paths differ when provider differs.
 6. Cache paths differ when voice differs.
 7. Cache path extension follows provider-supported format, with fallback to `mp3`.
+8. Cancelling speak during async stream write removes the partial cache file.
+9. Calling stop during generation prevents cache write and playback.
+10. `PlayScreen._speak_current_node()` refreshes a stale `StoryNode.tts_audio_path` after successful generation.
 
 Full verification should run the repository's canonical command:
 
@@ -117,6 +115,6 @@ make checkall
 
 ## Implementation notes
 
-This design intentionally avoids adding `SpeechPipeline` in the first implementation unless it materially simplifies the code. Direct use of provider async methods is enough for the requested update and keeps the change surgical.
+This implementation intentionally avoids `SpeechPipeline`. Direct use of provider async methods was sufficient for the update and kept the change surgical.
 
 A later phase can introduce `SpeechPipeline` if StoryGen adopts text chunking, pronunciation dictionaries, audio post-processing, or provider-specific options.

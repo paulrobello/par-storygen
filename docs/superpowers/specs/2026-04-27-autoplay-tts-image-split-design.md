@@ -41,7 +41,7 @@ Add a second per-save image config while preserving existing saves.
 
 ## Provider Wiring Design
 
-Introduce a small `SplitImageProvider` implementing the existing `ImageProvider` protocol:
+Introduce a small `SplitImageProvider` structurally conforming to the `ImageProvider` protocol (duck-typed, no explicit inheritance):
 
 - `generate_portrait()` delegates to the character provider/router.
 - `generate_scene()` delegates to the art provider/router.
@@ -52,8 +52,8 @@ Provider construction rules:
 
 - New stories use a split provider built from current art config plus current character config.
 - Loaded saves use a split provider pinned to `save.image_config` and `save.character_image_config`.
-- Fallback behavior remains app-level and is applied independently to both art and character routers.
-- Reference-loss warnings still apply to scene generation because scene refs are where visual consistency degrades. Character generation may use any configured provider, but default OpenAI `gpt-image-1.5` preserves transparent-background support.
+- Fallback behavior remains app-level and is applied independently to both art and character routers. Both halves get their own `RoutedImageProvider` wrapping, so fallback triggers independently for each.
+- Reference-loss warnings apply to scene generation because scene refs are where visual consistency degrades. Character generation may use any configured provider, but default OpenAI `gpt-image-1.5` preserves transparent-background support.
 
 ## Cost Accounting
 
@@ -70,7 +70,7 @@ Update cost call sites:
 
 The Settings screen will expose separate controls while keeping existing patterns:
 
-- Rename the current Image provider section to “Scene/cover art provider”.
+- Rename the current Image provider section to “Art generation provider (scenes + covers)”.
 - Add a “Character portrait provider” section with provider, curated model select, custom model input, base URL, API key status, and suggestions.
 - Save writes both art image prefs and character image prefs atomically.
 - Reset restores art to `openai / gpt-image-2` and characters to `openai / gpt-image-1.5`.
