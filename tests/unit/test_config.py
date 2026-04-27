@@ -429,6 +429,81 @@ def test_image_api_key_still_honored(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     assert cfg.image_config.api_key == "sk-image-layered"
 
 
+def test_character_openai_provider_uses_openai_key_not_scene_key(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Character OpenAI config must not fall back to scene/cover image keys."""
+    from storygen.images.provider_factory import build_image_provider
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-standard")
+    monkeypatch.setenv("STORYGEN_IMAGE_API_KEY", "scene-only")
+    monkeypatch.delenv("STORYGEN_CHARACTER_IMAGE_API_KEY", raising=False)
+    reset_dotenv_cache_for_tests()
+    captured: dict[str, object] = {}
+
+    class _Stub:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+    monkeypatch.setattr("storygen.images.openai_provider.AsyncOpenAI", _Stub)
+
+    build_image_provider(load_config().character_image_config)
+
+    assert captured["api_key"] == "openai-standard"
+
+
+def test_character_openai_provider_does_not_use_scene_key_without_openai_key(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """If no character/OpenAI key exists, character OpenAI gets no scene-only key."""
+    from storygen.images.provider_factory import build_image_provider
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("STORYGEN_IMAGE_API_KEY", "scene-only")
+    monkeypatch.delenv("STORYGEN_CHARACTER_IMAGE_API_KEY", raising=False)
+    reset_dotenv_cache_for_tests()
+    captured: dict[str, object] = {}
+
+    class _Stub:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+    monkeypatch.setattr("storygen.images.openai_provider.AsyncOpenAI", _Stub)
+
+    build_image_provider(load_config().character_image_config)
+
+    assert captured["api_key"] == ""
+
+
+def test_character_openai_provider_uses_character_key_over_openai_key(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """STORYGEN_CHARACTER_IMAGE_API_KEY is the top-priority character image key."""
+    from storygen.images.provider_factory import build_image_provider
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-standard")
+    monkeypatch.setenv("STORYGEN_IMAGE_API_KEY", "scene-only")
+    monkeypatch.setenv("STORYGEN_CHARACTER_IMAGE_API_KEY", "character-specific")
+    reset_dotenv_cache_for_tests()
+    captured: dict[str, object] = {}
+
+    class _Stub:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+    monkeypatch.setattr("storygen.images.openai_provider.AsyncOpenAI", _Stub)
+
+    build_image_provider(load_config().character_image_config)
+
+    assert captured["api_key"] == "character-specific"
+
+
 def test_app_config_is_frozen() -> None:
     from dataclasses import FrozenInstanceError
 

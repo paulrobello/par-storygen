@@ -145,7 +145,7 @@ def _resolve_image_config() -> ImageProviderConfig:
     # Normalize "" → None so the factory uses the provider's default URL.
     base_url: str | None = base_url_raw if base_url_raw else None
 
-    api_key = os.environ.get("STORYGEN_IMAGE_API_KEY")
+    api_key = _env_or_none("STORYGEN_IMAGE_API_KEY")
 
     # cast: provider was checked against _ALLOWED_IMAGE_PROVIDERS (which mirrors
     # the ImageProviderConfig.provider literal), so the cast is sound at runtime.
@@ -192,7 +192,13 @@ def _resolve_character_image_config() -> ImageProviderConfig:
     base_url_raw = env_base_url if env_base_url is not None else prefs.base_url
     base_url: str | None = base_url_raw if base_url_raw else None
 
-    api_key = os.environ.get("STORYGEN_CHARACTER_IMAGE_API_KEY")
+    character_api_key = _env_or_none("STORYGEN_CHARACTER_IMAGE_API_KEY")
+    api_key = character_api_key
+    if provider == "openai" and api_key is None:
+        # Character portraits are scoped separately from scene/cover art keys.
+        # Pin OpenAI's standard key (or an explicit empty value) so provider
+        # construction never falls back to STORYGEN_IMAGE_API_KEY.
+        api_key = _env_or_none("OPENAI_API_KEY") or ""
 
     candidate = ImageProviderConfig(
         provider=cast(ImageProviderName, provider),

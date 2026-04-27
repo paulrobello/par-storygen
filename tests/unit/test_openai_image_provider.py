@@ -382,3 +382,20 @@ def test_api_key_falls_back_to_openai_when_storygen_image_unset(
     monkeypatch.setattr("storygen.images.openai_provider.AsyncOpenAI", _Stub)
     OpenAIImageProvider(model="gpt-image-2")
     assert captured["api_key"] == "openai-env"
+
+
+def test_api_key_falls_back_to_openai_when_storygen_image_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Empty STORYGEN_IMAGE_API_KEY is treated as unset for art config fallback."""
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-env")
+    monkeypatch.setenv("STORYGEN_IMAGE_API_KEY", "")
+    captured: dict[str, object] = {}
+
+    class _Stub:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+    monkeypatch.setattr("storygen.images.openai_provider.AsyncOpenAI", _Stub)
+    OpenAIImageProvider(model="gpt-image-2")
+    assert captured["api_key"] == "openai-env"

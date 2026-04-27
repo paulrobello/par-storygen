@@ -70,6 +70,13 @@ class _EditKwargs(TypedDict, total=False):
     input_fidelity: Literal["high"]
 
 
+def _env_or_none(key: str) -> str | None:
+    value = os.environ.get(key)
+    if value is None or value == "":
+        return None
+    return value
+
+
 class OpenAIImageProvider:
     """Implements the `ImageProvider` protocol against OpenAI `gpt-image-2`."""
 
@@ -88,8 +95,10 @@ class OpenAIImageProvider:
         else:
             resolved_key = (
                 api_key
-                or os.environ.get("STORYGEN_IMAGE_API_KEY")
-                or os.environ.get("OPENAI_API_KEY", "")
+                if api_key is not None
+                else _env_or_none("STORYGEN_IMAGE_API_KEY")
+                or _env_or_none("OPENAI_API_KEY")
+                or ""
             )
             if base_url:
                 self._client = AsyncOpenAI(api_key=resolved_key, base_url=base_url)
