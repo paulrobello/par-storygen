@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Text-to-speech** — Read story narration aloud via `par-cli-tts` (OpenAI, ElevenLabs, Deepgram, Gemini, Kokoro). Settings: provider, API key, voice selection with refresh, auto-read toggle. Play screen: `t` pause/resume, `T` restart, `s` stop. Per-node audio caching in `audio/` directory avoids redundant API calls.
+- **Text-to-speech** — Read story narration aloud via `par-cli-tts` (OpenAI, ElevenLabs, Deepgram, Gemini, Kokoro). Settings: provider, API key, voice selection with refresh, auto-read toggle. Play screen: `t` pause/resume, `T` restart, `s` stop. Audio caching in `audio/` is keyed by node, provider, and voice, with provider-preferred file extensions to avoid stale narration after TTS setting changes.
 - **Auto-select** — Press `a` to auto-play the story with random choices. Waits for image display (5s viewing delay) and TTS playback to finish before advancing. Stops at endings or when toggled off with `a`.
 - **Deferred illustration fix** — Prefetched nodes that have an illustration plan but no image now trigger scene generation when picked. The `i` (retry image) key also works for `not_planned` nodes with prompts.
 
@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- TTS now targets `par-cli-tts` 0.5.1 and uses the library's async provider APIs when available. Cache writes use temporary files plus atomic replace, and stopping/cancelling generation no longer leaves partial cache files that can be replayed later.
 - `BeatPipeline.advance` / `retry_scene` / `_stage_3_scene` now take an explicit `callbacks: PipelineCallbacks | None` parameter; `PlayScreen._pick` passes callbacks per-call instead of mutating a private field. Extracted shared `_render_scene` helper.
 - Renamed `_StreamingBeatAgent` → `_BeatAgentAdapter`; renamed `BeatAgentLike.run_stream` → `run` (the implementation never actually streamed).
 - `save_library_character` returns a new `LibraryCharacter` via `model_copy` instead of mutating its input.
