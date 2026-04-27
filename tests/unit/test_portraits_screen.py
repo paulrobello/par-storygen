@@ -31,6 +31,7 @@ from storygen.screens._character_edit_modal import (
     CharacterEditResult,
 )
 from storygen.screens._outfit_modals import OutfitCreateRequest
+from storygen.screens._ref_image_modals import ReferenceImageResult
 from storygen.screens.portraits import (
     PortraitsScreen,
     _OutfitThumb,  # pyright: ignore[reportPrivateUsage]
@@ -146,8 +147,12 @@ async def test_regenerate_writes_versioned_file_and_updates_save(
 ) -> None:
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     save = _save_with_one_character()
+    save.character_image_config = ImageProviderConfig(
+        provider="gemini", model="gemini-3.1-flash-image-preview"
+    )
     save_game(save)
     char_id = save.characters[0].id
+    cost_before = save.total_image_cost_usd
     provider = FakeImageProvider()
 
     app = _Harness(save, provider)
@@ -169,6 +174,15 @@ async def test_regenerate_writes_versioned_file_and_updates_save(
     # Persisted save's portrait_path now points at the new file.
     reloaded = load_game(str(save.id))
     assert reloaded.characters[0].portrait_path == f"images/characters/{char_id}-v1.png"
+    expected_cost = cost_before + image_cost(
+        save.character_image_config.provider,
+        model=save.character_image_config.model,
+        size=PORTRAIT_SIZE,
+        quality=PORTRAIT_QUALITY,
+    )
+    assert reloaded.total_image_cost_usd == pytest.approx(  # pyright: ignore[reportUnknownMemberType]
+        expected_cost
+    )
 
 
 def _save_with_portrait_on_disk(portrait_bytes: bytes = b"PORTRAITDATA") -> GameSave:
@@ -632,6 +646,9 @@ async def test_create_modal_save_appends_outfit_and_bumps_cost(
     """End-to-end create flow via the screen's worker; bypasses the modal UI."""
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     save = _save_with_portrait_on_disk()
+    save.character_image_config = ImageProviderConfig(
+        provider="gemini", model="gemini-3.1-flash-image-preview"
+    )
     save_game(save)
     char_id = save.characters[0].id
     char_initial = save.characters[0]
@@ -668,8 +685,51 @@ async def test_create_modal_save_appends_outfit_and_bumps_cost(
     assert on_disk.read_bytes() == b"NEWPNG"
     # Cost bumped exactly once for the new portrait.
     expected_cost = cost_before + image_cost(
-        save.image_config.provider,
-        model=save.image_config.model,
+        save.character_image_config.provider,
+        model=save.character_image_config.model,
+        size=PORTRAIT_SIZE,
+        quality=PORTRAIT_QUALITY,
+    )
+    assert reloaded.total_image_cost_usd == pytest.approx(  # pyright: ignore[reportUnknownMemberType]
+        expected_cost
+    )
+
+
+@pytest.mark.asyncio
+async def test_reference_style_transfer_cost_uses_character_config(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    save = _save_with_portrait_on_disk()
+    save.character_image_config = ImageProviderConfig(
+        provider="gemini", model="gemini-3.1-flash-image-preview"
+    )
+    save_game(save)
+    char = save.characters[0]
+    cost_before = save.total_image_cost_usd
+    source = tmp_path / "reference.png"
+    source.write_bytes(_PNG_BYTES)
+    provider = FakeImageProvider()
+
+    app = _Harness(save, provider)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = cast(PortraitsScreen, app.screen)
+        screen._apply_ref_image_worker(  # pyright: ignore[reportPrivateUsage]
+            ReferenceImageResult(source_path=source, mode="style_transfer"),
+            char,
+        )
+        for _ in range(40):
+            await pilot.pause()
+            reloaded = load_game(str(save.id))
+            if reloaded.characters[0].reference_image_path is not None:
+                break
+
+    reloaded = load_game(str(save.id))
+    assert reloaded.characters[0].reference_image_path is not None
+    expected_cost = cost_before + image_cost(
+        save.character_image_config.provider,
+        model=save.character_image_config.model,
         size=PORTRAIT_SIZE,
         quality=PORTRAIT_QUALITY,
     )

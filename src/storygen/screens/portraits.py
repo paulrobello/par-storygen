@@ -492,8 +492,8 @@ class PortraitsScreen(Screen[None]):
                 updated if c.id == char.id else c for c in self._save.characters
             ]
             self._save.total_image_cost_usd += image_cost(
-                self._save.image_config.provider,
-                model=self._save.image_config.model,
+                self._save.character_image_config.provider,
+                model=self._save.character_image_config.model,
                 size=PORTRAIT_SIZE,
                 quality=PORTRAIT_QUALITY,
             )
@@ -638,8 +638,8 @@ class PortraitsScreen(Screen[None]):
             )
             # Track cost.
             cost = image_cost(
-                self._save.image_config.provider,
-                model=self._save.image_config.model,
+                self._save.character_image_config.provider,
+                model=self._save.character_image_config.model,
                 size=PORTRAIT_SIZE,
                 quality=PORTRAIT_QUALITY,
             )
@@ -715,8 +715,8 @@ class PortraitsScreen(Screen[None]):
             )
             self._append_outfit(char.id, outfit)
             self._save.total_image_cost_usd += image_cost(
-                self._save.image_config.provider,
-                model=self._save.image_config.model,
+                self._save.character_image_config.provider,
+                model=self._save.character_image_config.model,
                 size=PORTRAIT_SIZE,
                 quality=PORTRAIT_QUALITY,
             )

@@ -692,8 +692,8 @@ class BeatPipeline:
                 # PortraitsScreen open will let the user retry.
                 continue
             save.total_image_cost_usd += image_cost(
-                save.image_config.provider,
-                model=save.image_config.model,
+                save.character_image_config.provider,
+                model=save.character_image_config.model,
                 size=PORTRAIT_SIZE,
                 quality=PORTRAIT_QUALITY,
             )

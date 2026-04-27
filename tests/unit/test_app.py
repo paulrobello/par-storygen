@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -178,6 +179,81 @@ async def test_start_game_uses_save_text_config_not_app_model(
         "not reuse self._text_model (openai)"
     )
     assert pinned_calls[0].model == "llama3.3:70b"
+
+
+class _FakeStartImageProvider:
+    async def generate_portrait(
+        self,
+        description: str,
+        *,
+        transparent: bool,
+        art_style: str = "children's story book",
+        on_partial: Any = None,
+        reference_image: bytes | None = None,
+    ) -> bytes:
+        del description, transparent, art_style, on_partial, reference_image
+        return b"portrait"
+
+    async def generate_scene(
+        self,
+        prompt: str,
+        *,
+        reference_portraits: list[bytes],
+        art_style: str = "children's story book",
+        on_partial: Any = None,
+    ) -> bytes:
+        del prompt, reference_portraits, art_style, on_partial
+        return b"scene"
+
+
+@pytest.mark.asyncio
+async def test_start_game_builds_art_and_character_routers_from_save_configs(
+    xdg_tmp,  # type: ignore[no-untyped-def]
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.chdir(str(xdg_tmp))  # type: ignore[no-untyped-call]  # pyright: ignore[reportUnknownArgumentType]
+    from storygen.config import reset_dotenv_cache_for_tests
+
+    reset_dotenv_cache_for_tests()
+
+    calls: list[ImageProviderConfig] = []
+
+    def spy_build_routed_image_provider(
+        primary_cfg: ImageProviderConfig,
+        *,
+        fallback_cfg: ImageProviderConfig | None = None,
+        on_ref_loss: object = None,
+        on_fallback: object = None,
+    ) -> _FakeStartImageProvider:
+        del fallback_cfg, on_ref_loss, on_fallback
+        calls.append(primary_cfg)
+        return _FakeStartImageProvider()
+
+    monkeypatch.setattr(
+        "storygen.app.build_routed_image_provider",
+        spy_build_routed_image_provider,
+    )
+    monkeypatch.setattr(app_state, "art_enabled", lambda: False)
+
+    app = StoryGenApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        calls.clear()
+
+        def _no_switch(*_args: object, **_kwargs: object) -> None:
+            return None
+
+        monkeypatch.setattr(app, "switch_screen", _no_switch)
+        save = _make_pinned_save(provider="ollama", model="llama3.3:70b")
+        art_cfg = ImageProviderConfig(provider="gemini", model="gemini-3.1-flash-image-preview")
+        character_cfg = ImageProviderConfig(provider="zai", model="glm-image")
+        save.image_config = art_cfg
+        save.character_image_config = character_cfg
+
+        await app._start_game(save)  # pyright: ignore[reportPrivateUsage]
+
+    assert calls == [art_cfg, character_cfg]
 
 
 # ----- Phase 4: ref-loss + fallback wiring -----------------------------------
@@ -389,9 +465,9 @@ async def test_start_game_builds_per_save_routed_provider(
         await app._start_game(save)  # pyright: ignore[reportPrivateUsage]
 
     assert primary_cfgs, "_start_game must call build_routed_image_provider"
-    per_save = primary_cfgs[-1]
-    assert per_save.provider == "openai"
-    assert per_save.model == "gpt-image-1"
+    per_save_art = primary_cfgs[0]
+    assert per_save_art.provider == "openai"
+    assert per_save_art.model == "gpt-image-1"
 
 
 # ----- Phase 5: image-provider Settings handler ------------------------------

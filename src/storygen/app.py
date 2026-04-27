@@ -22,6 +22,7 @@ from storygen.images.provider_factory import (
     default_fallback_model,
 )
 from storygen.images.routed_provider import RoutedImageProvider
+from storygen.images.split_provider import SplitImageProvider
 from storygen.llm import agents as agent_mod
 from storygen.llm.models import ImageProviderConfig
 from storygen.llm.provider_factory import build_text_model
@@ -164,7 +165,7 @@ class StoryGenApp(App[None]):
         # session. One-per-(app, label) de-dup so players don't get spammed
         # on every scene generation with a non-ref provider.
         self._ref_loss_warned: set[str] = set()
-        self._image_provider: RoutedImageProvider = self._build_app_image_provider()
+        self._image_provider: ImageProvider = self._build_app_image_provider()
         self._resume_last = resume_last
         self._tts_player = TTSPlayer()
         tts_prefs = app_state.read_tts_prefs()
@@ -234,13 +235,31 @@ class StoryGenApp(App[None]):
             timeout=5,
         )
 
-    def _build_app_image_provider(self) -> RoutedImageProvider:
-        """Build the app-level routed image provider from current config + prefs."""
+    def _build_routed_image_provider(self, config: ImageProviderConfig) -> RoutedImageProvider:
+        """Build one routed image provider from a pinned config + app fallback prefs."""
         return build_routed_image_provider(
-            self._config.image_config,
-            fallback_cfg=self._resolve_fallback_cfg(self._config.image_config),
+            config,
+            fallback_cfg=self._resolve_fallback_cfg(config),
             on_ref_loss=self._handle_ref_loss,
             on_fallback=self._handle_fallback,
+        )
+
+    def _build_split_image_provider(
+        self,
+        *,
+        art_config: ImageProviderConfig,
+        character_config: ImageProviderConfig,
+    ) -> SplitImageProvider:
+        """Build a split provider with fallback routing applied to both halves."""
+        art_router = self._build_routed_image_provider(art_config)
+        character_router = self._build_routed_image_provider(character_config)
+        return SplitImageProvider(character_provider=character_router, art_provider=art_router)
+
+    def _build_app_image_provider(self) -> SplitImageProvider:
+        """Build the app-level split image provider from current config + prefs."""
+        return self._build_split_image_provider(
+            art_config=self._config.image_config,
+            character_config=self._config.character_image_config,
         )
 
     def _rebuild_image_provider(self) -> None:
@@ -330,18 +349,11 @@ class StoryGenApp(App[None]):
             image_provider_factory=self._build_save_image_provider,
         )
 
-    def _build_save_image_provider(self, save: GameSave) -> RoutedImageProvider:
-        """Build a save-pinned image provider for cover backfill + regeneration.
-
-        Mirrors the per-save provider construction in ``_start_game`` so
-        cover art for a loaded save uses the save's own ``image_config``
-        (not whatever the app default is right now).
-        """
-        return build_routed_image_provider(
-            save.image_config,
-            fallback_cfg=self._resolve_fallback_cfg(save.image_config),
-            on_ref_loss=self._handle_ref_loss,
-            on_fallback=self._handle_fallback,
+    def _build_save_image_provider(self, save: GameSave) -> SplitImageProvider:
+        """Build a save-pinned split provider for art and portraits."""
+        return self._build_split_image_provider(
+            art_config=save.image_config,
+            character_config=save.character_image_config,
         )
 
     def _make_catalog(self) -> CharacterCatalogScreen:
@@ -359,6 +371,7 @@ class StoryGenApp(App[None]):
             flow=WizardFlow(
                 text_config=self._config.text_config,
                 image_config=self._config.image_config,
+                character_image_config=self._config.character_image_config,
                 theme_agent=agent_mod.build_theme_agent(self._text_model),  # pyright: ignore[reportArgumentType]
                 character_agent_factory=lambda theme: agent_mod.build_character_agent(  # pyright: ignore[reportArgumentType]
                     self._text_model, theme=theme
@@ -535,16 +548,11 @@ class StoryGenApp(App[None]):
             agent_mod.build_summary_agent(text_model),
             on_usage=_on_usage,
         )
-        # Each save pins its own image_config — build a per-save router so
+        # Each save pins its own image configs — build per-save routers so
         # that a later Settings change to the primary image provider doesn't
         # silently reroute this save's generation traffic. The fallback is
         # still resolved from app-level prefs (not pinned per-save).
-        save_image_provider = build_routed_image_provider(
-            save.image_config,
-            fallback_cfg=self._resolve_fallback_cfg(save.image_config),
-            on_ref_loss=self._handle_ref_loss,
-            on_fallback=self._handle_fallback,
-        )
+        save_image_provider = self._build_save_image_provider(save)
         pipeline = BeatPipeline(
             beat_agent=beat_agent,
             illustration_agent=illustration_agent,

@@ -6,11 +6,14 @@ from pathlib import Path
 
 import pytest
 
+from storygen.images.constants import PORTRAIT_QUALITY, PORTRAIT_SIZE, SCENE_QUALITY, SCENE_SIZE
+from storygen.images.pricing import image_cost
 from storygen.llm.models import Character, ImageProviderConfig, TextProviderConfig, Theme
 from storygen.screens.wizard import WizardFlow, WizardStep
 
 _TEXT_CONFIG = TextProviderConfig(provider="openai", model="gpt-4o-mini")
 _IMAGE_CONFIG = ImageProviderConfig(provider="openai", model="gpt-image-2")
+_CHARACTER_IMAGE_CONFIG = ImageProviderConfig(provider="gemini", model="gemini-3.1-flash-image-preview")
 
 
 class FakeThemeAgent:
@@ -148,6 +151,51 @@ async def test_wizard_flow_builds_initial_save(
     for c in save.characters:
         assert c.portrait_path is not None
         assert c.portrait_path.endswith("-v1.png")
+
+
+@pytest.mark.asyncio
+async def test_wizard_flow_uses_character_config_for_portraits_and_art_config_for_cover(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from storygen.llm.models import Tone
+
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    flow = WizardFlow(
+        text_config=_TEXT_CONFIG,
+        image_config=_IMAGE_CONFIG,
+        character_image_config=_CHARACTER_IMAGE_CONFIG,
+        theme_agent=FakeThemeAgent(),
+        character_agent_factory=lambda theme: FakeCharacterAgent(),
+        blurb_agent_factory=_fake_blurb_factory,
+        image_provider=FakeImageProvider(),
+    )
+    theme = await flow.propose_theme("")
+    chars = await flow.generate_characters(theme)
+
+    save = await flow.build_initial_save(
+        theme=theme,
+        tone=Tone(preset="serious", custom_descriptor=None),
+        narration_style="third_person",
+        characters=chars,
+    )
+
+    portrait_cost = image_cost(
+        _CHARACTER_IMAGE_CONFIG.provider,
+        model=_CHARACTER_IMAGE_CONFIG.model,
+        size=PORTRAIT_SIZE,
+        quality=PORTRAIT_QUALITY,
+    ) * len(chars)
+    cover_cost = image_cost(
+        _IMAGE_CONFIG.provider,
+        model=_IMAGE_CONFIG.model,
+        size=SCENE_SIZE,
+        quality=SCENE_QUALITY,
+    )
+    assert save.character_image_config == _CHARACTER_IMAGE_CONFIG
+    assert save.image_config == _IMAGE_CONFIG
+    assert save.total_image_cost_usd == pytest.approx(  # pyright: ignore[reportUnknownMemberType]
+        portrait_cost + cover_cost
+    )
 
 
 @pytest.mark.asyncio

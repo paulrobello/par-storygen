@@ -102,6 +102,7 @@ def _bootstrap_save(
     monkeypatch: pytest.MonkeyPatch,
     *,
     image_config: ImageProviderConfig | None = None,
+    character_image_config: ImageProviderConfig | None = None,
 ) -> GameSave:
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     import uuid
@@ -132,6 +133,8 @@ def _bootstrap_save(
         narration_style="third_person",
         text_config=TextProviderConfig(provider="openai", model="gpt-4o-mini"),
         image_config=image_config or ImageProviderConfig(provider="openai", model="gpt-image-2"),
+        character_image_config=character_image_config
+        or ImageProviderConfig(provider="openai", model="gpt-image-1.5"),
         characters=[],
         nodes={"root": root},
         root_node_id="root",
@@ -354,6 +357,105 @@ async def test_pipeline_no_cost_when_not_illustrating(
 
     await pipeline.advance(save, from_node_id="root", choice_id="c1")
     assert save.total_image_cost_usd == 0.0
+
+
+@pytest.mark.asyncio
+async def test_pipeline_new_character_portrait_cost_uses_character_config(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    save = _bootstrap_save(
+        tmp_path,
+        monkeypatch,
+        image_config=ImageProviderConfig(provider="openai", model="gpt-image-2"),
+        character_image_config=ImageProviderConfig(
+            provider="gemini", model="gemini-3.1-flash-image-preview"
+        ),
+    )
+    new_char = Character(
+        id="newcomer",
+        name="Newcomer",
+        backstory="b",
+        personality="p",
+        physical_description="A moonlit traveler in a silver cloak.",
+        portrait_path=None,
+        portrait_prompt=None,
+        introduced_at_node_id="child",
+    )
+    save.characters.append(new_char)
+    pipeline = BeatPipeline(
+        beat_agent=FakeBeatAgent(
+            StoryBeat(narration="x", choices=[], is_major=False, is_ending=True)
+        ),
+        illustration_agent=FakeIllustrationAgent(
+            IllustrationPlan(
+                should_illustrate=False,
+                image_prompt="",
+                featured_character_ids=[],
+                reasoning="",
+            )
+        ),
+        summary_agent=None,
+        image_provider=FakeImageProvider(),
+        callbacks=PipelineCallbacks(),
+    )
+
+    await pipeline._portraits(save, [new_char])  # pyright: ignore[reportPrivateUsage]
+
+    assert save.total_image_cost_usd == pytest.approx(0.067)  # pyright: ignore[reportUnknownMemberType]
+
+
+@pytest.mark.asyncio
+async def test_pipeline_scene_cost_uses_art_config_when_character_config_differs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    save = _bootstrap_save(
+        tmp_path,
+        monkeypatch,
+        image_config=ImageProviderConfig(provider="gemini", model="gemini-3.1-flash-image-preview"),
+        character_image_config=ImageProviderConfig(provider="openai", model="gpt-image-1.5"),
+    )
+    from datetime import datetime
+
+    failed_node = StoryNode(
+        id="failed-node",
+        parent_id="root",
+        chosen_choice_id="c1",
+        chosen_at=datetime.now(UTC),
+        narration="x",
+        choices=[],
+        is_major=True,
+        is_ending=True,
+        image_prompt="some prompt",
+        image_path=None,
+        image_status="failed",
+        illustration_reasoning="x",
+        featured_character_ids=[],
+        summary_to_here=None,
+        created_at=datetime.now(UTC),
+    )
+    save.nodes["failed-node"] = failed_node
+    save.nodes["root"].choices[0].child_node_id = "failed-node"
+    save_game(save)
+    pipeline = BeatPipeline(
+        beat_agent=FakeBeatAgent(
+            StoryBeat(narration="x", choices=[], is_major=False, is_ending=True)
+        ),
+        illustration_agent=FakeIllustrationAgent(
+            IllustrationPlan(
+                should_illustrate=True,
+                image_prompt="",
+                featured_character_ids=[],
+                reasoning="",
+            )
+        ),
+        summary_agent=None,
+        image_provider=FakeImageProvider(),
+        callbacks=PipelineCallbacks(),
+    )
+
+    await pipeline.retry_scene(save, node_id="failed-node")
+
+    assert save.total_image_cost_usd == pytest.approx(0.067)  # pyright: ignore[reportUnknownMemberType]
 
 
 @pytest.mark.asyncio

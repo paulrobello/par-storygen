@@ -132,6 +132,7 @@ class WizardFlow:
         *,
         text_config: TextProviderConfig,
         image_config: ImageProviderConfig,
+        character_image_config: ImageProviderConfig | None = None,
         theme_agent: _AgentLike,
         character_agent_factory: Callable[[Theme], _AgentLike],
         blurb_agent_factory: Callable[[Theme, list[Character], NarrationStyle], _AgentLike],
@@ -140,6 +141,9 @@ class WizardFlow:
     ) -> None:
         self._text_config = text_config
         self._image_config = image_config
+        self._character_image_config = character_image_config or ImageProviderConfig(
+            provider="openai", model="gpt-image-1.5"
+        )
         self._theme_agent = theme_agent
         self._character_agent_factory = character_agent_factory
         self._blurb_agent_factory = blurb_agent_factory
@@ -364,8 +368,8 @@ class WizardFlow:
                     art_style=art_style,
                 )
                 total_image_cost_usd += image_cost(
-                    self._image_config.provider,
-                    model=self._image_config.model,
+                    self._character_image_config.provider,
+                    model=self._character_image_config.model,
                     size=PORTRAIT_SIZE,
                     quality=PORTRAIT_QUALITY,
                 )
@@ -421,6 +425,7 @@ class WizardFlow:
             reader_level=cast("ReaderLevel", reader_level),
             text_config=self._text_config,
             image_config=self._image_config,
+            character_image_config=self._character_image_config,
             characters=enriched,
             nodes={"root": root},
             root_node_id="root",
