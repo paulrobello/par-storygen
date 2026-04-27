@@ -348,6 +348,12 @@ class WizardFlow:
                 portrait_dest = paths.character_portrait_path(str(game_id), char.id, version=1)
                 if portrait_png is not None:
                     portrait_dest.write_bytes(portrait_png)
+                    total_image_cost_usd += image_cost(
+                        self._character_image_config.provider,
+                        model=self._character_image_config.model,
+                        size=PORTRAIT_SIZE,
+                        quality=PORTRAIT_QUALITY,
+                    )
                 else:
                     # Use-as-is: reference and portrait are the same bytes.
                     portrait_dest.write_bytes(ref_png)

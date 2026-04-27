@@ -519,6 +519,21 @@ async def test_build_initial_save_copies_library_portrait_without_generating(
     assert fresh_out.portrait_prompt == "d2"
     # introduced_at_node_id is rewritten to "root".
     assert imported_out.introduced_at_node_id == "root"
+    fresh_portrait_cost = image_cost(
+        save.character_image_config.provider,
+        model=save.character_image_config.model,
+        size=PORTRAIT_SIZE,
+        quality=PORTRAIT_QUALITY,
+    )
+    cover_cost = image_cost(
+        _IMAGE_CONFIG.provider,
+        model=_IMAGE_CONFIG.model,
+        size=SCENE_SIZE,
+        quality=SCENE_QUALITY,
+    )
+    assert save.total_image_cost_usd == pytest.approx(  # pyright: ignore[reportUnknownMemberType]
+        fresh_portrait_cost + cover_cost
+    )
 
 
 @pytest.mark.asyncio
@@ -876,6 +891,69 @@ async def test_build_initial_save_pending_ref_writes(
 
 
 @pytest.mark.asyncio
+async def test_build_initial_save_pending_ref_writes_counts_generated_portrait_cost(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Generated ref-image portraits are billed using the character image config."""
+    from storygen.llm.models import Tone
+    from storygen.storage import paths as _paths
+
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+
+    ref_char_id = "ref-char-cost"
+    ref_png_bytes = b"REFERENCE_PNG_BYTES"
+    portrait_png_bytes = b"GENERATED_STYLE_TRANSFER_PORTRAIT"
+    ref_char = Character(
+        id=ref_char_id,
+        name="Costed Ref Hero",
+        backstory="",
+        personality="",
+        physical_description="As shown in reference image",
+        portrait_path=_paths.relative_character_portrait_path(ref_char_id, version=1),
+        portrait_prompt="(from reference image)",
+        introduced_at_node_id="pending",
+        reference_image_path=_paths.relative_character_reference_path(ref_char_id),
+    )
+
+    provider = FakeImageProvider()
+    flow = WizardFlow(
+        text_config=_TEXT_CONFIG,
+        image_config=_IMAGE_CONFIG,
+        character_image_config=_CHARACTER_IMAGE_CONFIG,
+        theme_agent=FakeThemeAgent(),
+        character_agent_factory=lambda theme: FakeCharacterAgent(),
+        blurb_agent_factory=_fake_blurb_factory,
+        image_provider=provider,
+    )
+    theme = await flow.propose_theme("")
+    save = await flow.build_initial_save(
+        theme=theme,
+        tone=Tone(preset="serious", custom_descriptor=None),
+        narration_style="third_person",
+        characters=[ref_char],
+        pending_ref_writes={ref_char_id: (ref_png_bytes, portrait_png_bytes)},
+    )
+
+    assert provider.portrait_calls == []
+    portrait_cost = image_cost(
+        _CHARACTER_IMAGE_CONFIG.provider,
+        model=_CHARACTER_IMAGE_CONFIG.model,
+        size=PORTRAIT_SIZE,
+        quality=PORTRAIT_QUALITY,
+    )
+    cover_cost = image_cost(
+        _IMAGE_CONFIG.provider,
+        model=_IMAGE_CONFIG.model,
+        size=SCENE_SIZE,
+        quality=SCENE_QUALITY,
+    )
+    assert save.total_image_cost_usd == pytest.approx(  # pyright: ignore[reportUnknownMemberType]
+        portrait_cost + cover_cost
+    )
+
+
+@pytest.mark.asyncio
 async def test_build_initial_save_pending_ref_writes_use_as_is(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -929,3 +1007,11 @@ async def test_build_initial_save_pending_ref_writes_use_as_is(
     assert out.reference_image_path is not None
     ref_on_disk = _paths.game_dir(str(save.id)) / out.reference_image_path
     assert ref_on_disk.read_bytes() == ref_png_bytes
+
+    cover_cost = image_cost(
+        _IMAGE_CONFIG.provider,
+        model=_IMAGE_CONFIG.model,
+        size=SCENE_SIZE,
+        quality=SCENE_QUALITY,
+    )
+    assert save.total_image_cost_usd == pytest.approx(cover_cost)  # pyright: ignore[reportUnknownMemberType]
