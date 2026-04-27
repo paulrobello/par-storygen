@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -70,6 +71,25 @@ class _Harness(App[None]):
         yield from []
 
 
+class _LoadCallbackHarness(App[None]):
+    def __init__(self) -> None:
+        super().__init__()
+        self.started = asyncio.Event()
+        self.release = asyncio.Event()
+        self.loaded: list[GameSave] = []
+
+    def on_mount(self) -> None:
+        self.push_screen(LoadGameScreen(on_save_selected=self._on_save_selected))
+
+    def compose(self) -> ComposeResult:
+        yield from []
+
+    async def _on_save_selected(self, save: GameSave) -> None:
+        self.loaded.append(save)
+        self.started.set()
+        await self.release.wait()
+
+
 @pytest.mark.asyncio
 async def test_load_screen_empty(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
@@ -95,6 +115,32 @@ async def test_load_screen_lists_saves(monkeypatch: pytest.MonkeyPatch, tmp_path
         assert isinstance(screen, LoadGameScreen)
         rows = screen._scroll.query(".load-row")  # pyright: ignore[reportPrivateUsage]
         assert len(rows) == 2
+
+
+@pytest.mark.asyncio
+async def test_load_button_shows_loading_while_save_opens(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    save = _seed_save("Slow Load")
+
+    app = _LoadCallbackHarness()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, LoadGameScreen)
+        load_btn = screen.query_one(f"#load-{save.id}", Button)
+
+        await pilot.click(f"#load-{save.id}")
+        for _ in range(10):
+            await pilot.pause()
+            if app.started.is_set():
+                break
+
+        assert app.started.is_set()
+        assert str(load_btn.label) == "Loading…"
+        assert load_btn.disabled is True
+        app.release.set()
 
 
 @pytest.mark.asyncio

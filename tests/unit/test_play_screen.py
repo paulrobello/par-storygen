@@ -87,6 +87,16 @@ class _SuccessfulTTSPlayer(TTSPlayer):
         return True
 
 
+class _RecordingTTSPlayer(TTSPlayer):
+    def __init__(self) -> None:
+        super().__init__()
+        self.spoken: list[str] = []
+
+    async def speak(self, text: str, cache_path: Path | None = None) -> bool:
+        self.spoken.append(text)
+        return True
+
+
 class _Harness(App[None]):
     def __init__(self) -> None:
         super().__init__()
@@ -94,6 +104,26 @@ class _Harness(App[None]):
 
     def on_mount(self) -> None:
         self.push_screen(PlayScreen(self._save, pipeline=None, image_provider=None))  # type: ignore[arg-type]
+
+    def compose(self) -> ComposeResult:
+        yield from []
+
+
+class _TTSHarness(App[None]):
+    def __init__(self, player: TTSPlayer) -> None:
+        super().__init__()
+        self._save = _minimal_save()
+        self._player = player
+
+    def on_mount(self) -> None:
+        self.push_screen(
+            PlayScreen(
+                self._save,
+                pipeline=None,
+                image_provider=None,
+                tts_player=self._player,
+            )
+        )
 
     def compose(self) -> ComposeResult:
         yield from []
@@ -111,6 +141,21 @@ async def test_play_screen_composes_three_panels() -> None:
         # and cumulative input/output token counters.
         assert app.screen.title == "t"
         assert app.screen.sub_title == "$0.0000  ·  0↑/0↓ tok"
+
+
+@pytest.mark.asyncio
+async def test_play_screen_mount_does_not_auto_read_loaded_story(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prefs = app_state.TTSPrefs(auto_read=True)
+    monkeypatch.setattr(app_state, "read_tts_prefs", lambda: prefs)
+    player = _RecordingTTSPlayer()
+
+    app = _TTSHarness(player)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+    assert player.spoken == []
 
 
 def test_play_screen_tts_cache_path_uses_current_provider_voice_and_extension(

@@ -227,8 +227,13 @@ class LoadGameScreen(Screen[None]):
             return
         self._loading = True
         # Disable every row's buttons so a second click can't spawn a
-        # parallel _start_game while the pipeline boots.
+        # parallel _start_game while the pipeline boots. Relabel the clicked
+        # Load button so the list itself shows progress while the app builds
+        # the play screen.
+        loading_button_id = f"load-{game_id}"
         for btn in self._scroll.query(Button):
+            if btn.id == loading_button_id:
+                btn.label = "Loading…"
             btn.disabled = True
         self.notify("Loading…", timeout=5)
         self._run_on_save_selected(save)
