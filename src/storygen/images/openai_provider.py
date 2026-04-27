@@ -96,9 +96,7 @@ class OpenAIImageProvider:
             resolved_key = (
                 api_key
                 if api_key is not None
-                else _env_or_none("STORYGEN_IMAGE_API_KEY")
-                or _env_or_none("OPENAI_API_KEY")
-                or ""
+                else _env_or_none("STORYGEN_IMAGE_API_KEY") or _env_or_none("OPENAI_API_KEY") or ""
             )
             if base_url:
                 self._client = AsyncOpenAI(api_key=resolved_key, base_url=base_url)
