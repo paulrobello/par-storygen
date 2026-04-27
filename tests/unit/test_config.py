@@ -504,6 +504,58 @@ def test_character_openai_provider_uses_character_key_over_openai_key(
     assert captured["api_key"] == "character-specific"
 
 
+def test_invalid_character_config_fallback_pins_empty_openai_key(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Invalid character config must not let OpenAI fall back to scene image keys."""
+    from storygen.images.provider_factory import build_image_provider
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("STORYGEN_IMAGE_API_KEY", "scene-only")
+    monkeypatch.setenv("STORYGEN_CHARACTER_IMAGE_BASE_URL", "not-a-url")
+    monkeypatch.delenv("STORYGEN_CHARACTER_IMAGE_API_KEY", raising=False)
+    reset_dotenv_cache_for_tests()
+    captured: dict[str, object] = {}
+
+    class _Stub:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+    monkeypatch.setattr("storygen.images.openai_provider.AsyncOpenAI", _Stub)
+
+    build_image_provider(load_config().character_image_config)
+
+    assert captured["api_key"] == ""
+
+
+def test_invalid_character_config_fallback_preserves_character_key(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Invalid character config fallback keeps the character-scoped key."""
+    from storygen.images.provider_factory import build_image_provider
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-standard")
+    monkeypatch.setenv("STORYGEN_IMAGE_API_KEY", "scene-only")
+    monkeypatch.setenv("STORYGEN_CHARACTER_IMAGE_API_KEY", "character-specific")
+    monkeypatch.setenv("STORYGEN_CHARACTER_IMAGE_BASE_URL", "not-a-url")
+    reset_dotenv_cache_for_tests()
+    captured: dict[str, object] = {}
+
+    class _Stub:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+    monkeypatch.setattr("storygen.images.openai_provider.AsyncOpenAI", _Stub)
+
+    build_image_provider(load_config().character_image_config)
+
+    assert captured["api_key"] == "character-specific"
+
+
 def test_app_config_is_frozen() -> None:
     from dataclasses import FrozenInstanceError
 

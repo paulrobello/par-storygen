@@ -109,10 +109,15 @@ def _resolve_text_config() -> TextProviderConfig:
     return candidate
 
 
+def _character_openai_api_key_pin() -> str:
+    return _env_or_none("STORYGEN_CHARACTER_IMAGE_API_KEY") or _env_or_none("OPENAI_API_KEY") or ""
+
+
 def _image_config_from_character_defaults() -> ImageProviderConfig:
     return ImageProviderConfig(
         provider=cast(ImageProviderName, app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER),
         model=app_state.DEFAULT_CHARACTER_IMAGE_MODEL,
+        api_key=_character_openai_api_key_pin(),
     )
 
 
@@ -192,13 +197,12 @@ def _resolve_character_image_config() -> ImageProviderConfig:
     base_url_raw = env_base_url if env_base_url is not None else prefs.base_url
     base_url: str | None = base_url_raw if base_url_raw else None
 
-    character_api_key = _env_or_none("STORYGEN_CHARACTER_IMAGE_API_KEY")
-    api_key = character_api_key
+    api_key = _env_or_none("STORYGEN_CHARACTER_IMAGE_API_KEY")
     if provider == "openai" and api_key is None:
         # Character portraits are scoped separately from scene/cover art keys.
         # Pin OpenAI's standard key (or an explicit empty value) so provider
         # construction never falls back to STORYGEN_IMAGE_API_KEY.
-        api_key = _env_or_none("OPENAI_API_KEY") or ""
+        api_key = _character_openai_api_key_pin()
 
     candidate = ImageProviderConfig(
         provider=cast(ImageProviderName, provider),
