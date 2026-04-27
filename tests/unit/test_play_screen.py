@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -17,6 +18,7 @@ from storygen.llm.models import (
     Theme,
     Tone,
 )
+from storygen.pipeline import PipelineCallbacks
 from storygen.screens.endings import EndingsScreen
 from storygen.screens.play import PlayScreen
 from storygen.storage import app_state, paths
@@ -97,6 +99,82 @@ class _RecordingTTSPlayer(TTSPlayer):
         return True
 
 
+class _BlockingTTSPlayer(TTSPlayer):
+    def __init__(self) -> None:
+        super().__init__()
+        self.started = asyncio.Event()
+        self.release = asyncio.Event()
+        self.spoken: list[str] = []
+
+    def configure(
+        self,
+        provider: str,
+        *,
+        api_key: str = "",
+        voice: str = "",
+    ) -> None:
+        return None
+
+    async def speak(self, text: str, cache_path: Path | None = None) -> bool:
+        self.spoken.append(text)
+        self.started.set()
+        await self.release.wait()
+        return True
+
+
+class _AdvancingPipeline:
+    def __init__(self) -> None:
+        self.advance_calls: list[tuple[str, str]] = []
+        self.advance_started = asyncio.Event()
+
+    def start_prefetch(self, save: GameSave, *, from_node_id: str, with_images: bool) -> None:
+        return None
+
+    async def cancel_all_prefetches(self) -> None:
+        return None
+
+    async def advance(
+        self,
+        save: GameSave,
+        *,
+        from_node_id: str,
+        choice_id: str,
+        skip_image: bool = False,
+        suppress_side_effects: bool = False,
+        callbacks: PipelineCallbacks | None = None,
+    ) -> StoryNode:
+        self.advance_calls.append((from_node_id, choice_id))
+        self.advance_started.set()
+        child_id = f"{choice_id}-child"
+        parent = save.nodes[from_node_id]
+        for choice in parent.choices:
+            if choice.id == choice_id:
+                choice.child_node_id = child_id
+                break
+        child = StoryNode(
+            id=child_id,
+            parent_id=from_node_id,
+            chosen_choice_id=choice_id,
+            chosen_at=datetime.now(UTC),
+            narration="The path continues.",
+            choices=[],
+            is_major=False,
+            is_ending=True,
+            image_prompt=None,
+            image_path=None,
+            image_status="not_planned",
+            illustration_reasoning=None,
+            featured_character_ids=[],
+            summary_to_here=None,
+            created_at=datetime.now(UTC),
+        )
+        save.nodes[child_id] = child
+        save.current_node_id = child_id
+        if callbacks is not None and not suppress_side_effects:
+            await callbacks.on_beat_committed(child)
+        return child
+
+
 class _Harness(App[None]):
     def __init__(self) -> None:
         super().__init__()
@@ -120,6 +198,33 @@ class _TTSHarness(App[None]):
             PlayScreen(
                 self._save,
                 pipeline=None,
+                image_provider=None,
+                tts_player=self._player,
+            )
+        )
+
+    def compose(self) -> ComposeResult:
+        yield from []
+
+
+class _PlayHarnessWithDeps(App[None]):
+    def __init__(
+        self,
+        save: GameSave,
+        pipeline: object,
+        *,
+        tts_player: TTSPlayer | None = None,
+    ) -> None:
+        super().__init__()
+        self._save = save
+        self._pipeline = pipeline
+        self._player = tts_player
+
+    def on_mount(self) -> None:
+        self.push_screen(
+            PlayScreen(
+                self._save,
+                pipeline=self._pipeline,  # type: ignore[arg-type]
                 image_provider=None,
                 tts_player=self._player,
             )
@@ -156,6 +261,76 @@ async def test_play_screen_mount_does_not_auto_read_loaded_story(
         await pilot.pause()
 
     assert player.spoken == []
+
+
+@pytest.mark.asyncio
+async def test_autoplay_pick_waits_for_auto_read_to_finish(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setattr(app_state, "read_tts_prefs", lambda: app_state.TTSPrefs(auto_read=True))
+    save = _minimal_save()
+    pipeline = _AdvancingPipeline()
+    player = _BlockingTTSPlayer()
+    app = _PlayHarnessWithDeps(save, pipeline, tts_player=player)
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, PlayScreen)
+        task = asyncio.create_task(
+            screen._pick(1, auto_read_inline=True)  # pyright: ignore[reportPrivateUsage]
+        )
+        try:
+            await asyncio.sleep(0)
+            assert not task.done()
+            await asyncio.wait_for(player.started.wait(), timeout=1.0)
+            assert player.spoken == ["The path continues."]
+            assert not task.done()
+            player.release.set()
+            await asyncio.wait_for(task, timeout=1.0)
+        finally:
+            if not task.done():
+                task.cancel()
+            else:
+                task.exception()
+
+
+@pytest.mark.asyncio
+async def test_auto_select_waits_for_current_image_terminal_state(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setattr(app_state, "art_enabled", lambda: True)
+    monkeypatch.setattr(app_state, "read_tts_prefs", lambda: app_state.TTSPrefs(auto_read=False))
+    save = _minimal_save()
+    save.nodes[save.current_node_id].image_status = "generating"
+    pipeline = _AdvancingPipeline()
+    app = _PlayHarnessWithDeps(save, pipeline)
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, PlayScreen)
+        screen._auto_selecting = True  # pyright: ignore[reportPrivateUsage]
+        task = asyncio.create_task(screen._auto_select_next())  # pyright: ignore[reportPrivateUsage]
+        try:
+            await asyncio.sleep(0.1)
+            assert pipeline.advance_calls == []
+            assert not task.done()
+            save.nodes[save.current_node_id].image_status = "done"
+            await asyncio.wait_for(pipeline.advance_started.wait(), timeout=1.0)
+            screen._auto_selecting = False  # pyright: ignore[reportPrivateUsage]
+            await asyncio.wait_for(task, timeout=1.0)
+        finally:
+            if not task.done():
+                task.cancel()
+            else:
+                task.exception()
+
+    assert pipeline.advance_calls == [("root", "c1")]
 
 
 def test_play_screen_tts_cache_path_uses_current_provider_voice_and_extension(
@@ -593,7 +768,7 @@ async def test_action_regenerate_cancels_prefetches(
         # No — _pipeline is the fake. We need to short-circuit before _pick runs.
         # Easiest: raise from _pick by patching it to a no-op, OR just drive the
         # pre-_pick portion by patching _pick on the screen.
-        async def _noop_pick(n: int) -> None:
+        async def _noop_pick(n: int, *, auto_read_inline: bool = False) -> None:
             return None
 
         screen._pick = _noop_pick  # pyright: ignore[reportPrivateUsage]

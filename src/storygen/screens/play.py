@@ -336,7 +336,7 @@ class PlayScreen(Screen[None]):
             return
         self._image.clear()
 
-    async def _pick(self, n: int) -> None:
+    async def _pick(self, n: int, *, auto_read_inline: bool = False) -> None:
         node = self._save.nodes[self._save.current_node_id]
         if n - 1 >= len(node.choices):
             return
@@ -379,11 +379,14 @@ class PlayScreen(Screen[None]):
             # Auto-read the newly generated narration if TTS is configured.
             current_node = self._save.nodes.get(self._save.current_node_id)
             if current_node and current_node.narration:
-                self.run_worker(
-                    self._maybe_auto_read(current_node.narration),
-                    exclusive=False,
-                    name="auto-read",
-                )
+                if auto_read_inline:
+                    await self._maybe_auto_read(current_node.narration)
+                else:
+                    self.run_worker(
+                        self._maybe_auto_read(current_node.narration),
+                        exclusive=False,
+                        name="auto-read",
+                    )
 
     async def _on_narration_delta(self, delta: str) -> None:
         if getattr(self, "_awaiting_first_delta", False):
@@ -659,6 +662,23 @@ class PlayScreen(Screen[None]):
             self.notify("Auto-play stopped", timeout=3)
         self.refresh_bindings()
 
+    def _current_node_image_terminal(self, node_id: NodeId) -> bool:
+        """Return whether *node_id* no longer has an in-flight image generation."""
+        if not app_state.art_enabled():
+            return True
+        node = self._save.nodes.get(node_id)
+        if node is None:
+            return True
+        return node.image_status != "generating"
+
+    async def _wait_for_current_image_ready(self, node_id: NodeId) -> bool:
+        """Wait until the current node image is terminal, or autoplay should abort."""
+        while self._auto_selecting and self._save.current_node_id == node_id:
+            if self._current_node_image_terminal(node_id):
+                return True
+            await asyncio.sleep(0.5)
+        return False
+
     async def _auto_select_next(self) -> None:
         """One cycle: wait for image+TTS, pick a random choice, schedule next."""
         if not self._auto_selecting:
@@ -669,6 +689,9 @@ class PlayScreen(Screen[None]):
             if node and node.is_ending:
                 self.notify("Auto-play: story ended", timeout=5)
             self.refresh_bindings()
+            return
+
+        if not await self._wait_for_current_image_ready(node.id):
             return
 
         # Wait for image viewing delay (5s after image was displayed).
@@ -686,13 +709,13 @@ class PlayScreen(Screen[None]):
             ):
                 await asyncio.sleep(0.5)
 
-        # Abort if toggled off while waiting.
-        if not self._auto_selecting:
+        # Abort if toggled off while waiting or the visible node changed.
+        if not self._auto_selecting or self._save.current_node_id != node.id:
             return
 
         # Pick a random choice.
         n = random.randint(1, len(node.choices))
-        await self._pick(n)
+        await self._pick(n, auto_read_inline=True)
 
         # Schedule next cycle if still active.
         if self._auto_selecting:
