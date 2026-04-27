@@ -23,6 +23,7 @@ from storygen.screens.portraits import PortraitsScreen
 from storygen.storage import app_state, paths
 from storygen.storage.save import GameSave, save_game
 from storygen.tts.player import TTSPlayer, TTSState
+from storygen.util import open_in_system_viewer
 from storygen.widgets._header_util import format_cost_subtitle
 from storygen.widgets.choice_list import ChoiceList
 from storygen.widgets.image_panel import ImagePanel
@@ -419,6 +420,13 @@ class PlayScreen(Screen[None]):
         if isinstance(node, StoryNode) and node.id == self._save.current_node_id:
             self._image_displayed_at = time.monotonic()
             self._render_image_for(node.image_status, node.image_path)
+            if app_state.auto_open_art_enabled() and node.image_path:
+                try:
+                    abs_path = paths.safe_join(paths.game_dir(str(self._save.id)), node.image_path)
+                except ValueError:
+                    abs_path = None
+                if abs_path is not None and abs_path.exists():
+                    open_in_system_viewer(abs_path)
         # Cost may have changed even if the image isn't for the current node.
         self._apply_header()
 

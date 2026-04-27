@@ -499,6 +499,8 @@ class PortraitsScreen(Screen[None]):
             )
             save_game(self._save)
             self._rebuild()
+            if app_state.auto_open_art_enabled():
+                open_in_system_viewer(dest)
             self.notify(f"Regenerated portrait for {char.name} (v{version}).", timeout=5)
         except Exception:
             _logger.debug("Portrait regeneration failed", exc_info=True)
@@ -648,6 +650,9 @@ class PortraitsScreen(Screen[None]):
         self._save.characters = [updated if c.id == char.id else c for c in self._save.characters]
         save_game(self._save)
         self._rebuild()
+        if app_state.auto_open_art_enabled():
+            portrait_abs = paths.safe_join(paths.game_dir(save_id), new_rel)
+            open_in_system_viewer(portrait_abs)
         self.notify(f"Reference image set for {char.name}", timeout=5)
 
     def _remove_reference_image(self, char_id: str) -> None:
@@ -721,6 +726,8 @@ class PortraitsScreen(Screen[None]):
                 quality=PORTRAIT_QUALITY,
             )
             save_game(self._save)
+            if app_state.auto_open_art_enabled():
+                open_in_system_viewer(dest)
             self.notify(
                 f"Added outfit '{request.name}' for {char.name}.",
                 timeout=5,

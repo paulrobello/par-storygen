@@ -337,6 +337,8 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
             source="created",
         )
         save_library_character(lib_char, portrait_bytes)
+        if app_state.auto_open_art_enabled() and portrait_bytes is not PLACEHOLDER_PNG:
+            open_in_system_viewer(library_portrait_path(lib_char.id))
         self._rebuild()
         self.notify(f"Created '{lib_char.name}'.", timeout=5)
 
@@ -601,6 +603,8 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
                 button.label = cast(str, original_label)
             return
         save_library_character(entry, portrait_bytes)
+        if app_state.auto_open_art_enabled():
+            open_in_system_viewer(library_portrait_path(entry.id))
         self._rebuild()
         self.notify(f"Regenerated portrait for '{entry.name}'.", timeout=5)
 

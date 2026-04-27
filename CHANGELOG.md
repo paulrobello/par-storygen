@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Auto-open full-res art** — New Settings toggle ("Auto-open full-res images in system viewer when generated") that opens every newly generated image (scene illustrations and character portraits) in the OS default viewer immediately after creation. Persisted in `state.json` as `auto_open_art` (default OFF). Gated by the art-enabled switch. Triggers on: scene image commit, portrait regeneration, reference-image set, outfit creation, library character creation, and library portrait regeneration.
+
 ## [0.2.0] - 2026-04-26
 
 ### Added

@@ -417,6 +417,21 @@ def set_auto_select_enabled(value: bool) -> None:
     write_app_state(state)
 
 
+def auto_open_art_enabled() -> bool:
+    """Whether to auto-open full-res images in the system viewer when generated.
+
+    Applies to scene illustrations and character portraits. Default False.
+    """
+    return bool(read_app_state().get("auto_open_art", False))
+
+
+def set_auto_open_art_enabled(value: bool) -> None:
+    """Persist the auto-open-art flag."""
+    state = read_app_state()
+    state["auto_open_art"] = bool(value)
+    write_app_state(state)
+
+
 def read_provider_prefs() -> ProviderPrefs:
     """Load persisted text-provider prefs; fall back to defaults on any problem.
 
@@ -592,6 +607,7 @@ def write_all_settings(
     image_streaming_enabled_value: bool,
     llm_cache_enabled_value: bool = False,
     auto_select_value: bool = False,
+    auto_open_art_value: bool = False,
 ) -> None:
     """Atomic write of all Settings-screen-owned state in a single JSON rewrite.
 
@@ -618,4 +634,5 @@ def write_all_settings(
     state["image_streaming"] = bool(image_streaming_enabled_value)
     state["llm_cache"] = bool(llm_cache_enabled_value)
     state["auto_select"] = bool(auto_select_value)
+    state["auto_open_art"] = bool(auto_open_art_value)
     write_app_state(state)

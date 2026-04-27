@@ -317,6 +317,7 @@ class SettingsScreen(Screen[None]):
         self._prefetch_images_switch = Switch(value=False, id="prefetch-images-switch")
         self._llm_cache_switch = Switch(value=False, id="llm-cache-switch")
         self._auto_select_switch = Switch(value=False, id="auto-select-switch")
+        self._auto_open_art_switch = Switch(value=False, id="auto-open-art-switch")
 
         # --- TTS widgets ---
         self._suppress_tts_handler: bool = False
@@ -410,6 +411,12 @@ class SettingsScreen(Screen[None]):
                 yield self._streaming_switch
                 yield Static(
                     "Stream partial scene previews (OpenAI only — adds ~5% cost)",
+                    classes="switch-label",
+                )
+            with Horizontal(classes="switch-row"):
+                yield self._auto_open_art_switch
+                yield Static(
+                    "Auto-open full-res images in system viewer when generated",
                     classes="switch-label",
                 )
 
@@ -688,6 +695,7 @@ class SettingsScreen(Screen[None]):
             self._prefetch_images_switch.prevent(Switch.Changed),
             self._llm_cache_switch.prevent(Switch.Changed),
             self._auto_select_switch.prevent(Switch.Changed),
+            self._auto_open_art_switch.prevent(Switch.Changed),
         ):
             self._theme_area.text = defaults.theme
             self._tone_select.value = tone_preset
@@ -703,6 +711,7 @@ class SettingsScreen(Screen[None]):
             self._prefetch_images_switch.value = app_state.prefetch_images_enabled()
             self._llm_cache_switch.value = app_state.llm_cache_enabled()
             self._auto_select_switch.value = app_state.auto_select_enabled()
+            self._auto_open_art_switch.value = app_state.auto_open_art_enabled()
             self._refresh_image_gating()
 
         # TTS
@@ -872,6 +881,7 @@ class SettingsScreen(Screen[None]):
         art_on = self._art_switch.value
         prefetch_on = self._prefetch_switch.value
         self._streaming_switch.disabled = not art_on
+        self._auto_open_art_switch.disabled = not art_on
         self._prefetch_images_switch.disabled = not (art_on and prefetch_on)
 
     @on(Switch.Changed, "#art-enabled-switch")
@@ -1126,6 +1136,7 @@ class SettingsScreen(Screen[None]):
             image_streaming_enabled_value=self._streaming_switch.value,
             llm_cache_enabled_value=self._llm_cache_switch.value,
             auto_select_value=self._auto_select_switch.value,
+            auto_open_art_value=self._auto_open_art_switch.value,
         )
         self.post_message(ImageProviderChanged(image_prefs))
         self.post_message(TextProviderChanged(prefs))
@@ -1187,6 +1198,7 @@ class SettingsScreen(Screen[None]):
             self._prefetch_images_switch.value = False
             self._llm_cache_switch.value = False
             self._auto_select_switch.value = False
+            self._auto_open_art_switch.value = False
             self._refresh_image_gating()
             # TTS section.
             self._tts_provider_select.value = app_state.DEFAULT_TTS_PROVIDER
