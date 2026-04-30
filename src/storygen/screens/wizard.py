@@ -604,6 +604,7 @@ class WizardScreen(Screen[None]):
         self._cast_list = Static("", id="wizard-cast-list")
         self._confirm_summary = Static("", id="wizard-confirm-summary")
         self._next_button = Button("Next", id="btn-next")
+        self._library_button = Button("Import from Library", id="btn-library", variant="primary")
         self._save_to_catalog_checkbox = Checkbox(
             "Save generated characters to catalog",
             value=defaults.save_to_catalog,
@@ -623,6 +624,7 @@ class WizardScreen(Screen[None]):
             yield self._length_input
             yield self._reader_level_select
             yield self._char_area
+            yield self._library_button
             yield self._save_to_catalog_checkbox
             yield self._cast_list
             yield self._confirm_summary
@@ -876,6 +878,7 @@ class WizardScreen(Screen[None]):
             self._length_input,
             self._reader_level_select,
             self._char_area,
+            self._library_button,
             self._cast_list,
             self._save_to_catalog_checkbox,
             self._confirm_summary,
@@ -928,6 +931,7 @@ class WizardScreen(Screen[None]):
                 " or [b]Ctrl+I[/] to import a reference image."
             )
             self._char_area.display = True
+            self._library_button.display = True
             self._save_to_catalog_checkbox.display = True
             self._char_area.focus()
             self._refresh_cast_list()
@@ -1026,6 +1030,8 @@ class WizardScreen(Screen[None]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-next" and not self._next_button.disabled:
             self._advance_worker()
+        elif event.button.id == "btn-library":
+            self.action_add_from_library()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if not self._next_button.disabled:
