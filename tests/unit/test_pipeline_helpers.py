@@ -1,4 +1,4 @@
-"""Tests for pipeline private helpers: _one_sentence, _truncate, _resolve_chosen_text, _build_beat_prompt."""
+"""Tests for pipeline private helpers: _one_sentence, _resolve_chosen_text, _build_beat_prompt."""
 
 from __future__ import annotations
 
@@ -17,7 +17,6 @@ from storygen.pipeline import (
     _build_beat_prompt,  # pyright: ignore[reportPrivateUsage]
     _one_sentence,  # pyright: ignore[reportPrivateUsage]
     _resolve_chosen_text,  # pyright: ignore[reportPrivateUsage]
-    _truncate,  # pyright: ignore[reportPrivateUsage]
 )
 from storygen.storage.save import GameSave
 
@@ -100,27 +99,6 @@ def test_one_sentence_strips_whitespace() -> None:
     assert _one_sentence("  Hello. World.  ") == "Hello."
 
 
-# --- _truncate ---
-
-
-def test_truncate_short_text_unchanged() -> None:
-    assert _truncate("hi", 100) == "hi"
-
-
-def test_truncate_long_text_clips() -> None:
-    result = _truncate("abcde", 4)
-    assert result == "abc…"
-    assert len(result) == 4
-
-
-def test_truncate_exact_limit_unchanged() -> None:
-    assert _truncate("abc", 3) == "abc"
-
-
-def test_truncate_strips_whitespace() -> None:
-    assert _truncate("  hi  ", 10) == "hi"
-
-
 # --- _resolve_chosen_text ---
 
 
@@ -166,11 +144,11 @@ def test_build_beat_prompt_includes_choice_text() -> None:
     assert "PLAYER JUST CHOSE: open the door" in prompt
 
 
-def test_build_beat_prompt_includes_parent_narration() -> None:
+def test_build_beat_prompt_includes_beat_narration() -> None:
     root = _node("root", None, narration="A dark cave looms ahead.")
     save = _empty_save({"root": root})
     prompt = _build_beat_prompt(save, "root", "enter")
-    assert "IMMEDIATELY PRIOR BEAT:\nA dark cave looms ahead." in prompt
+    assert "A dark cave looms ahead." in prompt
 
 
 def test_build_beat_prompt_includes_summary() -> None:
@@ -187,21 +165,26 @@ def test_build_beat_prompt_omits_summary_when_none() -> None:
     assert "STORY-SO-FAR" not in prompt
 
 
-def test_build_beat_prompt_includes_older_beats() -> None:
-    root = _node("root", None, narration="Root beat.", is_major=True)
+def test_build_beat_prompt_includes_beats_since_summary() -> None:
+    root = _node("root", None, narration="Root beat.", is_major=True, summary="Summary.")
     mid = _node("mid", "root", narration="Middle beat.", chose="c1")
     leaf = _node("leaf", "mid", narration="Leaf beat.", chose="c1")
     save = _empty_save({"root": root, "mid": mid, "leaf": leaf})
     prompt = _build_beat_prompt(save, "leaf", "fight")
-    assert "EARLIER BEATS" in prompt
+    assert "BEATS SINCE LAST SUMMARY" in prompt
+    assert "Middle beat." in prompt
+    assert "Leaf beat." in prompt
+
+
+def test_build_beat_prompt_includes_all_beats_when_no_summary() -> None:
+    root = _node("root", None, narration="Root beat.")
+    mid = _node("mid", "root", narration="Middle beat.", chose="c1")
+    leaf = _node("leaf", "mid", narration="Leaf beat.", chose="c1")
+    save = _empty_save({"root": root, "mid": mid, "leaf": leaf})
+    prompt = _build_beat_prompt(save, "leaf", "fight")
     assert "Root beat." in prompt
-
-
-def test_build_beat_prompt_omits_older_beats_for_root() -> None:
-    root = _node("root", None, narration="Start.")
-    save = _empty_save({"root": root})
-    prompt = _build_beat_prompt(save, "root", "go")
-    assert "EARLIER BEATS" not in prompt
+    assert "Middle beat." in prompt
+    assert "Leaf beat." in prompt
 
 
 def test_build_beat_prompt_includes_pacing_hint_at_depth() -> None:

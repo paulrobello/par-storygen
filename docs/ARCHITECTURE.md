@@ -42,7 +42,7 @@ Lower layers never import higher ones. `core` is a neutral bottom layer holding 
 2. **Stage 1 — beat generation** — `beat_agent.run_stream(...)` resolves a `StoryBeat`. (Despite the protocol name, the adapter now uses `agent.run()` underneath — see "LLM call adapters" — so it's a single round-trip, not character-by-character streaming. The narration arrives as one `on_narration_delta` call once the beat resolves.) The new node is committed and persisted before stage 2 begins. `on_beat_committed` fires here. If `beat.new_characters` is non-empty, `on_new_characters` fires next so the UI can toast the introduction.
 3. **Stage 2 + 3 (concurrent)** — `_run_stage_2_and_3` runs the illustration agent and any new-character portrait generation in parallel; if `should_illustrate`, scene rendering is launched as a fire-and-forget `asyncio.create_task`. `on_image_committed` / `on_image_failed` fire when the background scene task finishes.
 
-The optional summary agent runs after `is_major` beats and writes `node.summary_to_here`, which `_build_beat_prompt` later folds into the next beat's context.
+The optional summary agent runs after `is_major` beats and writes `node.summary_to_here`. The summary is built incrementally: the agent receives the previous major beat's `summary_to_here` plus the full narration of all beats between that anchor and the current one (via `segment_since_last_summary` in `tree.py`), then produces a cumulative "story so far" paragraph. Non-major beats never store a summary — they read the nearest ancestor's via `segment_since_last_summary`.
 
 ## Mid-story character introductions
 
@@ -53,9 +53,8 @@ When a beat returns `new_characters: list[Character]`, those characters are appe
 `_build_beat_prompt` (in `pipeline.py`) assembles each beat's user-side prompt from:
 
 - **CAST** — every `save.characters` entry condensed to one line (personality + physical description), so the LLM doesn't drift on character traits.
-- **STORY-SO-FAR SUMMARY** — `latest_summary(save, from_node_id)` walks ancestors for the most recent `summary_to_here`.
-- **EARLIER BEATS (recent)** — up to 2 ancestors before the immediate parent, each truncated to ~280 chars, tagged with the choice the player picked.
-- **IMMEDIATELY PRIOR BEAT** — full narration.
+- **STORY-SO-FAR SUMMARY** — the `summary_to_here` from the nearest ancestor major beat (via `segment_since_last_summary`), or omitted if none exists yet.
+- **BEATS SINCE LAST SUMMARY** — full narration of every node between the summary anchor and the current position (chronological order), each tagged with the choice the player picked to reach it. When no summary anchor exists (early game), all beats from the root are included.
 - **PLAYER JUST CHOSE** — choice text.
 - A dynamic pacing hint (if non-empty) based on major-beat depth vs `target_major_beats` (silent ≤30%, "tension rising" ≤60%, "tighten toward climax" ≤90%, "resolve now" >90%).
 
@@ -152,7 +151,7 @@ The `blurb_agent_factory` signature is `Callable[[Theme, list[Character], Narrat
   - `tts_prefs` — persisted TTS provider preferences (`TTSPrefs` dataclass: provider/api_key/voice/auto_read). Defaults: `openai` provider, empty api key (falls back to env var), empty voice (provider default), auto_read OFF.
   - `auto_select` — persisted default for the auto-select story-play mode (default OFF). The `a` hotkey toggles it live regardless of the persisted value.
   - `auto_open_art` — persisted toggle (default OFF) for auto-opening full-res images in the system viewer when generated. Applies to scene illustrations, portrait regenerations, reference-image sets, outfit creation, and library portrait generation. Read **live** so Settings toggles take effect immediately. Gated by `art_enabled` in the Settings UI.
-- `storage/tree.py` — pure helpers (`path_from_root`, `ancestors`, `children`, `latest_summary`).
+- `storage/tree.py` — pure helpers (`path_from_root`, `ancestors`, `children`, `latest_summary`, `segment_since_last_summary`). The last walks ancestors to find the nearest node with `summary_to_here` and returns `(prev_summary, segment_beats)` — used by both `_build_beat_prompt` (beat context) and the summary agent (incremental major-beat summaries).
 
 ## Cost + token tracking
 

@@ -64,3 +64,30 @@ def latest_summary(save: GameSave, node_id: NodeId) -> str | None:
         if node.summary_to_here:
             return node.summary_to_here
     return None
+
+
+def segment_since_last_summary(
+    save: GameSave, node_id: NodeId
+) -> tuple[str | None, list[StoryNode]]:
+    """Return the beats between the last summary anchor and *node_id*.
+
+    Walks ancestors closest-first, collecting nodes until one with
+    ``summary_to_here`` is found.  Returns:
+
+    * ``prev_summary`` - the ``summary_to_here`` from that ancestor, or
+      ``None`` when no prior summary exists (first major beat).
+    * ``segment`` - all collected nodes in chronological (root-first) order,
+      **including** *node_id* itself but **excluding** the ancestor that
+      contributed ``prev_summary``.
+    """
+    node = save.nodes[node_id]
+    if node.summary_to_here:
+        return node.summary_to_here, []
+    collected: list[StoryNode] = [node]
+    for anc in ancestors(save, node_id):
+        if anc.summary_to_here:
+            collected.reverse()
+            return anc.summary_to_here, collected
+        collected.append(anc)
+    collected.reverse()
+    return None, collected

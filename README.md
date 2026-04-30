@@ -428,7 +428,7 @@ pre-commit run --all-files
 
 ## Roadmap
 
-As of v0.2.0. See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
+As of v0.2.1. See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
 
 ### Where we are
 * **Core Gameplay** — Theme wizard, beat pipeline, choice tree, caching, save/resume

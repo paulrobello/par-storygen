@@ -38,7 +38,7 @@ from storygen.llm.models import (
 from storygen.storage import app_state, paths
 from storygen.storage.llm_cache import dump_llm_exchange
 from storygen.storage.save import GameSave, save_game
-from storygen.storage.tree import latest_summary
+from storygen.storage.tree import path_from_root, segment_since_last_summary
 
 # Cap on the number of in-flight prefetch LLM calls. At typical 2-4 choices per
 # node a single prefetch wave fits unthrottled, but rapid back-and-forth
@@ -359,10 +359,22 @@ class BeatPipeline:
 
         # --- Summary (optional) ---
         if beat.is_major and self._summary is not None:
-            summary_input = (
-                "Summarize the story so far including this latest beat. "
-                "Beat just generated:\n" + beat.narration
-            )
+            prev_summary, segment = segment_since_last_summary(save, new_node_id)
+            parts: list[str] = []
+            if prev_summary:
+                parts.append("PREVIOUS SUMMARY:\n" + prev_summary)
+            if segment:
+                beat_texts = "\n\n".join(
+                    f"--- Beat {i + 1} ---\n{narration}"
+                    for i, narration in enumerate(
+                        n.narration for n in segment if n.id != new_node_id
+                    )
+                    if narration
+                )
+                if beat_texts:
+                    parts.append("BEATS SINCE LAST SUMMARY:\n" + beat_texts)
+            parts.append("CURRENT BEAT:\n" + beat.narration)
+            summary_input = "\n\n".join(parts)
             summary = await self._summary.run(
                 summary_input,
                 raw_sink=self._maybe_build_raw_sink(str(save.id), new_node_id, "summary"),
@@ -822,14 +834,6 @@ class BeatPipeline:
 
 # --- Beat prompt construction --------------------------------------------------
 
-# How many recent beats to include verbatim before the immediate parent. Smaller
-# numbers cost fewer tokens but give the LLM less continuity for callbacks.
-_RECENT_BEAT_WINDOW: int = 2
-
-# How long an excerpt of an older beat to include (chars). Older beats only need
-# to remind the model what happened; full text would burn the context window.
-_OLDER_BEAT_EXCERPT_CHARS: int = 280
-
 
 def _build_beat_prompt(save: GameSave, from_node_id: str, choice_text: str) -> str:
     """Compose the user-side prompt sent to the beat agent.
@@ -837,15 +841,13 @@ def _build_beat_prompt(save: GameSave, from_node_id: str, choice_text: str) -> s
     Includes:
       - Cast roster (names + brief descriptions) so the model doesn't drift
         on character traits or invent new ones.
-      - The last accumulated summary (if the summary agent has run).
-      - The chosen path of recent beats: short excerpts for older ones,
-        full text for the immediate parent.
+      - The last major beat's accumulated summary (if any).
+      - Full narration of all beats since that major beat, in order.
       - The choice the player just made.
     """
-    parent = save.nodes[from_node_id]
     sections: list[str] = []
 
-    # Cast — kept terse so the prompt doesn't bloat for stories with many chars.
+    # Cast - kept terse so the prompt doesn't bloat for stories with many chars.
     if save.characters:
         cast_lines = [
             f"- {c.name}: {_one_sentence(c.personality)} ({_one_sentence(c.physical_description)})"
@@ -853,38 +855,26 @@ def _build_beat_prompt(save: GameSave, from_node_id: str, choice_text: str) -> s
         ]
         sections.append("CAST:\n" + "\n".join(cast_lines))
 
-    summary = latest_summary(save, from_node_id)
-    if summary:
-        sections.append(f"STORY-SO-FAR SUMMARY:\n{summary}")
+    prev_summary, segment = segment_since_last_summary(save, from_node_id)
+    if prev_summary:
+        sections.append(f"STORY-SO-FAR SUMMARY:\n{prev_summary}")
 
-    # Walk ancestors so we can include the recent path leading to the parent.
-    chain: list[StoryNode] = []
-    cursor: str | None = from_node_id
-    while cursor is not None:
-        node = save.nodes[cursor]
-        chain.append(node)
-        cursor = node.parent_id
-    chain.reverse()  # root → ... → parent
-
-    older = chain[:-1][-_RECENT_BEAT_WINDOW:] if len(chain) > 1 else []
-    if older:
-        excerpts: list[str] = []
-        for node in older:
+    if segment:
+        beat_lines: list[str] = []
+        for node in segment:
             chosen = _resolve_chosen_text(save, node)
-            excerpt = _truncate(node.narration, _OLDER_BEAT_EXCERPT_CHARS)
-            line = f"- {excerpt}"
+            line = f"- {node.narration}"
             if chosen:
-                line += f"\n  → player chose: {chosen}"
-            excerpts.append(line)
-        sections.append("EARLIER BEATS (recent):\n" + "\n".join(excerpts))
+                line += f"\n  -> player chose: {chosen}"
+            beat_lines.append(line)
+        sections.append("BEATS SINCE LAST SUMMARY:\n" + "\n".join(beat_lines))
 
-    sections.append(f"IMMEDIATELY PRIOR BEAT:\n{parent.narration}")
     sections.append(f"PLAYER JUST CHOSE: {choice_text}")
 
     # Pacing is measured in MAJOR beats so far (the unit target_major_beats
-    # is denominated in), not total beats. The root counts as a checkpoint
-    # since it sets up the world even if its own narration is the blurb.
-    major_so_far = sum(1 for n in chain if n.is_major)
+    # is denominated in), not total beats. Count across the full ancestor path.
+    full_chain = path_from_root(save, from_node_id)
+    major_so_far = sum(1 for n in full_chain if n.is_major)
     pacing_hint = _pacing_hint_for_depth(major_so_far, save.target_major_beats)
     if pacing_hint:
         sections.append(pacing_hint.strip())
@@ -927,11 +917,6 @@ def _one_sentence(text: str) -> str:
             return text[: idx + 1].strip()
     # Fallback: clip to a reasonable length so it stays one line in the prompt.
     return text if len(text) <= 160 else text[:157] + "…"
-
-
-def _truncate(text: str, limit: int) -> str:
-    text = text.strip()
-    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
 def _resolve_chosen_text(save: GameSave, node: StoryNode) -> str:

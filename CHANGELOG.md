@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-04-30
+
+### Changed
+
+- **Incremental major-beat summaries** — Summary generation now builds on the previous major beat's summary plus full narrations of all beats in between, instead of summarizing from just the current beat alone. Improves story coherence as games get longer.
+- **Improved beat prompt context** — Beat generation now includes the last major beat's summary plus full narrations of all beats since that major beat (via `segment_since_last_summary`), replacing the old tiered approach (truncated excerpts + full parent only).
+- Added `segment_since_last_summary` helper to `storage/tree.py` for reuse by both the beat prompt builder and the summary agent.
+- Removed unused `_truncate` helper and `_RECENT_BEAT_WINDOW` / `_OLDER_BEAT_EXCERPT_CHARS` constants from `pipeline.py`.
+
 ### Added
 
 - **Auto-open full-res art** — New Settings toggle ("Auto-open full-res images in system viewer when generated") that opens every newly generated image (scene illustrations and character portraits) in the OS default viewer immediately after creation. Persisted in `state.json` as `auto_open_art` (default OFF). Gated by the art-enabled switch. Triggers on: scene image commit, portrait regeneration, reference-image set, outfit creation, library character creation, and library portrait regeneration.
