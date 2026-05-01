@@ -48,6 +48,8 @@ def _suffixes(node: StoryNode) -> str:
         tags.append("◆")
     if node.image_status == "done":
         tags.append("[+]")
+    if node.tts_audio_path:
+        tags.append("♪")
     return " ".join(tags)
 
 
@@ -82,7 +84,8 @@ class GraphScreen(Screen[None]):
         "[$text-muted]○[/] unexplored choice   "
         "★ ending   "
         "◆ major beat   "
-        "[+] illustrated"
+        "[+] illustrated   "
+        "♪ audio"
     )
 
     BINDINGS: ClassVar[list[tuple[str, str, str]]] = [

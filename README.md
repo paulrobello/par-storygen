@@ -30,6 +30,7 @@
 * [Character outfits](#character-outfits)
 * [Text-to-speech](#text-to-speech)
 * [Auto-play](#auto-play)
+* [Export book](#export-book)
 * [Contributing](#contributing)
 * [Roadmap](#roadmap)
 
@@ -66,6 +67,7 @@ A configurable LLM (via pydantic-ai) drives theme, characters, narration, and ch
 - **Reference Images**: Supply your own character images as portrait anchors for ref-aware providers
 - **Reader Levels**: Vocabulary and complexity controls for ages 0-5, 6-10, 11-15, or 15+
 - **Settings Persistence**: In-app Settings screen for provider defaults, art toggle, streaming, prefetch, TTS, and auto-play options
+- **Export Book**: Export any story path as a standalone HTML book reader with 3D page turns, audio player, and auto-read
 
 ### Technical Excellence
 - **Async Architecture**: Non-blocking pipeline with concurrent illustration and portrait generation
@@ -397,6 +399,20 @@ Press `a` from the play screen to auto-advance the story with random choices. Au
 
 During auto-play, only `menu`, `a` (stop auto), and TTS controls (`t`/`T`/`s`) are available.
 
+## Export book
+
+Press `x` from the play screen when viewing an ending to export the entire story path as a self-contained HTML book. The exported book opens in your browser and includes:
+
+- **Chapter-by-chapter navigation** with arrow keys and on-screen buttons
+- **3D page-turn animation** (CSS `rotateY`) with `prefers-reduced-motion` fallback
+- **Light/dark mode toggle** persisted via `localStorage`
+- **Inline audio player** for chapters with TTS narration, with seek bar and time display
+- **Auto-read mode** — plays each chapter's audio and advances automatically
+- **Open Graph / Twitter Card meta tags** for social sharing previews
+- **Scene images** copied alongside `index.html` into `~/Desktop/<Title>_Book/`
+
+No server required — the entire book is a single HTML file with inline CSS/JS plus local image and audio assets.
+
 ## Contributing
 
 Clone the repo and run the setup make target. Note `uv` is required.
@@ -428,7 +444,7 @@ pre-commit run --all-files
 
 ## Roadmap
 
-As of v0.2.1. See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
+As of v0.3.0. See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
 
 ### Where we are
 * **Core Gameplay** — Theme wizard, beat pipeline, choice tree, caching, save/resume
@@ -440,10 +456,11 @@ As of v0.2.1. See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
 * **Reader Levels** — Vocabulary and complexity controls for different age ranges
 * **Text-to-Speech** — Multi-provider narration with provider/voice-aware audio caching and auto-read
 * **Auto-Play** — Random-choice auto-advance with image and TTS wait gating
+* **Export Book** — Standalone HTML book reader with 3D page turns, inline audio, and auto-read
 
 ### Where we're going
 * Sound effects and music per scene
 * Multiplayer (shared story tree)
 * More image providers and art styles
 * Story templates and presets
-* Export stories as HTML/PDF
+* Export stories as PDF

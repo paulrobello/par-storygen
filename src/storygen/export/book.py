@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import webbrowser
@@ -30,8 +31,9 @@ class BookPage:
 
 
 def sanitize_title(title: str) -> str:
-    """Return a filesystem-safe version of a story title."""
-    return re.sub(r"[^A-Za-z0-9_ \-]+", "", title).strip()
+    """Return a filesystem-safe version of a story title with underscores."""
+    safe = re.sub(r"[^A-Za-z0-9_ \-]+", "", title).strip()
+    return safe.replace(" ", "_")
 
 
 def unique_output_dir(base: Path) -> Path:
@@ -72,7 +74,7 @@ def export_book(
         save: The game save containing all story nodes.
         ending_node_id: The terminal node (typically an ending) to build the path to.
         output_dir: Where to write the book. Defaults to
-            ``~/Desktop/<sanitized_title> - Book/``.
+            ``~/Desktop/<sanitized_title>_Book/``.
         open_browser: Whether to open the exported book in a web browser.
 
     Returns:
@@ -81,7 +83,7 @@ def export_book(
     # 1. Determine output directory
     if output_dir is None:
         sanitized = sanitize_title(save.theme.title)
-        base = Path.home() / "Desktop" / f"{sanitized} - Book"
+        base = Path.home() / "Desktop" / f"{sanitized}_Book"
         output_dir = unique_output_dir(base)
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -108,6 +110,7 @@ def export_book(
             if src.exists():
                 dest = images_dir / f"{node.id}.png"
                 shutil.copy2(src, dest)
+                os.chmod(dest, 0o644)
                 image_url = f"images/{node.id}.png"
 
         # Copy TTS audio
@@ -117,6 +120,7 @@ def export_book(
             if src.exists():
                 dest = audio_dir / src.name
                 shutil.copy2(src, dest)
+                os.chmod(dest, 0o644)
                 audio_url = f"audio/{src.name}"
                 has_any_audio = True
 

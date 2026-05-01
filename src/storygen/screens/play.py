@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import ClassVar
 
 from pyfiglet import Figlet
+from rich.align import Align
+from rich.console import Group
 from rich.text import Text
 from textual import work
 from textual.app import ComposeResult
@@ -181,22 +183,28 @@ class PlayScreen(Screen[None]):
         if self._tts_player is not None:
             await self._tts_player.stop()
 
+    async def _stop_tts(self) -> None:
+        """Stop any playing TTS audio."""
+        if self._tts_player is not None:
+            await self._tts_player.stop()
+
     def _apply_header(self) -> None:
         """Set the screen title to the story theme + cumulative image cost + tokens."""
         self.title = self._save.theme.title
-        self.sub_title = format_cost_subtitle(self._save)
+        subtitle = format_cost_subtitle(self._save)
+        node = self._save.nodes[self._save.current_node_id]
+        if node.tts_audio_path:
+            subtitle += "  ♪"
+        self.sub_title = subtitle
 
     def _render_current(self) -> None:
         node = self._save.nodes[self._save.current_node_id]
         if node.is_ending:
-            fig = Figlet(font="big")
-            banner = fig.renderText("The End")
-            # Use set_renderable so the bold banner is styled by Rich rather
-            # than treating the markup tag as literal text (StoryPanel is
-            # markup=False to prevent LLM injection).
-            from rich.console import Group
+            fig = Figlet(font="blocky")
+            from storygen.screens.intro import _gradient_text
 
-            self._story.set_renderable(Group(Text(banner, style="bold"), Text(node.narration)))
+            banner = _gradient_text(fig.renderText("The End"))
+            self._story.set_renderable(Group(Text(node.narration), Text(), Align.center(banner)))
         else:
             self._story.set_text(node.narration)
         self._choices.set_choices(node.choices)
@@ -348,6 +356,7 @@ class PlayScreen(Screen[None]):
         self._image.clear()
 
     async def _pick(self, n: int, *, auto_read_inline: bool = False) -> None:
+        await self._stop_tts()
         node = self._save.nodes[self._save.current_node_id]
         if n - 1 >= len(node.choices):
             return
@@ -455,6 +464,7 @@ class PlayScreen(Screen[None]):
         self.notify(f"New character(s) joined: {names}", timeout=5)
 
     async def action_go_back(self) -> None:
+        await self._stop_tts()
         node = self._save.nodes[self._save.current_node_id]
         if node.parent_id is None:
             return
@@ -486,6 +496,7 @@ class PlayScreen(Screen[None]):
 
     async def action_regenerate_node(self) -> None:
         """Discard the current beat and re-roll it from the parent's choice."""
+        await self._stop_tts()
         if self._pipeline is None:
             return
         node = self._save.nodes[self._save.current_node_id]
@@ -537,6 +548,7 @@ class PlayScreen(Screen[None]):
         self.run_worker(self._do_graph_jump(node_id), exclusive=False, name="play-graph-jump")
 
     async def _do_graph_jump(self, node_id: str) -> None:
+        await self._stop_tts()
         if self._pipeline is not None:
             await self._pipeline.cancel_all_prefetches()
         self._save.current_node_id = node_id
@@ -559,6 +571,7 @@ class PlayScreen(Screen[None]):
         self.run_worker(self._do_endings_jump(node_id), exclusive=False, name="play-endings-jump")
 
     async def _do_endings_jump(self, node_id: str) -> None:
+        await self._stop_tts()
         if self._pipeline is not None:
             await self._pipeline.cancel_all_prefetches()
         self._save.current_node_id = node_id
@@ -668,6 +681,7 @@ class PlayScreen(Screen[None]):
         if ok and node.tts_audio_path != relative_cache:
             node.tts_audio_path = relative_cache
             save_game(self._save)
+            self._apply_header()
         self.refresh_bindings()
 
     async def _maybe_auto_read(self, text: str) -> None:

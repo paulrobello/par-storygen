@@ -149,10 +149,10 @@ class TestBookPage:
 
 class TestSanitizeTitle:
     def test_removes_special_characters(self) -> None:
-        assert sanitize_title("Hello, World!") == "Hello World"
+        assert sanitize_title("Hello, World!") == "Hello_World"
 
     def test_keeps_alphanumeric_spaces_dashes(self) -> None:
-        assert sanitize_title("My-Story_2 Go!") == "My-Story_2 Go"
+        assert sanitize_title("My-Story_2 Go!") == "My-Story_2_Go"
 
     def test_strips_whitespace(self) -> None:
         assert sanitize_title("  spaced  ") == "spaced"
@@ -255,24 +255,23 @@ class TestExportBook:
         node = _node("root", None, narration="Hi", is_ending=True)
         save = _save({"root": node}, root="root", title="SuffixTest")
 
+        fake_home = tmp_path / "home"
+        fake_home.mkdir()
+        desktop = fake_home / "Desktop"
+        desktop.mkdir()
+
         # Pre-create the default directory
-        default_dir = Path.home() / "Desktop" / "SuffixTest - Book"
+        default_dir = desktop / "SuffixTest_Book"
         default_dir.mkdir(parents=True, exist_ok=True)
 
-        try:
-            with (
-                patch("storygen.export.book.__file__", fake_file),
-                patch("storygen.export.book.paths.game_dir", return_value=tmp_path / "g"),
-            ):
-                out = export_book(save, "root", open_browser=False)
-            assert out.name == "SuffixTest - Book (2)"
-            assert out.is_dir()
-        finally:
-            if default_dir.exists():
-                default_dir.rmdir()
-            suffix2 = Path.home() / "Desktop" / "SuffixTest - Book (2)"
-            if suffix2.exists():
-                shutil.rmtree(suffix2)
+        with (
+            patch("storygen.export.book.__file__", fake_file),
+            patch("storygen.export.book.paths.game_dir", return_value=tmp_path / "g"),
+            patch("storygen.export.book.Path.home", return_value=fake_home),
+        ):
+            out = export_book(save, "root", open_browser=False)
+        assert out.name == "SuffixTest_Book (2)"
+        assert out.is_dir()
 
     def test_scene_image_copied(self, tmp_path: Path, fake_file: str) -> None:
         """A node with a completed image gets its file copied."""
@@ -374,21 +373,23 @@ class TestExportBook:
         assert "Total: 2" in html
 
     def test_default_output_dir_is_desktop(self, tmp_path: Path, fake_file: str) -> None:
-        """When output_dir is None, the default is ~/Desktop/<title> - Book/."""
+        """When output_dir is None, the default is ~/Desktop/<title>_Book/."""
         node = _node("root", None, narration="Hi", is_ending=True)
         save = _save({"root": node}, root="root", title="DesktopTest")
 
-        expected_dir = Path.home() / "Desktop" / "DesktopTest - Book"
-        try:
-            with (
-                patch("storygen.export.book.__file__", fake_file),
-                patch("storygen.export.book.paths.game_dir", return_value=tmp_path / "g"),
-            ):
-                out = export_book(save, "root", open_browser=False)
-            assert out == expected_dir
-        finally:
-            if expected_dir.exists():
-                shutil.rmtree(expected_dir)
+        fake_home = tmp_path / "home"
+        fake_home.mkdir()
+        desktop = fake_home / "Desktop"
+        desktop.mkdir()
+
+        expected_dir = desktop / "DesktopTest_Book"
+        with (
+            patch("storygen.export.book.__file__", fake_file),
+            patch("storygen.export.book.paths.game_dir", return_value=tmp_path / "g"),
+            patch("storygen.export.book.Path.home", return_value=fake_home),
+        ):
+            out = export_book(save, "root", open_browser=False)
+        assert out == expected_dir
 
     def test_open_browser_called(self, tmp_path: Path, fake_file: str) -> None:
         """When open_browser=True, webbrowser.open is called."""

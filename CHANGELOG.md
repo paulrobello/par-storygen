@@ -7,18 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-01
+
 ### Added
 
-- **Export Book** — Press `x` on an ending screen to export the story path as a standalone HTML book reader. The book includes: chapter-by-chapter navigation with arrow keys, 3D page-turn animation (CSS `rotateY` with `prefers-reduced-motion` fallback), light/dark mode toggle persisted via `localStorage`, custom audio player for TTS narration (when available), auto-read mode (audio-aware advancement + configurable timer for non-audio pages), and a "The End" marker on the final chapter. Scene images and TTS audio files are copied alongside `index.html` into `~/Desktop/<Title> - Book/`. Uses Jinja2 template rendering with all CSS/JS inline.
+- **Export Book** — Press `x` on an ending screen to export the story path as a standalone HTML book reader. The book includes: chapter-by-chapter navigation with arrow keys, 3D page-turn animation (CSS `rotateY` with `prefers-reduced-motion` fallback), light/dark mode toggle persisted via `localStorage`, custom audio player for TTS narration (when available), auto-read mode (audio-aware advancement + configurable timer for non-audio pages), and a "The End" marker on the final chapter. Scene images and TTS audio files are copied alongside `index.html` into `~/Desktop/<Title>_Book/`. Uses Jinja2 template rendering with all CSS/JS inline. Exported HTML includes Open Graph / Twitter Card meta tags and a footer credit linking to the project GitHub.
+- **TTS audio indicator** — Story nodes with cached TTS audio now show a `♪` indicator in the story graph tree view (with legend entry) and in the PlayScreen header subtitle. The indicator appears immediately after audio finishes generating.
+- **Colorful ending banner** — The "The End" banner on ending nodes now uses the same blocky figlet font and purple-to-cyan gradient as the splash page, centered below the narration text instead of above it.
 
 ### Changed
 
-- **Image panel throbber** — The image panel now shows an animated rainbow throbber bar during illustration generation instead of static text.
-- **Read aloud disabled during generation** — The "Read aloud" action is no longer available while a beat's text is still generating; stop/restart remain available if audio is already playing. Read aloud becomes available as soon as text generation completes, even if image generation is still in progress.
+- **Export filenames use underscores** — `sanitize_title` now converts spaces to underscores; export output directories are `~/Desktop/<Title>_Book/` instead of `~/Desktop/<Title> - Book/`. Copied assets get `644` permissions for reliable browser loading from `file://` URLs.
+- **TTS cancels on navigation** — Moving forward, backward, jumping via graph/endings, or regenerating a beat now stops any playing TTS audio automatically.
 
 ### Fixed
 
-- **TTS toggle responsiveness** — Pressing "Read aloud" now immediately transitions to generating state instead of appearing unresponsive for 5-10 seconds while the TTS worker starts.
+- **Export book audio loading** — Audio tracks now load reliably on every chapter after page navigation (`audioEl.load()` called after setting src).
+- **Export book auto-read looping** — Auto-read no longer replays the same chapter's audio; a per-page tracking flag ensures audio plays once before advancing.
+- **Export tests touch real Desktop** — Tests that verify default output directory now patch `Path.home` to use `tmp_path` instead of writing to `~/Desktop`.
 
 ## [0.2.2] - 2026-04-30
 
@@ -129,7 +135,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings screen** — persisted in-app configuration for provider defaults, art toggle, streaming, prefetch options, and wizard defaults
 - **Save/resume** — `--resume` flag re-opens the last-played save; full game state persistence
 
-[Unreleased]: https://github.com/paulrobello/par-storygen/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/paulrobello/par-storygen/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/paulrobello/par-storygen/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/paulrobello/par-storygen/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/paulrobello/par-storygen/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/paulrobello/par-storygen/compare/v0.1.0...v0.2.0
