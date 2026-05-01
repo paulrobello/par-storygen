@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Image panel throbber** — The image panel now shows an animated rainbow throbber bar during illustration generation instead of static text.
-- **Read aloud disabled during generation** — The "Read aloud" action is no longer available while a beat is still generating; stop/restart remain available if audio is already playing.
+- **Read aloud disabled during generation** — The "Read aloud" action is no longer available while a beat's text is still generating; stop/restart remain available if audio is already playing. Read aloud becomes available as soon as text generation completes, even if image generation is still in progress.
 
 ## [0.2.2] - 2026-04-30
 

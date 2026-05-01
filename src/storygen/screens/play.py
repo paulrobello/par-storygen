@@ -197,13 +197,11 @@ class PlayScreen(Screen[None]):
         else:
             self._story.set_text(node.narration)
         self._choices.set_choices(node.choices)
-        # While a beat is being generated we're showing a "generating" spinner
-        # in the image panel (set in _pick); don't clobber it with the
-        # newly-committed node's image_status (which is "not_planned" until
-        # stage 2 finishes the illustration plan). The finally-block in _pick
-        # re-runs _render_current with _loading=False, so the real image
-        # status is picked up then.
-        if not self._loading:
+        # Don't clobber the image panel's generating throbber with a
+        # "not_planned" status from a node whose illustration hasn't started.
+        # Once the image pipeline sets a real status (generating/done/failed),
+        # the committed/failed callbacks drive the panel directly.
+        if node.image_status not in ("not_planned",):
             self._render_image_for(node.image_status, node.image_path)
         # Choice count, parent, and image state may have changed — refresh footer.
         self.refresh_bindings()
@@ -411,6 +409,11 @@ class PlayScreen(Screen[None]):
         self._story.append_delta(delta)
 
     async def _on_beat_committed(self, node: object) -> None:
+        # Text generation is done — clear loading so bindings (including
+        # read aloud) become available. Image generation may still be in
+        # flight; _render_current handles that via the image_status field.
+        self._loading = False
+        self.refresh_bindings()
         self._render_current()
 
     async def _on_image_committed(self, node: object) -> None:
