@@ -459,6 +459,10 @@ class WizardFlow:
             cover_path.parent.mkdir(parents=True, exist_ok=True)
             cover_path.write_bytes(cast(bytes, cover_bytes))
             cover_rel = str(cover_path.relative_to(paths.game_dir(str(game_id))))
+            if app_state.auto_open_art_enabled():
+                from storygen.util import open_in_system_viewer
+
+                open_in_system_viewer(cover_path)
             total_image_cost_usd += image_cost(
                 self._image_config.provider,
                 model=self._image_config.model,
@@ -557,6 +561,7 @@ class WizardScreen(Screen[None]):
         # Maps char_id -> generated portrait bytes (style-transfer mode).
         self._pending_portrait_bytes: dict[str, bytes] = {}
         self._user_character_prompt: str = ""
+        self._importing = False
         self._art_style: str = defaults.art_style or app_state.DEFAULT_ART_STYLE
         self._target_major_beats: int = defaults.target_major_beats
 
@@ -603,6 +608,7 @@ class WizardScreen(Screen[None]):
         self._char_area = TextArea(text=defaults.characters, id="wizard-char")
         self._cast_list = Static("", id="wizard-cast-list")
         self._confirm_summary = Static("", id="wizard-confirm-summary")
+        self._progress = Static("", id="wizard-progress")
         self._next_button = Button("Next", id="btn-next")
         self._library_button = Button("Import from Library", id="btn-library", variant="primary")
         self._save_to_catalog_checkbox = Checkbox(
@@ -739,6 +745,8 @@ class WizardScreen(Screen[None]):
         if self._theme is None or self._flow is None:
             self.notify("Cannot adapt — wizard state incomplete.", severity="error")
             return
+        self._importing = True
+        self._set_busy(False)
         self.notify(f"Adapting '{lib.name}' backstory to new theme…", timeout=5)
         try:
             adapted = await self._flow.adapt_library_character(lib, self._theme)
@@ -749,6 +757,9 @@ class WizardScreen(Screen[None]):
                 timeout=5,
             )
             return
+        finally:
+            self._importing = False
+            self._set_busy(False)
         self._append_library_character(adapted)
 
     # ---- Reference image import flow ------------------------------------
@@ -882,6 +893,7 @@ class WizardScreen(Screen[None]):
             self._cast_list,
             self._save_to_catalog_checkbox,
             self._confirm_summary,
+            self._progress,
         ]
 
     def _render_step(self) -> None:
@@ -939,6 +951,7 @@ class WizardScreen(Screen[None]):
             self._hint.update("Review your choices, then begin the story.")
             self._render_confirm_summary()
             self._confirm_summary.display = True
+            self._progress.display = True
 
         if not self._next_button.disabled:
             self._next_button.label = _label_for_step(self.current_step)
@@ -1039,12 +1052,15 @@ class WizardScreen(Screen[None]):
 
     def _set_busy(self, busy: bool) -> None:
         """Disable input while a worker is running so we don't double-fire."""
-        self._next_button.disabled = busy
-        self._next_button.label = "Working…" if busy else _label_for_step(self.current_step)
+        self._next_button.disabled = busy or self._importing
+        self._next_button.label = (
+            "Working…" if (busy or self._importing) else _label_for_step(self.current_step)
+        )
+        self._library_button.disabled = busy or self._importing
 
     def _notify_progress(self, message: str) -> None:
-        """Per-portrait progress callback for build_initial_save."""
-        self.notify(message, timeout=5)
+        """Per-step progress callback for build_initial_save."""
+        self._progress.update(f"[dim]⏳ {message}[/dim]")
 
     @work(exit_on_error=False)
     async def _advance_worker(self) -> None:
@@ -1120,6 +1136,7 @@ class WizardScreen(Screen[None]):
                     self.notify("Tone not set — go back to the Tone step.", severity="warning")
                     return
                 self.notify("Building your story world…", timeout=5)
+                self._progress.update("[dim]⏳ Preparing…[/dim]")
                 # Build pending ref-image writes: char_id -> (ref_png, portrait_png_or_none)
                 pending_ref_writes = {
                     cid: (data[1], self._pending_portrait_bytes.get(cid))
@@ -1137,6 +1154,7 @@ class WizardScreen(Screen[None]):
                     library_import_ids=dict(self._imported_from_library_ids),
                     pending_ref_writes=pending_ref_writes or None,
                 )
+                self._progress.update("[dim]⏳ Finishing up…[/dim]")
                 # Auto-export generated characters to catalog if checked.
                 if self._save_to_catalog_checkbox.value:
                     self._auto_export_to_catalog(save)
@@ -1146,6 +1164,7 @@ class WizardScreen(Screen[None]):
                     await self._on_complete(save)
                 return
         except Exception as exc:
+            self._progress.update("")
             self.notify(f"Error: {exc}", severity="error", timeout=5)
         finally:
             # Re-enable button only if we're still on the wizard (CONFIRM exits).

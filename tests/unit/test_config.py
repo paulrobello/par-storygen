@@ -429,10 +429,14 @@ def test_image_api_key_still_honored(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     assert cfg.image_config.api_key == "sk-image-layered"
 
 
-def test_character_openai_provider_uses_openai_key_not_scene_key(
+def test_character_openai_provider_prefers_scene_key_over_openai_key(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Character OpenAI config must not fall back to scene/cover image keys."""
+    """Character OpenAI config prefers STORYGEN_IMAGE_API_KEY over OPENAI_API_KEY.
+
+    STORYGEN_IMAGE_API_KEY is typically the real OpenAI key while OPENAI_API_KEY
+    may point to a non-OpenAI provider (e.g. z.ai) for text generation.
+    """
     from storygen.images.provider_factory import build_image_provider
 
     monkeypatch.chdir(tmp_path)
@@ -451,13 +455,13 @@ def test_character_openai_provider_uses_openai_key_not_scene_key(
 
     build_image_provider(load_config().character_image_config)
 
-    assert captured["api_key"] == "openai-standard"
+    assert captured["api_key"] == "scene-only"
 
 
-def test_character_openai_provider_does_not_use_scene_key_without_openai_key(
+def test_character_openai_provider_uses_scene_key_without_openai_key(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """If no character/OpenAI key exists, character OpenAI gets no scene-only key."""
+    """Without OPENAI_API_KEY, character OpenAI falls through to STORYGEN_IMAGE_API_KEY."""
     from storygen.images.provider_factory import build_image_provider
 
     monkeypatch.chdir(tmp_path)
@@ -476,7 +480,7 @@ def test_character_openai_provider_does_not_use_scene_key_without_openai_key(
 
     build_image_provider(load_config().character_image_config)
 
-    assert captured["api_key"] == ""
+    assert captured["api_key"] == "scene-only"
 
 
 def test_character_openai_provider_uses_character_key_over_openai_key(
@@ -504,10 +508,10 @@ def test_character_openai_provider_uses_character_key_over_openai_key(
     assert captured["api_key"] == "character-specific"
 
 
-def test_invalid_character_config_fallback_pins_empty_openai_key(
+def test_invalid_character_config_fallback_pins_scene_key(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Invalid character config must not let OpenAI fall back to scene image keys."""
+    """Invalid character config falls back to STORYGEN_IMAGE_API_KEY when available."""
     from storygen.images.provider_factory import build_image_provider
 
     monkeypatch.chdir(tmp_path)
@@ -527,7 +531,7 @@ def test_invalid_character_config_fallback_pins_empty_openai_key(
 
     build_image_provider(load_config().character_image_config)
 
-    assert captured["api_key"] == ""
+    assert captured["api_key"] == "scene-only"
 
 
 def test_invalid_character_config_fallback_preserves_character_key(

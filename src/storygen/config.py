@@ -119,7 +119,12 @@ def _resolve_text_config() -> TextProviderConfig:
 
 
 def _character_openai_api_key_pin() -> str:
-    return _env_or_none("STORYGEN_CHARACTER_IMAGE_API_KEY") or _env_or_none("OPENAI_API_KEY") or ""
+    return (
+        _env_or_none("STORYGEN_CHARACTER_IMAGE_API_KEY")
+        or _env_or_none("STORYGEN_IMAGE_API_KEY")
+        or _env_or_none("OPENAI_API_KEY")
+        or ""
+    )
 
 
 def _image_config_from_character_defaults() -> ImageProviderConfig:

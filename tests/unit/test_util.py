@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from storygen.util import open_in_system_viewer
 
 
@@ -16,8 +18,11 @@ def test_open_in_system_viewer_noop_for_missing_path(tmp_path: Path) -> None:
     mock_popen.assert_not_called()
 
 
-def test_open_in_system_viewer_opens_on_macos(tmp_path: Path) -> None:
+def test_open_in_system_viewer_opens_on_macos(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """On Darwin, spawns `open` via Popen."""
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
     f = tmp_path / "test.png"
     f.write_bytes(b"\x89PNG\r\n")
     with (
@@ -28,8 +33,11 @@ def test_open_in_system_viewer_opens_on_macos(tmp_path: Path) -> None:
     mock_popen.assert_called_once_with(["open", str(f)])
 
 
-def test_open_in_system_viewer_opens_on_linux(tmp_path: Path) -> None:
+def test_open_in_system_viewer_opens_on_linux(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """On Linux, spawns `xdg-open` via Popen."""
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
     f = tmp_path / "test.png"
     f.write_bytes(b"\x89PNG\r\n")
     with (
@@ -40,8 +48,11 @@ def test_open_in_system_viewer_opens_on_linux(tmp_path: Path) -> None:
     mock_popen.assert_called_once_with(["xdg-open", str(f)])
 
 
-def test_open_in_system_viewer_swallows_oserror(tmp_path: Path) -> None:
+def test_open_in_system_viewer_swallows_oserror(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """OSError from the viewer binary is silently caught."""
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
     f = tmp_path / "test.png"
     f.write_bytes(b"\x89PNG\r\n")
     with (

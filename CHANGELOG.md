@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-04-30
+
+### Fixed
+
+- **Character image API key error** — Character portrait provider now falls through to `STORYGEN_IMAGE_API_KEY` before `OPENAI_API_KEY`. Previously, when `OPENAI_API_KEY` pointed to a non-OpenAI provider (e.g. z.ai) for text generation, the character image provider would try to call OpenAI's image API with that wrong key.
+- **Test popups** — `open_in_system_viewer` now skips during pytest runs, preventing "could not be opened" system dialogs.
+
+### Changed
+
+- Default story length changed from 10 to 5 major beats.
+- Wizard "Generate Characters" and "Import from Library" buttons now disable each other while either operation is in progress.
+
+### Added
+
+- **Wizard progress indicator** — Confirm step now shows inline progress (portrait generation, blurb writing, cover art) instead of only transient toast notifications.
+- **Auto-open cover art** — Cover art generated during wizard setup now auto-opens in the system viewer when the auto-open setting is enabled.
+- **API key inputs** — Settings screen now has password-masked API key inputs for text, scene image, character image, and TTS providers. Keys persist in `state.json`; priority: env var > Settings-persisted key > `.env`.
+- **Import from Library button** — Wizard character step now has a visible "Import from Library" button alongside the existing Ctrl+L hotkey.
+
 ## [0.2.1] - 2026-04-30
 
 ### Changed
@@ -97,6 +116,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings screen** — persisted in-app configuration for provider defaults, art toggle, streaming, prefetch options, and wizard defaults
 - **Save/resume** — `--resume` flag re-opens the last-played save; full game state persistence
 
-[Unreleased]: https://github.com/paulrobello/par-storygen/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/paulrobello/par-storygen/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/paulrobello/par-storygen/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/paulrobello/par-storygen/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/paulrobello/par-storygen/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/paulrobello/par-storygen/releases/tag/v0.1.0

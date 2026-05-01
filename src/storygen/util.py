@@ -21,6 +21,8 @@ def open_in_system_viewer(path: Path) -> None:
     """
     if not path.exists():
         return
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return
     system = platform.system()
     try:
         if system == "Darwin":
