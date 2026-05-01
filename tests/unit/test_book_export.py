@@ -18,9 +18,13 @@ from storygen.core.models import (
     Theme,
     Tone,
 )
-from storygen.export.book import BookPage, _sanitize_title, _unique_output_dir, export_book  # type: ignore[reportPrivateUsage]
+from storygen.export.book import (
+    BookPage,
+    export_book,
+    sanitize_title,
+    unique_output_dir,
+)
 from storygen.storage.save import GameSave
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -139,35 +143,35 @@ class TestBookPage:
 
 
 # ---------------------------------------------------------------------------
-# _sanitize_title
+# sanitize_title
 # ---------------------------------------------------------------------------
 
 
 class TestSanitizeTitle:
     def test_removes_special_characters(self) -> None:
-        assert _sanitize_title("Hello, World!") == "Hello World"
+        assert sanitize_title("Hello, World!") == "Hello World"
 
     def test_keeps_alphanumeric_spaces_dashes(self) -> None:
-        assert _sanitize_title("My-Story_2 Go!") == "My-Story_2 Go"
+        assert sanitize_title("My-Story_2 Go!") == "My-Story_2 Go"
 
     def test_strips_whitespace(self) -> None:
-        assert _sanitize_title("  spaced  ") == "spaced"
+        assert sanitize_title("  spaced  ") == "spaced"
 
 
 # ---------------------------------------------------------------------------
-# _unique_output_dir
+# unique_output_dir
 # ---------------------------------------------------------------------------
 
 
 class TestUniqueOutputDir:
     def test_returns_base_when_not_exists(self, tmp_path: Path) -> None:
         base = tmp_path / "novel"
-        assert _unique_output_dir(base) == base
+        assert unique_output_dir(base) == base
 
     def test_appends_suffix_when_exists(self, tmp_path: Path) -> None:
         base = tmp_path / "novel"
         base.mkdir()
-        result = _unique_output_dir(base)
+        result = unique_output_dir(base)
         assert result == Path(f"{base} (2)")
 
     def test_increments_until_free(self, tmp_path: Path) -> None:
@@ -175,7 +179,7 @@ class TestUniqueOutputDir:
         base.mkdir()
         (tmp_path / "novel (2)").mkdir()
         (tmp_path / "novel (3)").mkdir()
-        result = _unique_output_dir(base)
+        result = unique_output_dir(base)
         assert result == Path(f"{base} (4)")
 
 
@@ -185,9 +189,7 @@ class TestUniqueOutputDir:
 
 
 class TestExportBook:
-    def test_single_ending_node(
-        self, tmp_path: Path, fake_file: str
-    ) -> None:
+    def test_single_ending_node(self, tmp_path: Path, fake_file: str) -> None:
         """Export a single-node path (root is also the ending)."""
         node = _node("end1", None, narration="The end.", is_ending=True)
         save = _save({"end1": node}, root="end1")
@@ -206,9 +208,7 @@ class TestExportBook:
         assert "The end." in html
         assert "Chapter 1" in html
 
-    def test_multi_node_path_with_choice_text(
-        self, tmp_path: Path, fake_file: str
-    ) -> None:
+    def test_multi_node_path_with_choice_text(self, tmp_path: Path, fake_file: str) -> None:
         """Export a multi-node path and verify choice text appears."""
         root = _node("root", None)
         mid = _node(
@@ -235,9 +235,7 @@ class TestExportBook:
         # mid chose c1 from root, root.choices[0].text == "next"
         assert "next" in html
 
-    def test_output_directory_creation(
-        self, tmp_path: Path, fake_file: str
-    ) -> None:
+    def test_output_directory_creation(self, tmp_path: Path, fake_file: str) -> None:
         """Sub-directories images/ and audio/ are created."""
         node = _node("root", None, narration="Hi", is_ending=True)
         save = _save({"root": node}, root="root")
@@ -252,9 +250,7 @@ class TestExportBook:
         assert (out / "audio").is_dir()
         assert (out / "index.html").exists()
 
-    def test_existing_dir_suffix(
-        self, tmp_path: Path, fake_file: str
-    ) -> None:
+    def test_existing_dir_suffix(self, tmp_path: Path, fake_file: str) -> None:
         """When output_dir is None and default exists, a (2) suffix is used."""
         node = _node("root", None, narration="Hi", is_ending=True)
         save = _save({"root": node}, root="root", title="SuffixTest")
@@ -278,9 +274,7 @@ class TestExportBook:
             if suffix2.exists():
                 shutil.rmtree(suffix2)
 
-    def test_scene_image_copied(
-        self, tmp_path: Path, fake_file: str
-    ) -> None:
+    def test_scene_image_copied(self, tmp_path: Path, fake_file: str) -> None:
         """A node with a completed image gets its file copied."""
         game_src = tmp_path / "game_src"
         game_src.mkdir()
@@ -308,9 +302,7 @@ class TestExportBook:
         assert copied.exists()
         assert copied.read_bytes() == b"\x89PNG_FAKE"
 
-    def test_scene_image_skipped_when_not_done(
-        self, tmp_path: Path, fake_file: str
-    ) -> None:
+    def test_scene_image_skipped_when_not_done(self, tmp_path: Path, fake_file: str) -> None:
         """A node whose image_status is not 'done' does not copy anything."""
         game_src = tmp_path / "game_src"
         game_src.mkdir()
@@ -334,9 +326,7 @@ class TestExportBook:
         html = (out / "index.html").read_text()
         assert "<img" not in html
 
-    def test_tts_audio_copied(
-        self, tmp_path: Path, fake_file: str
-    ) -> None:
+    def test_tts_audio_copied(self, tmp_path: Path, fake_file: str) -> None:
         """A node with a TTS audio file gets it copied to audio/."""
         game_src = tmp_path / "game_src"
         game_src.mkdir()
@@ -365,9 +355,7 @@ class TestExportBook:
         html = (out / "index.html").read_text()
         assert "audio/n1-openai-abc12345.mp3" in html
 
-    def test_html_contains_title_and_chapters(
-        self, tmp_path: Path, fake_file: str
-    ) -> None:
+    def test_html_contains_title_and_chapters(self, tmp_path: Path, fake_file: str) -> None:
         """The rendered HTML contains the story title and chapter markers."""
         n1 = _node("root", None, narration="Chapter one.")
         n2 = _node("ch2", "root", chose="c1", narration="Chapter two.", is_ending=True)
@@ -385,9 +373,7 @@ class TestExportBook:
         assert "Chapter 2" in html
         assert "Total: 2" in html
 
-    def test_default_output_dir_is_desktop(
-        self, tmp_path: Path, fake_file: str
-    ) -> None:
+    def test_default_output_dir_is_desktop(self, tmp_path: Path, fake_file: str) -> None:
         """When output_dir is None, the default is ~/Desktop/<title> - Book/."""
         node = _node("root", None, narration="Hi", is_ending=True)
         save = _save({"root": node}, root="root", title="DesktopTest")
@@ -404,9 +390,7 @@ class TestExportBook:
             if expected_dir.exists():
                 shutil.rmtree(expected_dir)
 
-    def test_open_browser_called(
-        self, tmp_path: Path, fake_file: str
-    ) -> None:
+    def test_open_browser_called(self, tmp_path: Path, fake_file: str) -> None:
         """When open_browser=True, webbrowser.open is called."""
         node = _node("root", None, narration="Hi", is_ending=True)
         save = _save({"root": node}, root="root")
@@ -420,9 +404,7 @@ class TestExportBook:
 
         mock_open.assert_called_once_with((out / "index.html").as_uri())
 
-    def test_open_browser_not_called_when_false(
-        self, tmp_path: Path, fake_file: str
-    ) -> None:
+    def test_open_browser_not_called_when_false(self, tmp_path: Path, fake_file: str) -> None:
         """When open_browser=False, webbrowser.open is not called."""
         node = _node("root", None, narration="Hi", is_ending=True)
         save = _save({"root": node}, root="root")
@@ -436,9 +418,7 @@ class TestExportBook:
 
         mock_open.assert_not_called()
 
-    def test_root_node_has_no_choice_text(
-        self, tmp_path: Path, fake_file: str
-    ) -> None:
+    def test_root_node_has_no_choice_text(self, tmp_path: Path, fake_file: str) -> None:
         """The root node (no parent, no chosen_choice_id) has choice_text=None."""
         node = _node("root", None, narration="Start.", is_ending=True)
         save = _save({"root": node}, root="root")

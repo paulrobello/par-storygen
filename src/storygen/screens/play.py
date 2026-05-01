@@ -16,6 +16,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Footer, Header
 
+from storygen.export.book import export_book
 from storygen.llm.models import NodeId, StoryNode
 from storygen.pipeline import BeatPipeline, PipelineCallbacks
 from storygen.screens.endings import EndingsScreen
@@ -25,7 +26,6 @@ from storygen.storage import app_state, paths
 from storygen.storage.save import GameSave, save_game
 from storygen.tts.player import TTSPlayer, TTSState
 from storygen.util import open_in_system_viewer
-from storygen.export.book import export_book
 from storygen.widgets._header_util import format_cost_subtitle
 from storygen.widgets.choice_list import ChoiceList
 from storygen.widgets.image_panel import ImagePanel

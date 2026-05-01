@@ -29,12 +29,12 @@ class BookPage:
     is_major: bool
 
 
-def _sanitize_title(title: str) -> str:
+def sanitize_title(title: str) -> str:
     """Return a filesystem-safe version of a story title."""
     return re.sub(r"[^A-Za-z0-9_ \-]+", "", title).strip()
 
 
-def _unique_output_dir(base: Path) -> Path:
+def unique_output_dir(base: Path) -> Path:
     """Return ``base`` or ``base (N)`` if base already exists."""
     if not base.exists():
         return base
@@ -80,9 +80,9 @@ def export_book(
     """
     # 1. Determine output directory
     if output_dir is None:
-        sanitized = _sanitize_title(save.theme.title)
+        sanitized = sanitize_title(save.theme.title)
         base = Path.home() / "Desktop" / f"{sanitized} - Book"
-        output_dir = _unique_output_dir(base)
+        output_dir = unique_output_dir(base)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     images_dir = output_dir / "images"
