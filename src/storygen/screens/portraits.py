@@ -123,7 +123,7 @@ class PortraitsScreen(Screen[None]):
         padding: 1 2;
     }
     PortraitsScreen .portrait-row {
-        height: 16;
+        height: 18;
         margin-bottom: 1;
         padding: 1;
         border: round $primary;
