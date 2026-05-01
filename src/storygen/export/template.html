@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ title }}</title>
+<style>
+/* ── CSS Custom Properties ─────────────────────────────────────── */
+:root {
+  --font-display: 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+  --font-body: Georgia, 'Times New Roman', Times, serif;
+  --font-ui: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  --nav-height: 56px;
+  --top-height: 48px;
+  --progress-height: 3px;
+  --content-max: 680px;
+  --radius: 6px;
+  --transition-speed: 300ms;
+}
+
+/* Dark theme (default) */
+body.dark {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-tertiary: #0f3460;
+  --bg-card: #1e2a45;
+  --accent: #e94560;
+  --accent-hover: #ff6b81;
+  --accent-glow: rgba(233, 69, 96, 0.25);
+  --text-primary: #e0e0e0;
+  --text-secondary: #a0a0b0;
+  --text-muted: #6b6b80;
+  --border: rgba(255, 255, 255, 0.08);
+  --shadow: rgba(0, 0, 0, 0.4);
+  --progress-bg: rgba(255, 255, 255, 0.08);
+  --overlay: rgba(10, 10, 20, 0.85);
+}
+
+/* Light theme */
+body.light {
+  --bg-primary: #faf8f5;
+  --bg-secondary: #f0ede8;
+  --bg-tertiary: #e8e4de;
+  --bg-card: #ffffff;
+  --accent: #e94560;
+  --accent-hover: #d6304a;
+  --accent-glow: rgba(233, 69, 96, 0.15);
+  --text-primary: #1a1a2e;
+  --text-secondary: #555;
+  --text-muted: #888;
+  --border: rgba(0, 0, 0, 0.08);
+  --shadow: rgba(0, 0, 0, 0.1);
+  --progress-bg: rgba(0, 0, 0, 0.08);
+  --overlay: rgba(255, 255, 255, 0.9);
+}
+
+/* ── Reset & Base ──────────────────────────────────────────────── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  line-height: 1.8;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Top Bar ───────────────────────────────────────────────────── */
+.top-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--top-height);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  z-index: 100;
+  backdrop-filter: blur(12px);
+}
+
+.top-bar__title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 50%;
+  letter-spacing: 0.02em;
+}
+
+.top-bar__counter {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.top-bar__toggle {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-speed);
+  flex-shrink: 0;
+}
+
+.top-bar__toggle:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+/* ── Progress Bar ──────────────────────────────────────────────── */
+.progress-bar {
+  position: fixed;
+  top: var(--top-height);
+  left: 0;
+  right: 0;
+  height: var(--progress-height);
+  background: var(--progress-bg);
+  z-index: 100;
+}
+
+.progress-bar__fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 400ms ease;
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* ── Content Area ──────────────────────────────────────────────── */
+.content-wrapper {
+  perspective: 1200px;
+  min-height: 100vh;
+  padding-top: calc(var(--top-height) + var(--progress-height) + 32px);
+  padding-bottom: calc(var(--nav-height) + 40px);
+}
+
+.page {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 0 24px;
+  transform-origin: center center;
+  transition: transform 400ms ease-in-out, opacity 400ms ease-in-out;
+}
+
+.page--exit-left {
+  animation: pageOutLeft 400ms ease-in-out forwards;
+}
+
+.page--exit-right {
+  animation: pageOutRight 400ms ease-in-out forwards;
+}
+
+.page--enter-left {
+  animation: pageInLeft 400ms ease-in-out forwards;
+}
+
+.page--enter-right {
+  animation: pageInRight 400ms ease-in-out forwards;
+}
+
+@keyframes pageOutLeft {
+  0%   { transform: rotateY(0deg); opacity: 1; }
+  100% { transform: rotateY(-90deg); opacity: 0; }
+}
+
+@keyframes pageOutRight {
+  0%   { transform: rotateY(0deg); opacity: 1; }
+  100% { transform: rotateY(90deg); opacity: 0; }
+}
+
+@keyframes pageInLeft {
+  0%   { transform: rotateY(90deg); opacity: 0; }
+  100% { transform: rotateY(0deg); opacity: 1; }
+}
+
+@keyframes pageInRight {
+  0%   { transform: rotateY(-90deg); opacity: 0; }
+  100% { transform: rotateY(0deg); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page--exit-left,
+  .page--exit-right,
+  .page--enter-left,
+  .page--enter-right {
+    animation-name: pageFade;
+  }
+  @keyframes pageFade {
+    0%   { opacity: 1; }
+    50%  { opacity: 0; }
+    100% { opacity: 1; }
+  }
+}
+
+/* ── Chapter Heading ───────────────────────────────────────────── */
+.chapter-heading {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 300;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-bottom: 32px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.chapter-heading span {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ── Choice Text ───────────────────────────────────────────────── */
+.choice-text {
+  font-family: var(--font-ui);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 28px;
+  padding: 12px 20px;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-glow);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+/* ── Scene Image ───────────────────────────────────────────────── */
+.scene-image {
+  display: block;
+  max-width: 100%;
+  border-radius: var(--radius);
+  margin: 0 auto 32px;
+  box-shadow: 0 8px 32px var(--shadow);
+}
+
+/* ── Narration ─────────────────────────────────────────────────── */
+.narration {
+  font-family: var(--font-body);
+  font-size: 1.1rem;
+  line-height: 2;
+  color: var(--text-primary);
+  margin-bottom: 32px;
+  text-align: justify;
+  hyphens: auto;
+}
+
+/* ── Audio Player ──────────────────────────────────────────────── */
+.audio-player {
+  display: none;
+  margin: 24px auto 16px;
+  max-width: 100%;
+  padding: 16px 20px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.audio-player.visible { display: flex; align-items: center; gap: 14px; }
+
+.audio-player__btn {
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--transition-speed);
+  font-size: 1rem;
+}
+
+.audio-player__btn:hover {
+  background: var(--accent-hover);
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+.audio-player__seek-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.audio-player__seek {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.audio-player__seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+
+.audio-player__seek::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: none;
+}
+
+.audio-player__time {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* ── The End ───────────────────────────────────────────────────── */
+.the-end {
+  text-align: center;
+  margin: 48px 0 24px;
+  padding: 40px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.the-end__text {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  font-weight: 300;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.the-end__sub {
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+/* ── Bottom Navigation ─────────────────────────────────────────── */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--nav-height);
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 0 24px;
+  z-index: 100;
+  backdrop-filter: blur(12px);
+}
+
+.bottom-nav__btn {
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 10px 24px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all var(--transition-speed);
+  white-space: nowrap;
+}
+
+.bottom-nav__btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.bottom-nav__btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.bottom-nav__btn--accent {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.bottom-nav__btn--accent:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: #fff;
+}
+
+.bottom-nav__btn--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+</style>
+</head>
+<body class="dark">
+
+<!-- Hidden audio element -->
+<audio id="audioEl" preload="auto"></audio>
+
+<!-- Top Bar -->
+<header class="top-bar">
+  <div class="top-bar__title">{{ title }}</div>
+  <div class="top-bar__counter" id="chapterCounter">Chapter 1 of {{ total }}</div>
+  <button class="top-bar__toggle" id="themeToggle" aria-label="Toggle theme">&#9788;</button>
+</header>
+
+<!-- Progress Bar -->
+<div class="progress-bar">
+  <div class="progress-bar__fill" id="progressFill" style="width: 0%"></div>
+</div>
+
+<!-- Content -->
+<div class="content-wrapper">
+  <div class="page" id="pageEl"></div>
+</div>
+
+<!-- Bottom Navigation -->
+<nav class="bottom-nav">
+  <button class="bottom-nav__btn" id="prevBtn" disabled>&larr; Previous</button>
+  <button class="bottom-nav__btn" id="autoReadBtn">Auto-Read</button>
+  <button class="bottom-nav__btn" id="nextBtn">Next &rarr;</button>
+</nav>
+
+<script>
+// ── Page Data ────────────────────────────────────────────────────
+const PAGES = {{ pages | tojson }};
+const TITLE = {{ title | tojson }};
+const HAS_ANY_AUDIO = {{ has_any_audio | tojson }};
+const AUTO_READ_DELAY = {{ auto_read_delay | tojson }};
+const TOTAL = {{ total | tojson }};
+
+// ── State ────────────────────────────────────────────────────────
+let currentIndex = 0;
+let isAnimating = false;
+let autoReadActive = false;
+let autoReadTimer = null;
+
+// ── DOM References ───────────────────────────────────────────────
+const pageEl        = document.getElementById('pageEl');
+const prevBtn       = document.getElementById('prevBtn');
+const nextBtn       = document.getElementById('nextBtn');
+const autoReadBtn   = document.getElementById('autoReadBtn');
+const themeToggle   = document.getElementById('themeToggle');
+const progressFill  = document.getElementById('progressFill');
+const chapterCounter= document.getElementById('chapterCounter');
+const audioEl       = document.getElementById('audioEl');
+
+// ── Render ───────────────────────────────────────────────────────
+function renderPage(index) {
+  const p = PAGES[index];
+  let html = '';
+
+  // Chapter heading
+  html += '<h2 class="chapter-heading">Chapter <span>' + p.chapter + '</span></h2>';
+
+  // Choice text
+  if (p.choice_text) {
+    html += '<div class="choice-text">' + escapeHtml(p.choice_text) + '</div>';
+  }
+
+  // Scene image
+  if (p.image_url) {
+    html += '<img class="scene-image" src="' + p.image_url + '" alt="Chapter ' + p.chapter + ' illustration" />';
+  }
+
+  // Narration
+  html += '<div class="narration">' + escapeHtml(p.narration) + '</div>';
+
+  // Audio player
+  html += '<div class="audio-player' + (p.audio_url ? ' visible' : '') + '" id="audioPlayer">';
+  html += '  <button class="audio-player__btn" id="audioPlayBtn">&#9654;</button>';
+  html += '  <div class="audio-player__seek-wrap">';
+  html += '    <input type="range" class="audio-player__seek" id="audioSeek" min="0" max="100" value="0" step="0.1" />';
+  html += '    <div class="audio-player__time" id="audioTime">0:00 / 0:00</div>';
+  html += '  </div>';
+  html += '</div>';
+
+  // The End marker
+  if (p.is_ending) {
+    html += '<div class="the-end">';
+    html += '  <div class="the-end__text">The End</div>';
+    html += '  <div class="the-end__sub">You have reached the end of this path.</div>';
+    html += '</div>';
+  }
+
+  pageEl.innerHTML = html;
+
+  // Update nav
+  prevBtn.disabled = (index === 0);
+  nextBtn.disabled = (index === TOTAL - 1);
+  chapterCounter.textContent = 'Chapter ' + (index + 1) + ' of ' + TOTAL;
+  progressFill.style.width = ((index / (TOTAL - 1)) * 100) + '%';
+
+  // Wire audio
+  wireAudio(p);
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ── Audio ────────────────────────────────────────────────────────
+function wireAudio(page) {
+  const playBtn = document.getElementById('audioPlayBtn');
+  const seekBar = document.getElementById('audioSeek');
+  const timeEl  = document.getElementById('audioTime');
+
+  if (!page.audio_url) {
+    audioEl.removeAttribute('src');
+    audioEl.pause();
+    return;
+  }
+
+  audioEl.src = page.audio_url;
+
+  if (playBtn) {
+    playBtn.onclick = function() {
+      if (audioEl.paused) {
+        audioEl.play();
+      } else {
+        audioEl.pause();
+      }
+    };
+  }
+
+  audioEl.onplay = function() {
+    if (playBtn) playBtn.innerHTML = '&#10074;&#10074;';
+  };
+
+  audioEl.onpause = function() {
+    if (playBtn) playBtn.innerHTML = '&#9654;';
+  };
+
+  audioEl.ontimeupdate = function() {
+    if (!audioEl.duration) return;
+    if (seekBar) seekBar.value = (audioEl.currentTime / audioEl.duration) * 100;
+    if (timeEl) timeEl.textContent = formatTime(audioEl.currentTime) + ' / ' + formatTime(audioEl.duration);
+  };
+
+  audioEl.onended = function() {
+    if (playBtn) playBtn.innerHTML = '&#9654;';
+    if (autoReadActive && currentIndex < TOTAL - 1) {
+      nextPage();
+    }
+  };
+
+  if (seekBar) {
+    seekBar.oninput = function() {
+      if (!audioEl.duration) return;
+      audioEl.currentTime = (seekBar.value / 100) * audioEl.duration;
+    };
+  }
+}
+
+function formatTime(sec) {
+  if (!sec || isNaN(sec)) return '0:00';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+// ── Navigation with Animation ────────────────────────────────────
+function nextPage() {
+  if (isAnimating || currentIndex >= TOTAL - 1) return;
+  navigateTo(currentIndex + 1, 'forward');
+}
+
+function prevPage() {
+  if (isAnimating || currentIndex <= 0) return;
+  navigateTo(currentIndex - 1, 'backward');
+}
+
+function navigateTo(newIndex, direction) {
+  isAnimating = true;
+  clearAutoReadTimer();
+
+  const exitClass = direction === 'forward' ? 'page--exit-left' : 'page--exit-right';
+  const enterClass = direction === 'forward' ? 'page--enter-right' : 'page--enter-left';
+
+  pageEl.classList.add(exitClass);
+
+  setTimeout(function() {
+    audioEl.pause();
+    audioEl.removeAttribute('src');
+    currentIndex = newIndex;
+    renderPage(currentIndex);
+    pageEl.classList.remove(exitClass);
+    pageEl.classList.add(enterClass);
+
+    setTimeout(function() {
+      pageEl.classList.remove(enterClass);
+      isAnimating = false;
+      handleAutoReadAdvance();
+    }, 400);
+  }, 400);
+}
+
+// ── Auto-Read ────────────────────────────────────────────────────
+function toggleAutoRead() {
+  autoReadActive = !autoReadActive;
+  if (autoReadActive) {
+    autoReadBtn.textContent = 'Stop';
+    autoReadBtn.classList.add('bottom-nav__btn--active');
+    handleAutoReadAdvance();
+  } else {
+    autoReadBtn.textContent = 'Auto-Read';
+    autoReadBtn.classList.remove('bottom-nav__btn--active');
+    clearAutoReadTimer();
+  }
+}
+
+function handleAutoReadAdvance() {
+  if (!autoReadActive) return;
+
+  const page = PAGES[currentIndex];
+  if (page.is_ending) {
+    autoReadActive = false;
+    autoReadBtn.textContent = 'Auto-Read';
+    autoReadBtn.classList.remove('bottom-nav__btn--active');
+    return;
+  }
+
+  if (page.audio_url) {
+    // Audio pages: autoplay and advance on 'ended'
+    audioEl.play().catch(function() {});
+  } else {
+    // Non-audio pages: wait auto_read_delay seconds
+    clearAutoReadTimer();
+    autoReadTimer = setTimeout(function() {
+      if (autoReadActive && currentIndex < TOTAL - 1) {
+        nextPage();
+      }
+    }, AUTO_READ_DELAY * 1000);
+  }
+}
+
+function clearAutoReadTimer() {
+  if (autoReadTimer) {
+    clearTimeout(autoReadTimer);
+    autoReadTimer = null;
+  }
+}
+
+// ── Theme Toggle ─────────────────────────────────────────────────
+function setTheme(theme) {
+  document.body.className = theme;
+  themeToggle.innerHTML = theme === 'dark' ? '&#9788;' : '&#9790;';
+  try { localStorage.setItem('book-theme', theme); } catch(e) {}
+}
+
+function loadTheme() {
+  try {
+    const saved = localStorage.getItem('book-theme');
+    if (saved === 'light' || saved === 'dark') {
+      setTheme(saved);
+    }
+  } catch(e) {}
+}
+
+// ── Keyboard ─────────────────────────────────────────────────────
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'ArrowRight') { e.preventDefault(); nextPage(); }
+  if (e.key === 'ArrowLeft')  { e.preventDefault(); prevPage(); }
+});
+
+// ── Event Listeners ──────────────────────────────────────────────
+prevBtn.addEventListener('click', prevPage);
+nextBtn.addEventListener('click', nextPage);
+autoReadBtn.addEventListener('click', toggleAutoRead);
+themeToggle.addEventListener('click', function() {
+  setTheme(document.body.classList.contains('dark') ? 'light' : 'dark');
+});
+
+// ── Initialize ───────────────────────────────────────────────────
+loadTheme();
+renderPage(0);
+</script>
+</html>
