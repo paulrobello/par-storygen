@@ -597,6 +597,7 @@ class PlayScreen(Screen[None]):
                 tts_prefs = app_state.read_tts_prefs()
                 cache = self._tts_cache_path(node.id, tts_prefs)
                 if not cache.exists():
+                    self._tts_player.set_state(TTSState.GENERATING)
                     self.notify("Generating speech…", timeout=15)
             self.run_worker(self._speak_current_node(), exclusive=True, name="tts-speak")
         self.refresh_bindings()

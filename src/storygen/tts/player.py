@@ -68,6 +68,14 @@ class TTSPlayer:
     def state(self) -> TTSState:
         return self._state
 
+    def set_state(self, state: TTSState) -> None:
+        """Set the playback state directly.
+
+        Used by the UI layer to eagerly transition to GENERATING before the
+        async worker runs, so the user gets immediate feedback.
+        """
+        self._state = state
+
     @property
     def voices(self) -> list[Voice]:
         return list(self._voices)
