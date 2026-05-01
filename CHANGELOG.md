@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Export Book** — Press `x` on an ending screen to export the story path as a standalone HTML book reader. The book includes: chapter-by-chapter navigation with arrow keys, 3D page-turn animation (CSS `rotateY` with `prefers-reduced-motion` fallback), light/dark mode toggle persisted via `localStorage`, custom audio player for TTS narration (when available), auto-read mode (audio-aware advancement + configurable timer for non-audio pages), and a "The End" marker on the final chapter. Scene images and TTS audio files are copied alongside `index.html` into `~/Desktop/<Title> - Book/`. Uses Jinja2 template rendering with all CSS/JS inline.
+
 ### Changed
 
 - **Image panel throbber** — The image panel now shows an animated rainbow throbber bar during illustration generation instead of static text.
