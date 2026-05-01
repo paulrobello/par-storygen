@@ -95,7 +95,7 @@ class OpenAIImageProvider:
         else:
             resolved_key = (
                 api_key
-                if api_key is not None
+                if api_key
                 else _env_or_none("STORYGEN_IMAGE_API_KEY") or _env_or_none("OPENAI_API_KEY") or ""
             )
             if base_url:
