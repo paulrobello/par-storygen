@@ -95,12 +95,21 @@ def _resolve_text_config() -> TextProviderConfig:
     # Normalize "" → None so the factory uses its per-provider default URL.
     base_url: str | None = base_url_raw if base_url_raw else None
 
-    # cast: provider was checked against _ALLOWED_PROVIDERS (which mirrors the
-    # TextProviderConfig.provider literal), so the cast is sound at runtime.
+    _KEY_ENV: dict[str, str | None] = {
+        "openai": "OPENAI_API_KEY",
+        "openrouter": "OPENROUTER_API_KEY",
+        "ollama": None,
+    }
+    api_key: str | None = None
+    env_var = _KEY_ENV.get(provider)
+    if env_var is not None and _env_or_none(env_var) is None and prefs.api_key:
+        api_key = prefs.api_key
+
     candidate = TextProviderConfig(
         provider=cast(Provider, provider),
         model=model,
         base_url=base_url,
+        api_key=api_key,
     )
     ok, err = validate_config(candidate)
     if not ok:
@@ -150,7 +159,7 @@ def _resolve_image_config() -> ImageProviderConfig:
     # Normalize "" → None so the factory uses the provider's default URL.
     base_url: str | None = base_url_raw if base_url_raw else None
 
-    api_key = _env_or_none("STORYGEN_IMAGE_API_KEY")
+    api_key = _env_or_none("STORYGEN_IMAGE_API_KEY") or (prefs.api_key or None)
 
     # cast: provider was checked against _ALLOWED_IMAGE_PROVIDERS (which mirrors
     # the ImageProviderConfig.provider literal), so the cast is sound at runtime.
@@ -197,7 +206,7 @@ def _resolve_character_image_config() -> ImageProviderConfig:
     base_url_raw = env_base_url if env_base_url is not None else prefs.base_url
     base_url: str | None = base_url_raw if base_url_raw else None
 
-    api_key = _env_or_none("STORYGEN_CHARACTER_IMAGE_API_KEY")
+    api_key = _env_or_none("STORYGEN_CHARACTER_IMAGE_API_KEY") or (prefs.api_key or None)
     if provider == "openai" and api_key is None:
         # Character portraits are scoped separately from scene/cover art keys.
         # Pin OpenAI's standard key (or an explicit empty value) so provider

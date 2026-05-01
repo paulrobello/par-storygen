@@ -36,7 +36,7 @@ DEFAULT_ART_STYLE: str = "children's story book"
 DEFAULT_TONE_PRESET: str = "serious"
 DEFAULT_NARRATION_STYLE: str = "third_person"
 
-DEFAULT_TARGET_MAJOR_BEATS: int = 10
+DEFAULT_TARGET_MAJOR_BEATS: int = 5
 MIN_TARGET_MAJOR_BEATS: int = 2
 MAX_TARGET_MAJOR_BEATS: int = 30
 
@@ -153,6 +153,7 @@ class ProviderPrefs:
     provider: str = DEFAULT_TEXT_PROVIDER  # one of PROVIDER_CHOICES ids
     model: str = DEFAULT_TEXT_MODEL
     base_url: str = ""  # empty → provider factory picks its default
+    api_key: str = ""  # blank → fall back to env var
 
 
 @dataclass(frozen=True)
@@ -167,6 +168,7 @@ class ImageProviderPrefs:
     provider: str = DEFAULT_IMAGE_PROVIDER  # one of IMAGE_PROVIDER_CHOICES ids
     model: str = DEFAULT_IMAGE_MODEL
     base_url: str = ""  # empty → factory picks the provider's default URL
+    api_key: str = ""  # blank → fall back to env var
     fallback_provider: str = ""  # "" = no fallback
     fallback_model: str = ""  # "" = use SUGGESTED_IMAGE_MODELS[fallback_provider][0]
 
@@ -178,6 +180,7 @@ class CharacterImageProviderPrefs:
     provider: str = DEFAULT_CHARACTER_IMAGE_PROVIDER  # one of IMAGE_PROVIDER_CHOICES ids
     model: str = DEFAULT_CHARACTER_IMAGE_MODEL
     base_url: str = ""  # empty → factory picks the provider's default URL
+    api_key: str = ""  # blank → fall back to env var
 
 
 @dataclass(frozen=True)
@@ -448,7 +451,9 @@ def read_provider_prefs() -> ProviderPrefs:
         return ProviderPrefs()
     model = str(raw.get("model", DEFAULT_TEXT_MODEL))
     base_url = str(raw.get("base_url", ""))
-    return ProviderPrefs(provider=provider, model=model, base_url=base_url)
+    return ProviderPrefs(
+        provider=provider, model=model, base_url=base_url, api_key=str(raw.get("api_key", ""))
+    )
 
 
 def write_provider_prefs(prefs: ProviderPrefs) -> None:
@@ -487,6 +492,7 @@ def read_image_provider_prefs() -> ImageProviderPrefs:
         provider=provider,
         model=model,
         base_url=base_url,
+        api_key=str(raw.get("api_key", "")),
         fallback_provider=fallback_provider,
         fallback_model=fallback_model,
     )
@@ -510,7 +516,9 @@ def read_character_image_provider_prefs() -> CharacterImageProviderPrefs:
         return CharacterImageProviderPrefs()
     model = str(raw.get("model", DEFAULT_CHARACTER_IMAGE_MODEL))
     base_url = str(raw.get("base_url", ""))
-    return CharacterImageProviderPrefs(provider=provider, model=model, base_url=base_url)
+    return CharacterImageProviderPrefs(
+        provider=provider, model=model, base_url=base_url, api_key=str(raw.get("api_key", ""))
+    )
 
 
 def write_character_image_provider_prefs(prefs: CharacterImageProviderPrefs) -> None:
@@ -526,6 +534,7 @@ def _serialize_character_image_prefs(prefs: CharacterImageProviderPrefs) -> dict
         "provider": prefs.provider,
         "model": prefs.model,
         "base_url": prefs.base_url,
+        "api_key": prefs.api_key,
     }
 
 
@@ -536,6 +545,7 @@ def _serialize_image_prefs(prefs: ImageProviderPrefs) -> dict[str, Any]:
         "provider": prefs.provider,
         "model": prefs.model,
         "base_url": prefs.base_url,
+        "api_key": prefs.api_key,
         "fallback_provider": prefs.fallback_provider,
         "fallback_model": prefs.fallback_model,
     }
@@ -548,6 +558,7 @@ def _serialize_text_prefs(prefs: ProviderPrefs) -> dict[str, Any]:
         "provider": prefs.provider,
         "model": prefs.model,
         "base_url": prefs.base_url,
+        "api_key": prefs.api_key,
     }
 
 

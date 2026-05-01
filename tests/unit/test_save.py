@@ -196,12 +196,12 @@ def test_art_style_round_trip(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     assert restored.art_style == "watercolor"
 
 
-def test_target_major_beats_defaults_to_ten(
+def test_target_major_beats_defaults_to_five(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     save = _make_save()
-    assert save.target_major_beats == 10
+    assert save.target_major_beats == 5
 
 
 def test_target_major_beats_round_trip(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

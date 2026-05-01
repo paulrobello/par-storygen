@@ -195,6 +195,12 @@ class SettingsScreen(Screen[None]):
             ),
             id="provider-base-url",
         )
+        self._text_api_key_input = Input(
+            value="",
+            placeholder="Leave blank to use env var",
+            id="text-api-key",
+            password=True,
+        )
         self._api_key_status = Static("", id="provider-api-key-status")
         self._suggested = Static("", id="provider-suggested")
 
@@ -220,6 +226,12 @@ class SettingsScreen(Screen[None]):
             value="",
             placeholder=_image_base_url_placeholder(app_state.DEFAULT_IMAGE_PROVIDER),
             id="image-provider-base-url",
+        )
+        self._image_api_key_input = Input(
+            value="",
+            placeholder="Leave blank to use env var",
+            id="image-api-key",
+            password=True,
         )
         self._image_api_key_status = Static("", id="image-provider-api-key-status")
         self._image_suggested = Static("", id="image-provider-suggested")
@@ -270,6 +282,12 @@ class SettingsScreen(Screen[None]):
             value="",
             placeholder=_image_base_url_placeholder(app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER),
             id="character-image-provider-base-url",
+        )
+        self._char_image_api_key_input = Input(
+            value="",
+            placeholder="Leave blank to use env var",
+            id="char-image-api-key",
+            password=True,
         )
         self._character_image_api_key_status = Static(
             "", id="character-image-provider-api-key-status"
@@ -352,6 +370,8 @@ class SettingsScreen(Screen[None]):
             yield self._model_input
             yield Label("Base URL (blank = use provider default)")
             yield self._base_url_input
+            yield Label("API key (blank = use provider env var)")
+            yield self._text_api_key_input
             yield self._api_key_status
             yield self._suggested
 
@@ -363,6 +383,8 @@ class SettingsScreen(Screen[None]):
             yield self._image_model_input
             yield Label("Base URL (blank = use provider default)")
             yield self._image_base_url_input
+            yield Label("API key (blank = use provider env var)")
+            yield self._image_api_key_input
             yield self._image_api_key_status
             yield self._image_suggested
             yield Label("Fallback provider (optional)")
@@ -380,6 +402,8 @@ class SettingsScreen(Screen[None]):
             yield self._character_image_model_input
             yield Label("Base URL (blank = use provider default)")
             yield self._character_image_base_url_input
+            yield Label("API key (blank = use provider env var)")
+            yield self._char_image_api_key_input
             yield self._character_image_api_key_status
             yield self._character_image_suggested
 
@@ -493,9 +517,13 @@ class SettingsScreen(Screen[None]):
         if env_name is None:
             self._api_key_status.update("API key: not required (local)")
             return
+        persisted = self._text_api_key_input.value.strip()
         present = bool(os.environ.get(env_name))
-        mark = "present" if present else "missing"
-        self._api_key_status.update(f"API key ({env_name}): {mark}")
+        if persisted:
+            self._api_key_status.update(f"API key ({env_name}): set in settings")
+        else:
+            mark = "present" if present else "missing"
+            self._api_key_status.update(f"API key ({env_name}): {mark}")
 
     def _refresh_suggested(self, provider: str) -> None:
         models = app_state.SUGGESTED_MODELS.get(provider, [])
@@ -509,9 +537,13 @@ class SettingsScreen(Screen[None]):
         if env_name is None:
             self._image_api_key_status.update("No API key required (local)")
             return
+        persisted = self._image_api_key_input.value.strip()
         present = bool(os.environ.get(env_name))
-        mark = "present" if present else "missing"
-        self._image_api_key_status.update(f"API key ({env_name}): {mark}")
+        if persisted:
+            self._image_api_key_status.update(f"API key ({env_name}): set in settings")
+        else:
+            mark = "present" if present else "missing"
+            self._image_api_key_status.update(f"API key ({env_name}): {mark}")
 
     def _image_model_options(self, provider: str) -> list[tuple[str, str]]:
         """Curated image-model choices for the Select widget, plus a Custom entry.
@@ -552,9 +584,13 @@ class SettingsScreen(Screen[None]):
         if env_name is None:
             self._character_image_api_key_status.update("No API key required (local)")
             return
+        persisted = self._char_image_api_key_input.value.strip()
         present = bool(os.environ.get(env_name))
-        mark = "present" if present else "missing"
-        self._character_image_api_key_status.update(f"API key ({env_name}): {mark}")
+        if persisted:
+            self._character_image_api_key_status.update(f"API key ({env_name}): set in settings")
+        else:
+            mark = "present" if present else "missing"
+            self._character_image_api_key_status.update(f"API key ({env_name}): {mark}")
 
     def _character_image_model_options(self, provider: str) -> list[tuple[str, str]]:
         return self._image_model_options(provider)
@@ -614,6 +650,7 @@ class SettingsScreen(Screen[None]):
             self._provider_select.prevent(Select.Changed),
             self._model_input.prevent(Input.Changed),
             self._base_url_input.prevent(Input.Changed),
+            self._text_api_key_input.prevent(Input.Changed),
         ):
             self._provider_select.value = prefs.provider
             self._model_input.value = prefs.model
@@ -621,6 +658,7 @@ class SettingsScreen(Screen[None]):
             self._base_url_input.placeholder = resolve_base_url(
                 cast(Provider, prefs.provider), override=None
             )
+            self._text_api_key_input.value = prefs.api_key
         self._refresh_api_key_status(prefs.provider)
         self._refresh_suggested(prefs.provider)
 
@@ -633,6 +671,7 @@ class SettingsScreen(Screen[None]):
             self._image_provider_select.prevent(Select.Changed),
             self._image_model_input.prevent(Input.Changed),
             self._image_base_url_input.prevent(Input.Changed),
+            self._image_api_key_input.prevent(Input.Changed),
             self._fallback_select.prevent(Select.Changed),
             self._fallback_model_input.prevent(Input.Changed),
         ):
@@ -640,6 +679,7 @@ class SettingsScreen(Screen[None]):
             self._image_model_input.value = img_prefs.model
             self._image_base_url_input.value = img_prefs.base_url
             self._image_base_url_input.placeholder = _image_base_url_placeholder(img_prefs.provider)
+            self._image_api_key_input.value = img_prefs.api_key
             self._fallback_select.value = fallback_value
             self._fallback_model_input.value = img_prefs.fallback_model
             self._fallback_model_input.disabled = not img_prefs.fallback_provider
@@ -655,6 +695,7 @@ class SettingsScreen(Screen[None]):
             self._character_image_provider_select.prevent(Select.Changed),
             self._character_image_model_input.prevent(Input.Changed),
             self._character_image_base_url_input.prevent(Input.Changed),
+            self._char_image_api_key_input.prevent(Input.Changed),
         ):
             self._character_image_provider_select.value = character_img_prefs.provider
             self._character_image_model_input.value = character_img_prefs.model
@@ -662,6 +703,7 @@ class SettingsScreen(Screen[None]):
             self._character_image_base_url_input.placeholder = _image_base_url_placeholder(
                 character_img_prefs.provider
             )
+            self._char_image_api_key_input.value = character_img_prefs.api_key
         self._sync_character_image_model_select(
             character_img_prefs.provider, character_img_prefs.model
         )
@@ -745,12 +787,14 @@ class SettingsScreen(Screen[None]):
         with (
             self._model_input.prevent(Input.Changed),
             self._base_url_input.prevent(Input.Changed),
+            self._text_api_key_input.prevent(Input.Changed),
         ):
             self._model_input.value = first_model
             self._base_url_input.value = ""
             self._base_url_input.placeholder = resolve_base_url(
                 cast(Provider, provider), override=None
             )
+            self._text_api_key_input.value = ""
         self._refresh_api_key_status(provider)
         self._refresh_suggested(provider)
 
@@ -768,10 +812,12 @@ class SettingsScreen(Screen[None]):
         with (
             self._image_model_input.prevent(Input.Changed),
             self._image_base_url_input.prevent(Input.Changed),
+            self._image_api_key_input.prevent(Input.Changed),
         ):
             self._image_model_input.value = first_model
             self._image_base_url_input.value = ""
             self._image_base_url_input.placeholder = _image_base_url_placeholder(provider)
+            self._image_api_key_input.value = ""
         self._sync_image_model_select(provider, first_model)
         self._refresh_image_api_key_status(provider)
         self._refresh_image_suggested(provider)
@@ -820,10 +866,12 @@ class SettingsScreen(Screen[None]):
         with (
             self._character_image_model_input.prevent(Input.Changed),
             self._character_image_base_url_input.prevent(Input.Changed),
+            self._char_image_api_key_input.prevent(Input.Changed),
         ):
             self._character_image_model_input.value = first_model
             self._character_image_base_url_input.value = ""
             self._character_image_base_url_input.placeholder = _image_base_url_placeholder(provider)
+            self._char_image_api_key_input.value = ""
         self._sync_character_image_model_select(provider, first_model)
         self._refresh_character_image_api_key_status(provider)
         self._refresh_character_image_suggested(provider)
@@ -1077,6 +1125,7 @@ class SettingsScreen(Screen[None]):
             provider=image_provider,
             model=image_model,
             base_url=image_base_url,
+            api_key=self._image_api_key_input.value.strip(),
             fallback_provider=fallback_provider,
             fallback_model=fallback_model if fallback_provider else "",
         )
@@ -1084,8 +1133,14 @@ class SettingsScreen(Screen[None]):
             provider=character_image_provider,
             model=character_image_model,
             base_url=character_image_base_url,
+            api_key=self._char_image_api_key_input.value.strip(),
         )
-        prefs = ProviderPrefs(provider=provider, model=model, base_url=base_url)
+        prefs = ProviderPrefs(
+            provider=provider,
+            model=model,
+            base_url=base_url,
+            api_key=self._text_api_key_input.value.strip(),
+        )
 
         # --- Wizard defaults ---
         raw_length = self._length_input.value.strip()
@@ -1166,6 +1221,7 @@ class SettingsScreen(Screen[None]):
             self._base_url_input.placeholder = resolve_base_url(
                 cast(Provider, app_state.DEFAULT_TEXT_PROVIDER), override=None
             )
+            self._text_api_key_input.value = ""
             # Image-provider section.
             self._image_provider_select.value = app_state.DEFAULT_IMAGE_PROVIDER
             self._image_model_input.value = app_state.DEFAULT_IMAGE_MODEL
@@ -1176,6 +1232,7 @@ class SettingsScreen(Screen[None]):
             self._fallback_select.value = self._FALLBACK_NONE
             self._fallback_model_input.value = ""
             self._fallback_model_input.disabled = True
+            self._image_api_key_input.value = ""
             # Character portrait image-provider section.
             self._character_image_provider_select.value = app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER
             self._character_image_model_input.value = app_state.DEFAULT_CHARACTER_IMAGE_MODEL
@@ -1183,6 +1240,7 @@ class SettingsScreen(Screen[None]):
             self._character_image_base_url_input.placeholder = _image_base_url_placeholder(
                 app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER
             )
+            self._char_image_api_key_input.value = ""
             # Wizard defaults.
             self._theme_area.text = ""
             self._tone_select.value = app_state.DEFAULT_TONE_PRESET

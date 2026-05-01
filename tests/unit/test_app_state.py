@@ -47,7 +47,7 @@ def test_wizard_defaults_empty_state_returns_constants(
     assert defaults.narration_style == app_state.DEFAULT_NARRATION_STYLE
     assert defaults.art_style == app_state.DEFAULT_ART_STYLE
     assert defaults.target_major_beats == app_state.DEFAULT_TARGET_MAJOR_BEATS
-    assert defaults.target_major_beats == 10
+    assert defaults.target_major_beats == 5
     assert defaults.characters == ""
 
 

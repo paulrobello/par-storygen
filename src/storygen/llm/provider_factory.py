@@ -81,8 +81,9 @@ def validate_config(config: TextProviderConfig) -> tuple[bool, str]:
 def build_text_model(config: TextProviderConfig) -> OpenAIChatModel:
     """Construct a pydantic-ai model pointed at the configured provider."""
     base_url = resolve_base_url(config.provider, override=config.base_url)
+    api_key = config.api_key if config.api_key else _api_key_for(config.provider)
     provider = OpenAIProvider(
-        api_key=_api_key_for(config.provider),
+        api_key=api_key,
         base_url=base_url,
     )
     return OpenAIChatModel(model_name=config.model, provider=provider)

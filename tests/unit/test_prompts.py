@@ -54,11 +54,11 @@ def test_beat_prompt_uses_target_major_beats() -> None:
     assert "beat 13+" in out
 
 
-def test_beat_prompt_default_target_is_ten() -> None:
+def test_beat_prompt_default_target_is_five() -> None:
     theme = Theme(title="t", setting="s", premise="p", keywords=[])
     tone = Tone(preset="serious", custom_descriptor=None)
     out = beat_system_prompt(theme=theme, tone=tone, narration_style="third_person")
-    assert "10" in out
+    assert "5" in out
     assert "6-12" not in out
 
 

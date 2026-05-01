@@ -36,6 +36,7 @@ class TextProviderConfig(BaseModel):
     provider: Literal["openai", "openrouter", "ollama"] = "openai"
     model: str = "gpt-4o-mini"
     base_url: str | None = None
+    api_key: str | None = Field(default=None, exclude=True)
 
 
 class ImageProviderConfig(BaseModel):
