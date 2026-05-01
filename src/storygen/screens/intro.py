@@ -13,7 +13,7 @@ _SPLASH_DURATION = 2.5
 _GRADIENT_COLORS = ["#e06cff", "#b44dff", "#7c3aed", "#3b82f6", "#06b6d4", "#22d3ee"]
 
 
-def _gradient_text(ascii_art: str) -> Text:
+def gradient_text(ascii_art: str) -> Text:
     """Apply a vertical gradient of colors to figlet block characters."""
     lines = ascii_art.splitlines()
     text = Text()
@@ -52,7 +52,7 @@ class IntroScreen(Screen[None]):
         fig = Figlet(font="blocky")
         title_art = fig.renderText("PAR") + "\n" + fig.renderText("STORYGEN")
         with Vertical(id="splash-container"):
-            yield Static(_gradient_text(title_art), id="splash-title")
+            yield Static(gradient_text(title_art), id="splash-title")
             yield Static("AI-driven choose-your-own-adventure", id="splash-subtitle")
 
     def on_mount(self) -> None:

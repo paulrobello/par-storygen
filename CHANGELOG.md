@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-05-01
+
+### Changed
+
+- **Export book mobile-friendly** — Added responsive CSS breakpoints for screens under 600px and 380px: compact nav buttons with 44px minimum touch targets, reduced padding/fonts, narration left-aligned on narrow screens, and a narrower fallback that hides the chapter counter.
+- **Export book swipe navigation** — Touch swipe gestures (left = next, right = previous) with threshold filtering to avoid accidental triggers.
+- **Renamed `_gradient_text` to `gradient_text`** — Public API, used across modules (intro + play screens).
+
+### Fixed
+
+- **Lint: unused `shutil` import** — Removed from `test_book_export.py`.
+- **Typecheck: private usage** — `_gradient_text` was accessed cross-module; renamed to public `gradient_text`.
+
 ## [0.3.0] - 2026-05-01
 
 ### Added

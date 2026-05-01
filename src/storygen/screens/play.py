@@ -201,9 +201,9 @@ class PlayScreen(Screen[None]):
         node = self._save.nodes[self._save.current_node_id]
         if node.is_ending:
             fig = Figlet(font="blocky")
-            from storygen.screens.intro import _gradient_text
+            from storygen.screens.intro import gradient_text
 
-            banner = _gradient_text(fig.renderText("The End"))
+            banner = gradient_text(fig.renderText("The End"))
             self._story.set_renderable(Group(Text(node.narration), Text(), Align.center(banner)))
         else:
             self._story.set_text(node.narration)
