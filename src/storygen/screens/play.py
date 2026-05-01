@@ -250,7 +250,6 @@ class PlayScreen(Screen[None]):
         if self._loading and action not in (
             "menu",
             "auto_select",
-            "tts_toggle",
             "tts_stop",
             "tts_restart",
         ):

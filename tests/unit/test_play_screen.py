@@ -592,7 +592,7 @@ async def test_tts_controls_available_while_autoplay_loading() -> None:
         screen._auto_selecting = True  # pyright: ignore[reportPrivateUsage]
         screen._loading = True  # pyright: ignore[reportPrivateUsage]
 
-        assert screen.check_action("tts_toggle", ()) is True
+        assert screen.check_action("tts_toggle", ()) is False
         assert screen.check_action("tts_stop", ()) is True
         assert screen.check_action("tts_restart", ()) is True
         assert screen.check_action("pick", (1,)) is False
