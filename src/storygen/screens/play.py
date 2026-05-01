@@ -10,6 +10,7 @@ from typing import ClassVar
 
 from pyfiglet import Figlet
 from rich.text import Text
+from textual import work
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
@@ -24,6 +25,7 @@ from storygen.storage import app_state, paths
 from storygen.storage.save import GameSave, save_game
 from storygen.tts.player import TTSPlayer, TTSState
 from storygen.util import open_in_system_viewer
+from storygen.export.book import export_book
 from storygen.widgets._header_util import format_cost_subtitle
 from storygen.widgets.choice_list import ChoiceList
 from storygen.widgets.image_panel import ImagePanel
@@ -118,6 +120,7 @@ class PlayScreen(Screen[None]):
         ("7", "pick(7)", "Pick 7"),
         ("8", "pick(8)", "Pick 8"),
         ("9", "pick(9)", "Pick 9"),
+        ("x", "export_book", "Export book"),
     ]
 
     def __init__(
@@ -315,6 +318,9 @@ class PlayScreen(Screen[None]):
             )
         if action == "auto_select":
             return self._pipeline is not None
+        if action == "export_book":
+            node = self._save.nodes.get(self._save.current_node_id)
+            return node is not None and node.is_ending
         if action == "menu":
             return True
         return None
@@ -746,3 +752,20 @@ class PlayScreen(Screen[None]):
         # Schedule next cycle if still active.
         if self._auto_selecting:
             self.run_worker(self._auto_select_next(), exclusive=True, name="auto-select")
+
+    @work(exit_on_error=False)
+    async def action_export_book(self) -> None:
+        """Export the current ending path as an HTML book and open in browser."""
+        node = self._save.nodes.get(self._save.current_node_id)
+        if node is None or not node.is_ending:
+            return
+        try:
+            out = await asyncio.to_thread(export_book, self._save, node.id)
+            self.notify(f"Book exported to {out}", title="Export Complete", timeout=10)
+        except Exception as exc:
+            self.notify(
+                f"Export failed: {exc}",
+                title="Export Error",
+                severity="error",
+                timeout=15,
+            )
