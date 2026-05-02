@@ -19,6 +19,8 @@ make lint             # uv run ruff check .
 make fmt              # uv run ruff format .
 make typecheck        # uv run pyright
 make checkall         # fmt + lint + typecheck + test  (run before committing)
+make precommit        # Run pre-commit hooks on all files
+make package          # uv build (sdist + wheel)
 make clean            # Remove .pytest_cache, .ruff_cache, .pyright, build, dist, *.egg-info, __pycache__
 ```
 
@@ -54,10 +56,15 @@ storage  →  llm + images  →  widgets  →  screens  →  app
 
 Lower layers never import higher ones. `app.py` wires concrete providers/agents/pipelines into screens. See `docs/ARCHITECTURE.md` for full implementation details.
 
-Key concepts: **3-stage beat pipeline** (cache → beat gen → concurrent illustration + portraits), **choice schema split** (`Choice` for LLM vs `StoredChoice` for storage), **tree graph** (not DAG, frozen nodes), **branch prefetch** (background-generates pending choices), **cross-game character library** (export/import with optional backstory adaptation).
+Key concepts: **3-stage beat pipeline** (cache → beat gen → concurrent illustration + portraits), **choice schema split** (`Choice` for LLM vs `StoredChoice` for storage), **tree graph** (not DAG, frozen nodes), **branch prefetch** (background-generates pending choices), **cross-game character library** (export/import with optional backstory adaptation), **TTS player** (4-state machine wrapping `par_tts`, per-node audio caching), **export book** (HTML with 3D page-turn rendering via `export/book.py`).
+
+**Screen flow:** `intro` (splash, auto-dismiss) → `menu` → `wizard` (8 steps) → `play` (main loop). From `play`: `portraits` (modal), `graph` (modal with `replay` sub-modal), `endings` (modal), `load`, `settings`. All screens reachable from `play` re-render on `on_screen_resume`.
+
+**Important:** `_textual_patches.py` monkey-patches `Header._on_mount` to catch a Textual startup race. It's imported for side effects from `app.py` and **must be imported before any Header is constructed**.
 
 ## Testing patterns
 
+- **conftest.py fixtures:** `xdg_tmp` (isolated XDG_DATA_HOME + XDG_CONFIG_HOME via `monkeypatch` + `tmp_path`) and `reset_dotenv_cache` (autouse — clears `.env` caching between tests). Use `xdg_tmp` in any test that touches storage or config.
 - Screen tests use a `_Harness(App[None])` that pushes the screen-under-test in `on_mount` — see existing tests for the shape.
 - LLM-dependent code uses a `_Result` wrapper with an `output` attribute and Fake agent classes returning canned data. See `tests/unit/test_wizard_flow.py` and `tests/unit/test_pipeline.py`.
 - Image-provider tests pass `AsyncMock`-equipped `client=` directly to `OpenAIImageProvider(...)`.
