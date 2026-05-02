@@ -21,7 +21,18 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.reactive import reactive
 from textual.screen import Screen
-from textual.widgets import Button, Checkbox, Footer, Header, Input, Select, Static, TextArea
+from textual.widgets import (
+    Button,
+    Checkbox,
+    Footer,
+    Header,
+    Input,
+    RadioButton,
+    RadioSet,
+    Select,
+    Static,
+    TextArea,
+)
 
 from storygen.images._prompts import build_cover_prompt
 from storygen.images.constants import (
@@ -45,7 +56,7 @@ from storygen.screens._ref_image_modals import ReferenceImageModal, ReferenceIma
 from storygen.screens.library_browser import CharacterCatalogScreen, LibraryPick
 from storygen.storage import app_state, paths
 from storygen.storage.library import LibraryCharacter, library_portrait_path, load_library_character
-from storygen.storage.save import GameSave, NarrationStyle, ReaderLevel, save_game
+from storygen.storage.save import GameSave, NarrationStyle, Pacing, ReaderLevel, save_game
 
 
 def _load_lib_char_if_exists(library_id: str) -> LibraryCharacter | None:
@@ -269,6 +280,7 @@ class WizardFlow:
         art_style: str = app_state.DEFAULT_ART_STYLE,
         target_major_beats: int = app_state.DEFAULT_TARGET_MAJOR_BEATS,
         reader_level: str = app_state.DEFAULT_READER_LEVEL,
+        pacing: str = app_state.DEFAULT_PACING,
         on_progress: Callable[[str], None] | None = None,
         library_import_ids: dict[str, str] | None = None,
         pending_ref_writes: dict[str, tuple[bytes, bytes | None]] | None = None,
@@ -429,6 +441,7 @@ class WizardFlow:
             art_style=art_style,
             target_major_beats=target_major_beats,
             reader_level=cast("ReaderLevel", reader_level),
+            pacing=cast("Pacing", pacing),
             text_config=self._text_config,
             image_config=self._image_config,
             character_image_config=self._character_image_config,
@@ -593,6 +606,13 @@ class WizardScreen(Screen[None]):
             id="wizard-length",
             restrict=r"\d*",
         )
+        self._pacing_input = RadioSet(
+            "Slow — long narration, fewer but weightier choices",
+            RadioButton("Moderate — balanced narration and choices", value=True),
+            "Fast — short narration, more frequent choices",
+            id="wizard-pacing",
+        )
+        self._pacing: str = defaults.pacing
         reader_level_default = (
             defaults.reader_level
             if defaults.reader_level in valid_reader_level_values()
@@ -628,6 +648,7 @@ class WizardScreen(Screen[None]):
             yield self._style_select
             yield self._art_style_input
             yield self._length_input
+            yield self._pacing_input
             yield self._reader_level_select
             yield self._char_area
             yield self._library_button
@@ -887,6 +908,7 @@ class WizardScreen(Screen[None]):
             self._style_select,
             self._art_style_input,
             self._length_input,
+            self._pacing_input,
             self._reader_level_select,
             self._char_area,
             self._library_button,
@@ -929,6 +951,7 @@ class WizardScreen(Screen[None]):
             )
             self._length_input.display = True
             self._length_input.focus()
+            self._pacing_input.display = True
         elif self.current_step == WizardStep.READER_LEVEL:
             self._hint.update(
                 "Select the target reader age range. This adjusts vocabulary,"
@@ -1102,6 +1125,12 @@ class WizardScreen(Screen[None]):
                     app_state.MIN_TARGET_MAJOR_BEATS,
                     min(app_state.MAX_TARGET_MAJOR_BEATS, n),
                 )
+                # Capture pacing selection
+                _PACING_OPTIONS = ("slow", "moderate", "fast")
+                idx = self._pacing_input.pressed_index
+                self._pacing = (
+                    _PACING_OPTIONS[idx] if 0 <= idx < len(_PACING_OPTIONS) else "moderate"
+                )
                 self.current_step = WizardStep.READER_LEVEL
                 return
             if self.current_step == WizardStep.READER_LEVEL:
@@ -1150,6 +1179,7 @@ class WizardScreen(Screen[None]):
                     art_style=self._art_style,
                     target_major_beats=self._target_major_beats,
                     reader_level=self._reader_level,
+                    pacing=self._pacing,
                     on_progress=self._notify_progress,
                     library_import_ids=dict(self._imported_from_library_ids),
                     pending_ref_writes=pending_ref_writes or None,

@@ -537,6 +537,7 @@ class StoryGenApp(App[None]):
                 narration_style=save.narration_style,
                 target_major_beats=save.target_major_beats,
                 reader_level=save.reader_level,
+                pacing=save.pacing,
             ),
             on_usage=_on_usage,
         )
