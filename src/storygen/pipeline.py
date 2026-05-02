@@ -875,22 +875,23 @@ def _build_beat_prompt(save: GameSave, from_node_id: str, choice_text: str) -> s
     # is denominated in), not total beats. Count across the full ancestor path.
     full_chain = path_from_root(save, from_node_id)
     major_so_far = sum(1 for n in full_chain if n.is_major)
-    pacing_hint = _pacing_hint_for_depth(major_so_far, save.target_major_beats)
+    pacing_hint = _pacing_hint_for_depth(major_so_far, save.target_major_beats, save.pacing)
     if pacing_hint:
         sections.append(pacing_hint.strip())
     return "\n\n".join(sections)
 
 
-def _pacing_hint_for_depth(depth: int, target: int) -> str:
+def _pacing_hint_for_depth(depth: int, target: int, pacing: str = "moderate") -> str:
     """Encourage the model to wind down rather than meander indefinitely.
 
     Uses ratios of the per-save ``target`` so very short stories don't get a
     "tighten" prod at beat 5 of 5 and very long stories don't get told to
     "resolve now" at beat 11 of 30.
     """
-    silent_threshold = max(int(target * 0.3), 1)
-    tension_threshold = max(int(target * 0.6), 1)
-    climax_threshold = max(int(target * 0.9), 1)
+    multiplier = {"slow": 1.4, "fast": 0.7}.get(pacing, 1.0)
+    silent_threshold = max(int(target * 0.3 * multiplier), 1)
+    tension_threshold = max(int(target * 0.6 * multiplier), 1)
+    climax_threshold = max(int(target * 0.9 * multiplier), 1)
     if depth <= silent_threshold:
         return ""
     if depth <= tension_threshold:

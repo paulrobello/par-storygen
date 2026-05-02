@@ -16,6 +16,7 @@ from storygen.llm.models import (
 from storygen.pipeline import (
     _build_beat_prompt,  # pyright: ignore[reportPrivateUsage]
     _one_sentence,  # pyright: ignore[reportPrivateUsage]
+    _pacing_hint_for_depth,  # pyright: ignore[reportPrivateUsage]
     _resolve_chosen_text,  # pyright: ignore[reportPrivateUsage]
 )
 from storygen.storage.save import GameSave
@@ -194,3 +195,40 @@ def test_build_beat_prompt_includes_pacing_hint_at_depth() -> None:
     result = _build_beat_prompt(save, "root", "go")
     # depth=1 (root is major), target=10 → 30% threshold=3 → silent (no pacing hint)
     assert "PLAYER JUST CHOSE: go" in result
+
+
+# --- _pacing_hint_for_depth ---
+
+
+def test_pacing_hint_moderate_silent_at_low_depth() -> None:
+    assert _pacing_hint_for_depth(1, 10, "moderate") == ""
+
+
+def test_pacing_hint_moderate_tension_at_mid_depth() -> None:
+    result = _pacing_hint_for_depth(5, 10, "moderate")
+    assert "tension rising" in result
+
+
+def test_pacing_hint_moderate_climax_at_high_depth() -> None:
+    result = _pacing_hint_for_depth(8, 10, "moderate")
+    assert "tightening" in result
+
+
+def test_pacing_hint_slow_gives_more_room() -> None:
+    # target=5, slow -> multiplier=1.4 -> silent=2, tension=4, climax=6
+    # depth=3 should be "tension" not "climax"
+    result = _pacing_hint_for_depth(3, 5, "slow")
+    assert "tension rising" in result
+
+
+def test_pacing_hint_fast_tightens_sooner() -> None:
+    # target=5, fast -> multiplier=0.7 -> silent=1, tension=2, climax=3
+    # depth=2 should be "tension" not "silent"
+    result = _pacing_hint_for_depth(2, 5, "fast")
+    assert "tension rising" in result
+
+
+def test_pacing_hint_fast_climax_earlier() -> None:
+    # target=5, fast -> climax=3
+    result = _pacing_hint_for_depth(3, 5, "fast")
+    assert "tightening" in result
