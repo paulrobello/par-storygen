@@ -43,6 +43,12 @@ from storygen.storage.app_state import (
 )
 from storygen.tts.player import TTSPlayer
 
+PACING_OPTIONS: list[tuple[str, str]] = [
+    ("Slow", "slow"),
+    ("Moderate", "moderate"),
+    ("Fast", "fast"),
+]
+
 
 class TextProviderChanged(Message):
     """Emitted by SettingsScreen after a successful text-provider save.
@@ -328,6 +334,12 @@ class SettingsScreen(Screen[None]):
             allow_blank=False,
             id="default-reader-level",
         )
+        self._pacing_select = Select(
+            PACING_OPTIONS,
+            value=app_state.DEFAULT_PACING,
+            allow_blank=False,
+            id="default-pacing",
+        )
         self._char_area = TextArea(id="default-characters")
         self._art_switch = Switch(value=True, id="art-enabled-switch")
         self._streaming_switch = Switch(value=False, id="image-streaming-switch")
@@ -421,6 +433,8 @@ class SettingsScreen(Screen[None]):
             yield self._length_input
             yield Label("Default reader level")
             yield self._reader_level_select
+            yield Label("Default pacing")
+            yield self._pacing_select
             yield Label("Default character requirements")
             yield self._char_area
 
@@ -731,6 +745,7 @@ class SettingsScreen(Screen[None]):
             self._tone_select.prevent(Select.Changed),
             self._style_select.prevent(Select.Changed),
             self._reader_level_select.prevent(Select.Changed),
+            self._pacing_select.prevent(Select.Changed),
             self._art_switch.prevent(Switch.Changed),
             self._streaming_switch.prevent(Switch.Changed),
             self._prefetch_switch.prevent(Switch.Changed),
@@ -746,6 +761,11 @@ class SettingsScreen(Screen[None]):
             self._art_style_input.value = defaults.art_style
             self._length_input.value = str(defaults.target_major_beats)
             self._reader_level_select.value = reader_level
+            self._pacing_select.value = (
+                defaults.pacing
+                if defaults.pacing in {"slow", "moderate", "fast"}
+                else app_state.DEFAULT_PACING
+            )
             self._char_area.text = defaults.characters
             self._art_switch.value = app_state.art_enabled()
             self._streaming_switch.value = app_state.image_streaming_enabled()
@@ -1160,6 +1180,7 @@ class SettingsScreen(Screen[None]):
             art_style=self._art_style_input.value.strip() or app_state.DEFAULT_ART_STYLE,
             target_major_beats=clamped_length,
             reader_level=coerce_reader_level(self._reader_level_select.value),
+            pacing=str(self._pacing_select.value),
             characters=self._char_area.text,
         )
 
@@ -1208,6 +1229,7 @@ class SettingsScreen(Screen[None]):
             self._tone_select.prevent(Select.Changed),
             self._style_select.prevent(Select.Changed),
             self._reader_level_select.prevent(Select.Changed),
+            self._pacing_select.prevent(Select.Changed),
             self._image_provider_select.prevent(Select.Changed),
             self._character_image_provider_select.prevent(Select.Changed),
             self._fallback_select.prevent(Select.Changed),
@@ -1249,6 +1271,7 @@ class SettingsScreen(Screen[None]):
             self._art_style_input.value = app_state.DEFAULT_ART_STYLE
             self._length_input.value = str(app_state.DEFAULT_TARGET_MAJOR_BEATS)
             self._reader_level_select.value = app_state.DEFAULT_READER_LEVEL
+            self._pacing_select.value = app_state.DEFAULT_PACING
             self._char_area.text = ""
             self._art_switch.value = True
             self._streaming_switch.value = False
