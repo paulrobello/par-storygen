@@ -10,6 +10,7 @@ from storygen.core.models import (
     Character,
     IllustrationPlan,
     NarrationStyle,
+    Pacing,
     ReaderLevel,
     StoryBeat,
     Summary,
@@ -46,6 +47,7 @@ def build_beat_agent(
     narration_style: NarrationStyle,
     target_major_beats: int = DEFAULT_TARGET_MAJOR_BEATS,
     reader_level: ReaderLevel = "ages_11_15",
+    pacing: Pacing = "moderate",
 ) -> Agent[None, StoryBeat]:
     """Build an agent that writes a single story beat."""
     return Agent(
@@ -57,6 +59,7 @@ def build_beat_agent(
             narration_style=narration_style,
             target_major_beats=target_major_beats,
             reader_level=reader_level,
+            pacing=pacing,
         ),
     )
 

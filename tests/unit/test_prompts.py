@@ -147,3 +147,33 @@ def test_adapt_backstory_prompt_forbids_identity_changes() -> None:
     # Output-shape guidance — rewrites only the backstory, not a full
     # re-character-sheet.
     assert "backstory" in lower
+
+
+def test_beat_prompt_slow_pacing_uses_longer_narration() -> None:
+    theme = Theme(title="t", setting="s", premise="p", keywords=[])
+    tone = Tone(preset="serious", custom_descriptor=None)
+    out = beat_system_prompt(theme=theme, tone=tone, narration_style="third_person", pacing="slow")
+    assert "4-6" in out
+    assert "2 meaningfully" in out
+    assert "atmosphere" in out.lower()
+
+
+def test_beat_prompt_fast_pacing_uses_shorter_narration() -> None:
+    theme = Theme(title="t", setting="s", premise="p", keywords=[])
+    tone = Tone(preset="serious", custom_descriptor=None)
+    out = beat_system_prompt(theme=theme, tone=tone, narration_style="third_person", pacing="fast")
+    assert "1-3" in out
+    assert "3-5" in out
+    assert "brisk" in out.lower()
+
+
+def test_beat_prompt_moderate_pacing_matches_default() -> None:
+    theme = Theme(title="t", setting="s", premise="p", keywords=[])
+    tone = Tone(preset="serious", custom_descriptor=None)
+    out_default = beat_system_prompt(theme=theme, tone=tone, narration_style="third_person")
+    out_moderate = beat_system_prompt(
+        theme=theme, tone=tone, narration_style="third_person", pacing="moderate"
+    )
+    assert out_default == out_moderate
+    assert "2-5" in out_moderate
+    assert "2-4" in out_moderate

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from storygen.core.models import Character, NarrationStyle, ReaderLevel, Theme, Tone
+from storygen.core.models import Character, NarrationStyle, Pacing, ReaderLevel, Theme, Tone
 from storygen.storage.app_state import DEFAULT_TARGET_MAJOR_BEATS
 
 
@@ -84,6 +84,26 @@ def _reader_level_guidance(reader_level: ReaderLevel) -> str:
     return mapping.get(reader_level, mapping["ages_11_15"])
 
 
+def _pacing_guidance(pacing: Pacing) -> tuple[str, str, str]:
+    """Return (paragraph_range, choice_range, extra_guidance) for pacing level."""
+    if pacing == "slow":
+        return (
+            "4-6",
+            "2",
+            "\nPACING: Take time with description, atmosphere, and inner thoughts."
+            " Choices should feel weighty — every decision matters.",
+        )
+    if pacing == "fast":
+        return (
+            "1-3",
+            "3-5",
+            "\nPACING: Keep the pace brisk — action over description. Give the"
+            " player frequent choices to maintain momentum.",
+        )
+    # moderate — current defaults
+    return "2-5", "2-4", ""
+
+
 def _style_reminder_for_system(narration_style: str) -> str:
     """Style reminder embedded in the system prompt (static per playthrough)."""
     if narration_style == "fourth_wall":
@@ -106,10 +126,12 @@ def beat_system_prompt(
     narration_style: NarrationStyle,
     target_major_beats: int = DEFAULT_TARGET_MAJOR_BEATS,
     reader_level: ReaderLevel = "ages_11_15",
+    pacing: Pacing = "moderate",
 ) -> str:
     """Return the system prompt for the beat-generation agent."""
     tighten_threshold = max(target_major_beats - 2, 4)
     style_reminder = _style_reminder_for_system(narration_style)
+    para_range, choice_range, pacing_extra = _pacing_guidance(pacing)
     return (
         "You write one beat at a time of a choose-your-own-adventure story.\n"
         f"Theme: {theme.title} — {theme.setting}\n"
@@ -117,8 +139,8 @@ def beat_system_prompt(
         f"Narration style: {_narration_style_guidance(narration_style)}\n"
         f"{_reader_level_guidance(reader_level)}\n"
         "Return a StoryBeat with these fields:\n"
-        " - narration: 2-5 paragraphs of prose.\n"
-        " - choices: 2-4 meaningfully different options. Set to an empty"
+        f" - narration: {para_range} paragraphs of prose.\n"
+        f" - choices: {choice_range} meaningfully different options. Set to an empty"
         " list ONLY when is_ending is true.\n"
         " - is_major: true ONLY when this beat is a real narrative"
         " checkpoint — new location, revelation, or consequence worth"
@@ -156,6 +178,7 @@ def beat_system_prompt(
         " beats can still be vivid (dialogue, small actions) but should"
         " not advance the headline plot."
         f"{style_reminder}"
+        f"{pacing_extra}"
     )
 
 
