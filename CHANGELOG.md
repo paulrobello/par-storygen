@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Dynamic pacing control** — Choose Slow / Moderate / Fast pacing when creating a story. Slow produces longer narration with fewer but weightier choices. Fast produces shorter narration with more frequent choices. Pacing also adjusts story escalation thresholds. Configurable per-story in the wizard LENGTH step and as a default in Settings.
+
 ## [0.3.1] - 2026-05-01
 
 ### Changed
