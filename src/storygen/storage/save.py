@@ -16,6 +16,7 @@ from storygen.core.models import (
     ImageProviderConfig,
     NarrationStyle,
     NodeId,
+    Pacing,
     ReaderLevel,
     StoryNode,
     TextProviderConfig,
@@ -46,6 +47,7 @@ class GameSave(BaseModel):
     art_style: str = DEFAULT_ART_STYLE
     target_major_beats: int = DEFAULT_TARGET_MAJOR_BEATS
     reader_level: ReaderLevel = "ages_11_15"
+    pacing: Pacing = "moderate"
     text_config: TextProviderConfig
     image_config: ImageProviderConfig
     character_image_config: ImageProviderConfig = Field(

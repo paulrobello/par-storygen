@@ -23,6 +23,7 @@ NodeId = str
 CharacterId = str
 
 NarrationStyle = Literal["first_person", "third_person", "fourth_wall"]
+Pacing = Literal["slow", "moderate", "fast"]
 ReaderLevel = Literal["ages_0_5", "ages_6_10", "ages_11_15", "ages_15_plus"]
 
 # ---------------------------------------------------------------------------
@@ -226,6 +227,7 @@ __all__ = [
     "ImageStatus",
     "NarrationStyle",
     "NodeId",
+    "Pacing",
     "ReaderLevel",
     "StoredChoice",
     "StoryBeat",

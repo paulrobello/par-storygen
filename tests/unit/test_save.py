@@ -253,3 +253,20 @@ def test_token_usage_defaults_on_legacy_save(
     assert restored.text_total_output_tokens == 0
     assert restored.text_total_requests == 0
     assert restored.text_calls_by_model == {}
+
+
+def test_pacing_defaults_to_moderate_on_old_saves(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A save JSON without the pacing field loads with 'moderate' default."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    save = _make_save()
+    save_game(save)
+    import json
+
+    path = paths.game_save_file(str(save.id))
+    data = json.loads(path.read_text())
+    del data["pacing"]
+    path.write_text(json.dumps(data))
+    restored = load_game(str(save.id))
+    assert restored.pacing == "moderate"

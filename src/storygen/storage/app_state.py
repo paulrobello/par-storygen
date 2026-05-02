@@ -18,6 +18,7 @@ from typing import Any, cast, get_args
 from storygen.core.models import ReaderLevel
 from storygen.storage import paths
 
+_ALLOWED_PACINGS: frozenset[str] = frozenset({"slow", "moderate", "fast"})
 _ALLOWED_READER_LEVELS: frozenset[str] = frozenset(get_args(ReaderLevel))
 
 _STATE_FILENAME = "state.json"
@@ -40,6 +41,7 @@ DEFAULT_TARGET_MAJOR_BEATS: int = 5
 MIN_TARGET_MAJOR_BEATS: int = 2
 MAX_TARGET_MAJOR_BEATS: int = 30
 
+DEFAULT_PACING: str = "moderate"
 DEFAULT_READER_LEVEL: ReaderLevel = "ages_11_15"
 
 DEFAULT_TEXT_PROVIDER: str = "openai"
@@ -194,6 +196,7 @@ class WizardDefaults:
     art_style: str = DEFAULT_ART_STYLE
     target_major_beats: int = DEFAULT_TARGET_MAJOR_BEATS
     reader_level: ReaderLevel = DEFAULT_READER_LEVEL
+    pacing: str = DEFAULT_PACING
     characters: str = ""
     save_to_catalog: bool = True
 
@@ -318,6 +321,7 @@ def read_wizard_defaults() -> WizardDefaults:
         art_style=str(raw.get("art_style", DEFAULT_ART_STYLE)),
         target_major_beats=_clamp_target_beats(target_raw),
         reader_level=coerce_reader_level(raw.get("reader_level")),
+        pacing=str(raw.get("pacing", DEFAULT_PACING)),
         characters=str(raw.get("characters", "")),
         save_to_catalog=bool(raw.get("save_to_catalog", True)),
     )
@@ -600,6 +604,7 @@ def _serialize_wizard_defaults(defaults: WizardDefaults) -> dict[str, Any]:
         "art_style": defaults.art_style,
         "target_major_beats": defaults.target_major_beats,
         "reader_level": defaults.reader_level,
+        "pacing": defaults.pacing,
         "characters": defaults.characters,
         "save_to_catalog": defaults.save_to_catalog,
     }

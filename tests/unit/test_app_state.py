@@ -788,3 +788,21 @@ def test_write_wizard_defaults_roundtrips_save_to_catalog(
     app_state.write_wizard_defaults(defaults)
     restored = app_state.read_wizard_defaults()
     assert restored.save_to_catalog is False
+
+
+def test_wizard_defaults_pacing_round_trip(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Pacing preference persists through wizard defaults save/load."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    from storygen.storage.app_state import (
+        DEFAULT_PACING,
+        WizardDefaults,
+        read_wizard_defaults,
+        write_wizard_defaults,
+    )
+
+    write_wizard_defaults(WizardDefaults(pacing="fast"))
+    loaded = read_wizard_defaults()
+    assert loaded.pacing == "fast"
+    # Default
+    write_wizard_defaults(WizardDefaults())
+    assert read_wizard_defaults().pacing == DEFAULT_PACING
