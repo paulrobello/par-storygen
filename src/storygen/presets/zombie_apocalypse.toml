@@ -1,0 +1,11 @@
+name = "Zombie Apocalypse"
+description = "Survive the undead hordes in a world gone mad"
+theme = "Civilization has collapsed after a mysterious outbreak. A small group of survivors must find safety while confronting both the undead and the living."
+tone_preset = "serious"
+tone_descriptor = "intense, survival-focused, with moments of hope and humanity"
+narration_style = "first_person"
+art_style = "comic book gritty style with muted colors and heavy inks"
+target_major_beats = 8
+reader_level = "ages_15_plus"
+pacing = "fast"
+characters = "A former paramedic turned leader, a resourceful teenager, a cynical ex-soldier, and a scientist who might hold the key to a cure"

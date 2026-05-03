@@ -1,0 +1,11 @@
+name = "Enchanted Forest"
+description = "A whimsical fairy tale adventure through a magical forest"
+theme = "A enchanted forest where animals talk, trees have feelings, and a young adventurer must find the Crystal of Wonders to break a spell."
+tone_preset = "whimsical"
+tone_descriptor = "playful, magical, with gentle humor and heartwarming moments"
+narration_style = "third_person"
+art_style = "storybook watercolor with soft pastel colors"
+target_major_beats = 6
+reader_level = "ages_6_10"
+pacing = "moderate"
+characters = "A brave young explorer, a wise old owl, a friendly but clumsy troll, and a mischievous fairy who speaks in riddles"
