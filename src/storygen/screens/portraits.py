@@ -27,6 +27,7 @@ from storygen.images.constants import (
 )
 from storygen.images.pricing import image_cost
 from storygen.llm.models import Character, CharacterOutfit
+from storygen.screens._art_edit_modal import ArtEditModal, ArtEditMode, ArtEditResult
 from storygen.screens._character_edit_modal import (
     CharacterEditModal,
     CharacterEditResult,
@@ -254,6 +255,9 @@ class PortraitsScreen(Screen[None]):
             regen_button = Button("Regenerate", id=f"regen-{char.id}")
             regen_button.disabled = art_disabled
             meta.mount(regen_button)
+            edit_regen_button = Button("Edit regen", id=f"edit-regen-{char.id}")
+            edit_regen_button.disabled = art_disabled or char.portrait_path is None
+            meta.mount(edit_regen_button)
             export_button = Button("Export", id=f"export-{char.id}")
             # Export is a file copy — keep it enabled even when art is off.
             # It can only run when there's something to copy.
@@ -363,6 +367,12 @@ class PortraitsScreen(Screen[None]):
             if char is None:
                 return
             self._regenerate_worker(char, event.button)
+            return
+        if button_id.startswith("edit-regen-"):
+            char_id = button_id[len("edit-regen-") :]
+            char = next((c for c in self._save.characters if c.id == char_id), None)
+            if char is not None:
+                self._open_edit_regen_modal(char)
             return
         if button_id.startswith("export-"):
             char_id = button_id[len("export-") :]
@@ -514,6 +524,97 @@ class PortraitsScreen(Screen[None]):
             if button.is_attached:
                 button.disabled = False
                 button.label = cast(str, original_label)
+
+    # ---- Edit-regen flow -------------------------------------------------
+
+    def _open_edit_regen_modal(self, char: Character) -> None:
+        """Open the edit-regen modal for a character portrait."""
+        save_id = str(self._save.id)
+        image_bytes: bytes | None = None
+        if char.portrait_path:
+            try:
+                abs_path = paths.safe_join(paths.game_dir(save_id), char.portrait_path)
+                if abs_path.exists():
+                    image_bytes = abs_path.read_bytes()
+            except ValueError:
+                pass
+
+        original = char.portrait_prompt or char.physical_description
+
+        def _on_result(result: ArtEditResult | None) -> None:
+            if result is None:
+                return
+            self._edit_regen_worker(char, result)
+
+        self.app.push_screen(  # pyright: ignore[reportUnknownMemberType]
+            ArtEditModal(
+                original_prompt=original,
+                image_bytes=image_bytes,
+            ),
+            _on_result,
+        )
+
+    @work(exit_on_error=False)
+    async def _edit_regen_worker(self, char: Character, result: ArtEditResult) -> None:
+        """Regenerate a portrait with an edited prompt."""
+        if not app_state.art_enabled():
+            self.notify(
+                "Art generation is disabled in Settings.",
+                severity="warning",
+                timeout=5,
+            )
+            return
+        if result.mode == ArtEditMode.EDIT:
+            original = char.portrait_prompt or char.physical_description
+            description = f"{original}\n\nEdit instructions: {result.text}"
+        else:
+            description = result.text
+        save_id = str(self._save.id)
+        try:
+            ref_bytes: bytes | None = None
+            if result.use_current_as_ref:
+                if char.portrait_path:
+                    try:
+                        abs_path = paths.safe_join(paths.game_dir(save_id), char.portrait_path)
+                        if abs_path.exists():
+                            ref_bytes = abs_path.read_bytes()
+                    except ValueError:
+                        pass
+            png_bytes = await self._image_provider.generate_portrait(
+                description,
+                transparent=True,
+                art_style=self._save.art_style,
+                reference_image=ref_bytes,
+            )
+            paths.ensure_game_dirs(save_id)
+            version = paths.next_portrait_version(save_id, char.id)
+            dest = paths.character_portrait_path(save_id, char.id, version=version)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(png_bytes)
+            new_rel = str(dest.relative_to(paths.game_dir(save_id)))
+            updated = char.model_copy(
+                update={
+                    "portrait_path": new_rel,
+                    "portrait_prompt": description,
+                }
+            )
+            self._save.characters = [
+                updated if c.id == char.id else c for c in self._save.characters
+            ]
+            self._save.total_image_cost_usd += image_cost(
+                self._save.character_image_config.provider,
+                model=self._save.character_image_config.model,
+                size=PORTRAIT_SIZE,
+                quality=PORTRAIT_QUALITY,
+            )
+            save_game(self._save)
+            self._rebuild()
+            if app_state.auto_open_art_enabled():
+                open_in_system_viewer(dest)
+            self.notify(f"Edit-regenerated portrait for {char.name} (v{version}).", timeout=5)
+        except Exception:
+            _logger.debug("Portrait edit-regen failed", exc_info=True)
+            self.notify("Portrait edit-regen failed.", severity="error", timeout=5)
 
     # ---- Bio edit flow ---------------------------------------------------
 

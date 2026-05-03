@@ -560,13 +560,16 @@ class PlayScreen(Screen[None]):
             on_image_committed=self._on_image_committed,
             on_image_failed=self._on_image_failed,
         )
-        await self._pipeline.edit_scene(
-            self._save,
-            node_id=node.id,
-            new_prompt=new_prompt,
-            current_image_as_ref=result.use_current_as_ref,
-            callbacks=cb,
-        )
+        try:
+            await self._pipeline.edit_scene(
+                self._save,
+                node_id=node.id,
+                new_prompt=new_prompt,
+                current_image_as_ref=result.use_current_as_ref,
+                callbacks=cb,
+            )
+        except Exception:
+            self.notify("Edit regen failed.", severity="error", timeout=10)
         self._render_current()
 
     def action_menu(self) -> None:
