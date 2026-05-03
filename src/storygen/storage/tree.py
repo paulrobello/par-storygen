@@ -54,6 +54,21 @@ def children_index(save: GameSave) -> dict[NodeId, list[NodeId]]:
     return index
 
 
+def descendants(save: GameSave, node_id: NodeId) -> list[NodeId]:
+    """Return *node_id* and all its descendants in BFS order.
+
+    Uses :func:`children_index` for O(n) traversal.
+    """
+    idx = children_index(save)
+    result: list[NodeId] = []
+    queue: list[NodeId] = [node_id]
+    while queue:
+        current = queue.pop(0)
+        result.append(current)
+        queue.extend(idx.get(current, []))
+    return result
+
+
 def latest_summary(save: GameSave, node_id: NodeId) -> str | None:
     """Walk ancestors newest-first and return the first `summary_to_here`.
 

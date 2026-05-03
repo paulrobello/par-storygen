@@ -17,6 +17,7 @@ from storygen.storage.save import GameSave
 from storygen.storage.tree import (
     ancestors,
     children,
+    descendants,
     latest_summary,
     path_from_root,
 )
@@ -123,3 +124,40 @@ def test_latest_summary_none_if_no_major_ancestors() -> None:
         }
     )
     assert latest_summary(save, "a") is None
+
+
+def test_descendants_returns_bfs_order() -> None:
+    save = _empty_save(
+        {
+            "root": _node("root", None),
+            "a": _node("a", "root", chose="c1"),
+            "b": _node("b", "root", chose="c2"),
+            "a1": _node("a1", "a", chose="c1"),
+            "a2": _node("a2", "a", chose="c2"),
+            "a1x": _node("a1x", "a1", chose="c1"),
+        }
+    )
+    result = descendants(save, "a")
+    assert set(result) == {"a", "a1", "a2", "a1x"}
+    assert result.index("a") < result.index("a1")
+
+
+def test_descendants_leaf_returns_self_only() -> None:
+    save = _empty_save(
+        {
+            "root": _node("root", None),
+            "a": _node("a", "root", chose="c1"),
+        }
+    )
+    assert descendants(save, "a") == ["a"]
+
+
+def test_descendants_root_returns_everything() -> None:
+    save = _empty_save(
+        {
+            "root": _node("root", None),
+            "a": _node("a", "root", chose="c1"),
+            "b": _node("b", "root", chose="c2"),
+        }
+    )
+    assert set(descendants(save, "root")) == {"root", "a", "b"}
