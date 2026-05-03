@@ -114,6 +114,8 @@ _ALLOWED_IMAGE_PROVIDERS: frozenset[str] = frozenset(pid for _, pid in IMAGE_PRO
 DEFAULT_TTS_PROVIDER: str = "openai"
 DEFAULT_TTS_VOICE: str = ""
 DEFAULT_TTS_AUTO_READ: bool = False
+DEFAULT_AUTO_RECAP: bool = False
+DEFAULT_RECAP_INTERVAL: int = 3
 
 TTS_PROVIDER_CHOICES: tuple[tuple[str, str], ...] = (
     ("OpenAI", "openai"),
@@ -439,6 +441,34 @@ def set_auto_open_art_enabled(value: bool) -> None:
     write_app_state(state)
 
 
+def auto_recap_enabled() -> bool:
+    """Return whether auto-recap is enabled (default: False)."""
+    return bool(read_app_state().get("auto_recap", DEFAULT_AUTO_RECAP))
+
+
+def set_auto_recap(enabled: bool) -> None:
+    """Set auto-recap enabled flag."""
+    state = read_app_state()
+    state["auto_recap"] = bool(enabled)
+    write_app_state(state)
+
+
+def recap_interval() -> int:
+    """Return auto-recap interval in major beats (default: 3)."""
+    raw = read_app_state().get("recap_interval", DEFAULT_RECAP_INTERVAL)
+    try:
+        return max(1, int(raw))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return DEFAULT_RECAP_INTERVAL
+
+
+def set_recap_interval(interval: int) -> None:
+    """Set auto-recap interval."""
+    state = read_app_state()
+    state["recap_interval"] = max(1, interval)
+    write_app_state(state)
+
+
 def read_provider_prefs() -> ProviderPrefs:
     """Load persisted text-provider prefs; fall back to defaults on any problem.
 
@@ -624,6 +654,8 @@ def write_all_settings(
     llm_cache_enabled_value: bool = False,
     auto_select_value: bool = False,
     auto_open_art_value: bool = False,
+    auto_recap_value: bool = False,
+    recap_interval_value: int = 3,
 ) -> None:
     """Atomic write of all Settings-screen-owned state in a single JSON rewrite.
 
@@ -651,4 +683,6 @@ def write_all_settings(
     state["llm_cache"] = bool(llm_cache_enabled_value)
     state["auto_select"] = bool(auto_select_value)
     state["auto_open_art"] = bool(auto_open_art_value)
+    state["auto_recap"] = bool(auto_recap_value)
+    state["recap_interval"] = max(1, int(recap_interval_value))
     write_app_state(state)

@@ -1,0 +1,11 @@
+name = "Dragon's Quest"
+description = "A classic fantasy adventure with dragons, magic, and ancient prophecies"
+theme = "A kingdom threatened by an ancient dragon awakened from a thousand-year slumber. Only a chosen hero can wield the legendary sword."
+tone_preset = "action"
+tone_descriptor = "adventurous, heroic, with moments of levity and wonder"
+narration_style = "third_person"
+art_style = "watercolor fantasy illustration with golden highlights"
+target_major_beats = 8
+reader_level = "ages_11_15"
+pacing = "moderate"
+characters = "A young farmhand with a hidden destiny, a wise old wizard mentor, a fierce elven archer, and a mischievous talking fox companion"

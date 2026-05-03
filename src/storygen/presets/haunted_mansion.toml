@@ -1,0 +1,11 @@
+name = "Haunted Mansion Mystery"
+description = "A spooky gothic mystery in a Victorian mansion full of secrets"
+theme = "A cursed Victorian mansion where guests disappear one by one. The walls whisper secrets and portraits watch your every move."
+tone_preset = "mysterious"
+tone_descriptor = "creepy, atmospheric, with moments of dark humor"
+narration_style = "first_person"
+art_style = "dark gothic oil painting"
+target_major_beats = 8
+reader_level = "ages_15_plus"
+pacing = "slow"
+characters = "A skeptical detective, a nervous butler who knows more than he says, a mysterious heiress, and the ghost of the previous owner"

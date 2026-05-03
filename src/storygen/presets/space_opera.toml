@@ -1,0 +1,11 @@
+name = "Space Opera Epic"
+description = "A grand sci-fi adventure across the stars with alien civilizations"
+theme = "An interstellar empire on the brink of war. Ancient alien technology has been discovered that could save or destroy civilization."
+tone_preset = "action"
+tone_descriptor = "epic, sweeping, with moments of wonder and political intrigue"
+narration_style = "third_person"
+art_style = "retro sci-fi poster art with vibrant colors"
+target_major_beats = 10
+reader_level = "ages_15_plus"
+pacing = "moderate"
+characters = "A rogue starship captain, an alien diplomat from a rival species, a brilliant engineer, and a mysterious AI with its own agenda"

@@ -26,6 +26,8 @@ from storygen.core.models import (
 from storygen.storage import paths
 from storygen.storage.app_state import DEFAULT_ART_STYLE, DEFAULT_TARGET_MAJOR_BEATS
 
+SAVE_VERSION: int = 2
+
 __all__ = [
     "GameSave",
     "NarrationStyle",
@@ -40,7 +42,7 @@ __all__ = [
 class GameSave(BaseModel):
     """Entire persisted state of one story."""
 
-    version: int
+    version: int = SAVE_VERSION
     id: UUID
     theme: Theme
     tone: Tone
@@ -86,15 +88,6 @@ def _migrate(data: dict[str, Any], *, from_version: int) -> dict[str, Any]:
     """Apply forward migrations from ``from_version`` to the current schema.
 
     This is the canonical place for future non-additive schema changes.
-    At version 1 the function is a no-op — it exists to establish the
-    pattern and give callers a stable hook point.
-
-    Example future migration::
-
-        if from_version < 2:
-            # Rename old_field → new_field
-            for node in data.get("nodes", {}).values():
-                node["new_field"] = node.pop("old_field", None)
 
     Args:
         data: The raw decoded JSON dict from ``game.json``.
@@ -103,8 +96,9 @@ def _migrate(data: dict[str, Any], *, from_version: int) -> dict[str, Any]:
     Returns:
         The (possibly mutated) data dict, ready for ``model_validate``.
     """
-    # v1 → current: nothing to migrate yet.
-    del from_version
+    if from_version < 2:
+        for node in data.get("nodes", {}).values():
+            node.setdefault("recap_text", None)
     return data
 
 

@@ -348,6 +348,12 @@ class SettingsScreen(Screen[None]):
         self._llm_cache_switch = Switch(value=False, id="llm-cache-switch")
         self._auto_select_switch = Switch(value=False, id="auto-select-switch")
         self._auto_open_art_switch = Switch(value=False, id="auto-open-art-switch")
+        self._auto_recap_switch = Switch(value=False, id="auto-recap-switch")
+        self._recap_interval_input = Input(
+            value="3",
+            id="recap-interval-input",
+            classes="narrow",
+        )
 
         # --- TTS widgets ---
         self._suppress_tts_handler: bool = False
@@ -388,6 +394,7 @@ class SettingsScreen(Screen[None]):
             yield self._suggested
 
             yield Static("Art generation provider (scenes + covers)", classes="section")
+            yield Button("Open Style Gallery", id="btn-style-gallery", variant="primary")
             yield Label("Provider")
             yield self._image_provider_select
             yield Label("Model")
@@ -485,6 +492,17 @@ class SettingsScreen(Screen[None]):
                     "Auto-select choices (random, waits for image + TTS)",
                     classes="switch-label",
                 )
+
+            yield Static("Narrative Recap", classes="section")
+            with Horizontal(classes="switch-row"):
+                yield self._auto_recap_switch
+                yield Static(
+                    "Auto-show recap every N major beats",
+                    classes="switch-label",
+                )
+            with Horizontal(classes="setting-row"):
+                yield Label("Interval (major beats):")
+                yield self._recap_interval_input
 
             yield Static("Text-to-speech", classes="section")
             yield Label("Provider")
@@ -753,6 +771,8 @@ class SettingsScreen(Screen[None]):
             self._llm_cache_switch.prevent(Switch.Changed),
             self._auto_select_switch.prevent(Switch.Changed),
             self._auto_open_art_switch.prevent(Switch.Changed),
+            self._auto_recap_switch.prevent(Switch.Changed),
+            self._recap_interval_input.prevent(Input.Changed),
         ):
             self._theme_area.text = defaults.theme
             self._tone_select.value = tone_preset
@@ -774,6 +794,8 @@ class SettingsScreen(Screen[None]):
             self._llm_cache_switch.value = app_state.llm_cache_enabled()
             self._auto_select_switch.value = app_state.auto_select_enabled()
             self._auto_open_art_switch.value = app_state.auto_open_art_enabled()
+            self._auto_recap_switch.value = app_state.auto_recap_enabled()
+            self._recap_interval_input.value = str(app_state.recap_interval())
             self._refresh_image_gating()
 
         # TTS
@@ -1043,6 +1065,9 @@ class SettingsScreen(Screen[None]):
         self._refresh_image_gating()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-style-gallery":
+            self.app.push_screen("style_gallery")  # pyright: ignore[reportUnknownMemberType]
+            return
         bid = event.button.id
         if bid == "btn-save":
             self._save_settings()
@@ -1213,6 +1238,8 @@ class SettingsScreen(Screen[None]):
             llm_cache_enabled_value=self._llm_cache_switch.value,
             auto_select_value=self._auto_select_switch.value,
             auto_open_art_value=self._auto_open_art_switch.value,
+            auto_recap_value=self._auto_recap_switch.value,
+            recap_interval_value=max(1, int(self._recap_interval_input.value or "3")),
         )
         self.post_message(ImageProviderChanged(image_prefs))
         self.post_message(TextProviderChanged(prefs))

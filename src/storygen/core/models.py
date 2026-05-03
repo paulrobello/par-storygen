@@ -179,6 +179,12 @@ class Summary(BaseModel):
     text: str
 
 
+class Recap(BaseModel):
+    """Output of `recap_agent`."""
+
+    text: str
+
+
 class AdaptedBackstory(BaseModel):
     """Output of ``adapt_backstory_agent`` — ONLY the rewritten backstory.
 
@@ -212,6 +218,7 @@ class StoryNode(BaseModel):
     illustration_reasoning: str | None
     featured_character_ids: list[CharacterId]
     summary_to_here: str | None
+    recap_text: str | None = None
     tts_audio_path: str | None = None
     created_at: datetime
 
@@ -229,6 +236,7 @@ __all__ = [
     "NodeId",
     "Pacing",
     "ReaderLevel",
+    "Recap",
     "StoredChoice",
     "StoryBeat",
     "StoryNode",

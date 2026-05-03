@@ -1,0 +1,11 @@
+name = "Noir Detective"
+description = "A gritty crime story in a rain-soaked city where nothing is what it seems"
+theme = "A hardboiled private investigator takes on a case that leads deep into the city's criminal underworld. Everyone has something to hide."
+tone_preset = "dark"
+tone_descriptor = "gritty, cynical, with sharp wit and moral ambiguity"
+narration_style = "first_person"
+art_style = "black and white film noir with high contrast shadows"
+target_major_beats = 7
+reader_level = "ages_15_plus"
+pacing = "slow"
+characters = "A world-weary private detective, a femme fatale with a hidden past, a corrupt police captain, and an informant who plays both sides"

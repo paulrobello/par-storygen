@@ -584,6 +584,8 @@ def test_write_all_settings_matches_individual_writers_byte_for_byte(
     app_state.set_llm_cache_enabled(False)
     app_state.set_auto_select_enabled(False)
     app_state.set_auto_open_art_enabled(False)
+    app_state.set_auto_recap(False)
+    app_state.set_recap_interval(3)
     bytes_a = (path_a / "storygen" / "state.json").read_bytes()
 
     # Path B: single atomic write.
@@ -600,6 +602,8 @@ def test_write_all_settings_matches_individual_writers_byte_for_byte(
         llm_cache_enabled_value=False,
         auto_select_value=False,
         auto_open_art_value=False,
+        auto_recap_value=False,
+        recap_interval_value=3,
     )
     bytes_b = (path_b / "storygen" / "state.json").read_bytes()
 

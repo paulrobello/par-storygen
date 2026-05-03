@@ -274,3 +274,18 @@ def summary_system_prompt() -> str:
         " progression, character changes, key decisions, and unresolved"
         " threads. Do not retell dialogue verbatim. Return { text: str }."
     )
+
+
+def recap_system_prompt() -> str:
+    """Return the system prompt for the recap agent."""
+    return (
+        'You write "Previously on..." recaps for an interactive story.'
+        " Given a sequence of story events, produce a dramatic recap"
+        " (2-4 paragraphs, max 500 tokens) that:\n"
+        "- Opens with 'Previously on [story title]...'\n"
+        "- Highlights key plot points, character introductions, and turning points\n"
+        "- Emphasizes cliffhangers and unresolved threads\n"
+        "- Uses dramatic, engaging tone (not dry summary)\n"
+        "- Ends by setting up what comes next\n"
+        "Return { text: str }."
+    )

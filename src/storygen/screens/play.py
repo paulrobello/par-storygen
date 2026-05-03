@@ -18,10 +18,12 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Footer, Header
 
+from storygen.core.models import Recap
 from storygen.export.book import export_book
 from storygen.llm.models import NodeId, StoryNode
 from storygen.pipeline import BeatPipeline, PipelineCallbacks
 from storygen.screens._art_edit_modal import ArtEditModal, ArtEditMode, ArtEditResult
+from storygen.screens._recap_modal import RecapModal
 from storygen.screens.endings import EndingsScreen
 from storygen.screens.graph import GraphScreen
 from storygen.screens.portraits import PortraitsScreen
@@ -108,6 +110,7 @@ class PlayScreen(Screen[None]):
         ("r", "regenerate_node", "Regen beat"),
         ("p", "portraits", "Portraits"),
         ("g", "graph", "Graph"),
+        ("R", "recap", "Previously on..."),
         ("e", "endings", "Endings"),
         ("a", "auto_select", "Auto play"),
         ("t", "tts_toggle", "Read aloud"),
@@ -164,6 +167,7 @@ class PlayScreen(Screen[None]):
         # cached via some other path while this is still pinned, a redundant
         # call would be a no-op (start_prefetch skips cached choices).
         self._last_prefetched_from: NodeId | None = None
+        self._major_beats_since_recap: int = 0
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -281,6 +285,7 @@ class PlayScreen(Screen[None]):
         # when auto-play is waiting on image generation while audio is playing.
         if self._loading and action not in (
             "menu",
+            "recap",
             "auto_select",
             "tts_stop",
             "tts_restart",
@@ -429,6 +434,15 @@ class PlayScreen(Screen[None]):
                         exclusive=False,
                         name="auto-read",
                     )
+                # Auto-recap after major beats.
+                if committed.is_major:
+                    self._major_beats_since_recap += 1
+                    if (
+                        app_state.auto_recap_enabled()
+                        and self._major_beats_since_recap >= app_state.recap_interval()
+                    ):
+                        self._major_beats_since_recap = 0
+                        self.run_worker(self.action_recap(), name="auto-recap")
 
         cb = PipelineCallbacks(
             on_narration_delta=self._on_narration_delta,
@@ -592,6 +606,54 @@ class PlayScreen(Screen[None]):
 
     def action_menu(self) -> None:
         self.app.pop_screen()  # pyright: ignore[reportUnknownMemberType]
+
+    async def action_recap(self) -> None:
+        """Show a 'Previously on...' recap for the current story."""
+        if self._pipeline is None:
+            return
+        node = self._save.nodes[self._save.current_node_id]
+
+        if node.recap_text:
+            self.app.push_screen(RecapModal(node.recap_text))  # pyright: ignore[reportUnknownMemberType]
+            return
+
+        self.notify("Generating recap…", timeout=30)
+        try:
+            recap = await self._generate_recap()
+        except Exception as exc:
+            self.notify(f"Recap failed: {exc}", severity="error", timeout=10)
+            return
+
+        node.recap_text = recap.text
+        save_game(self._save)
+        self.app.push_screen(RecapModal(recap.text))  # pyright: ignore[reportUnknownMemberType]
+
+    async def _generate_recap(self) -> Recap:
+        from storygen.llm.agents import build_recap_agent
+        from storygen.llm.provider_factory import build_text_model
+        from storygen.storage.tree import path_from_root
+
+        text_model = build_text_model(self._save.text_config)
+        agent = build_recap_agent(text_model)
+
+        chain = path_from_root(self._save, self._save.current_node_id)
+        parts: list[str] = [f"Story title: {self._save.theme.title}"]
+
+        for node in chain:
+            if node.narration:
+                label = "[Opening blurb]" if node.id == "root" else "[Beat]"
+                parts.append(f"---\n{label}\n{node.narration}")
+            if node.choices:
+                chosen = next(
+                    (c for c in node.choices if c.child_node_id is not None),
+                    None,
+                )
+                if chosen:
+                    parts.append(f"Player chose: {chosen.text}")
+
+        prompt = "\n\n".join(parts)
+        result = await agent.run(prompt)
+        return result.output
 
     async def action_regenerate_node(self) -> None:
         """Discard the current beat and re-roll it from the parent's choice."""

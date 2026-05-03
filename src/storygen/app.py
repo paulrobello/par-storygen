@@ -34,12 +34,14 @@ from storygen.screens.library_browser import CharacterCatalogScreen
 from storygen.screens.load import LoadGameScreen
 from storygen.screens.menu import MenuScreen
 from storygen.screens.play import PlayScreen
+from storygen.screens.preset_picker import PresetPickerScreen
 from storygen.screens.settings import (
     ImageProviderChanged,
     SettingsScreen,
     TextProviderChanged,
     TTSPrefsChanged,
 )
+from storygen.screens.style_gallery import StyleGalleryScreen
 from storygen.screens.wizard import WizardFlow, WizardScreen
 from storygen.storage import app_state, paths
 from storygen.storage.llm_cache import dump_llm_exchange
@@ -177,10 +179,15 @@ class StoryGenApp(App[None]):
 
     def on_mount(self) -> None:
         self.install_screen(MenuScreen(), name="menu")  # pyright: ignore[reportUnknownMemberType]
+        self.install_screen(PresetPickerScreen(), name="preset_picker")  # pyright: ignore[reportUnknownMemberType]
         self.install_screen(self._make_wizard, name="wizard")  # pyright: ignore[reportUnknownMemberType,reportArgumentType]
         self.install_screen(self._make_load, name="load")  # pyright: ignore[reportUnknownMemberType,reportArgumentType]
         self.install_screen(lambda: SettingsScreen(self._config, self._tts_player), name="settings")  # pyright: ignore[reportUnknownMemberType,reportArgumentType]
         self.install_screen(self._make_catalog, name="catalog")  # pyright: ignore[reportUnknownMemberType,reportArgumentType]
+        self.install_screen(  # pyright: ignore[reportUnknownMemberType]
+            lambda: StyleGalleryScreen(self._config, self._image_provider),  # pyright: ignore[reportArgumentType]
+            name="style_gallery",
+        )
         self.push_screen("menu")  # pyright: ignore[reportUnknownMemberType]
         if self._resume_last:
             self._auto_resume()
@@ -579,3 +586,22 @@ class StoryGenApp(App[None]):
                 tts_player=self._tts_player,
             )
         )
+        # Show recap for loaded games (not fresh wizard saves)
+        has_progress = len(save.nodes) > 1
+        if has_progress:
+
+            async def _show_resume_recap() -> None:
+                await asyncio.sleep(0.5)
+                screen = self.screen
+                if isinstance(screen, PlayScreen):
+                    node = screen._save.nodes[screen._save.current_node_id]  # pyright: ignore[reportPrivateUsage]
+                    if node.recap_text:
+                        from storygen.screens._recap_modal import RecapModal
+
+                        self.push_screen(RecapModal(node.recap_text))  # pyright: ignore[reportUnknownMemberType]
+                    else:
+                        screen.run_worker(screen.action_recap(), name="resume-recap")
+
+            _recap_task: asyncio.Task[None] = asyncio.create_task(_show_resume_recap())
+            _background_tasks.add(_recap_task)
+            _recap_task.add_done_callback(_background_tasks.discard)

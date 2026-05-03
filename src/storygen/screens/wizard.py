@@ -34,6 +34,7 @@ from textual.widgets import (
     TextArea,
 )
 
+from storygen.core.presets import StoryPreset
 from storygen.images._prompts import build_cover_prompt
 from storygen.images.constants import (
     PORTRAIT_QUALITY,
@@ -631,6 +632,8 @@ class WizardScreen(Screen[None]):
         self._progress = Static("", id="wizard-progress")
         self._next_button = Button("Next", id="btn-next")
         self._library_button = Button("Import from Library", id="btn-library", variant="primary")
+        self._preset_button: Button = Button("Load Preset", id="btn-preset", variant="primary")
+        self._save_preset_button: Button = Button("Save as Preset", id="btn-save-preset")
         self._save_to_catalog_checkbox = Checkbox(
             "Save generated characters to catalog",
             value=defaults.save_to_catalog,
@@ -913,6 +916,8 @@ class WizardScreen(Screen[None]):
             self._char_area,
             self._library_button,
             self._cast_list,
+            self._preset_button,
+            self._save_preset_button,
             self._save_to_catalog_checkbox,
             self._confirm_summary,
             self._progress,
@@ -927,6 +932,7 @@ class WizardScreen(Screen[None]):
         if self.current_step == WizardStep.THEME:
             self._hint.update("Describe your story setting, or leave blank for a surprise.")
             self._theme_area.display = True
+            self._preset_button.display = True
             self._theme_area.focus()
         elif self.current_step == WizardStep.TONE:
             self._hint.update("Pick a tone preset. Choose Custom to enter your own descriptor.")
@@ -974,6 +980,7 @@ class WizardScreen(Screen[None]):
             self._hint.update("Review your choices, then begin the story.")
             self._render_confirm_summary()
             self._confirm_summary.display = True
+            self._save_preset_button.display = True
             self._progress.display = True
 
         if not self._next_button.disabled:
@@ -1064,6 +1071,12 @@ class WizardScreen(Screen[None]):
             existing_names.add(char.name)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-preset":
+            self._open_preset_picker()
+            return
+        if event.button.id == "btn-save-preset":
+            self._save_as_preset()
+            return
         if event.button.id == "btn-next" and not self._next_button.disabled:
             self._advance_worker()
         elif event.button.id == "btn-library":
@@ -1072,6 +1085,68 @@ class WizardScreen(Screen[None]):
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if not self._next_button.disabled:
             self._advance_worker()
+
+    # ---- Preset load / save -------------------------------------------------
+
+    def _open_preset_picker(self) -> None:
+        from storygen.core.presets import load_all_presets
+        from storygen.screens._preset_picker_modal import PresetPickerModal
+
+        presets = load_all_presets()
+        if not presets:
+            self.notify("No presets available", severity="warning", timeout=5)
+            return
+
+        def _on_pick(preset: StoryPreset | None) -> None:
+            if preset is None:
+                return
+            self._apply_preset(preset)
+
+        self.app.push_screen(PresetPickerModal(presets), _on_pick)  # pyright: ignore[reportUnknownMemberType]
+
+    def _apply_preset(self, preset: StoryPreset) -> None:
+        """Populate all wizard fields from a preset."""
+        self._theme_area.text = preset.theme
+        self._tone_select.value = preset.tone_preset
+        if preset.tone_descriptor:
+            self._tone_descriptor.value = preset.tone_descriptor
+            self._tone_descriptor.display = True
+        self._style_select.value = preset.narration_style
+        self._art_style_input.value = preset.art_style
+        self._length_input.value = str(preset.target_major_beats)
+        self._reader_level_select.value = preset.reader_level
+        self._char_area.text = preset.characters
+
+        self._art_style = preset.art_style
+        self._target_major_beats = preset.target_major_beats
+        self._reader_level = preset.reader_level
+        self._pacing = preset.pacing
+
+        self.notify(f"Loaded preset: {preset.name}", timeout=3)
+
+    def _save_as_preset(self) -> None:
+        from storygen.core.presets import save_custom_preset
+
+        theme_text = self._theme_area.text.strip()
+        if not theme_text:
+            self.notify("Enter a theme first", severity="warning", timeout=3)
+            return
+
+        preset = StoryPreset(
+            name=self._theme.title if self._theme else theme_text[:48],
+            description=f"Custom preset from {datetime.now().strftime('%Y-%m-%d')}",
+            theme=theme_text,
+            tone_preset=cast(str, self._tone_select.value),
+            tone_descriptor=self._tone_descriptor.value,
+            narration_style=cast(NarrationStyle, self._style_select.value),
+            art_style=self._art_style_input.value,
+            target_major_beats=int(self._length_input.value or "5"),
+            reader_level=cast(ReaderLevel, self._reader_level_select.value),
+            pacing=cast(Pacing, self._pacing),
+            characters=self._char_area.text,
+        )
+        path = save_custom_preset(preset)
+        self.notify(f"Preset saved to {path.name}", timeout=5)
 
     def _set_busy(self, busy: bool) -> None:
         """Disable input while a worker is running so we don't double-fire."""
