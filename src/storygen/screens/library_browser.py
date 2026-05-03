@@ -336,6 +336,7 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
                         char.physical_description,
                         transparent=True,
                         art_style=app_state.DEFAULT_ART_STYLE,
+                        reference_image=request.reference_image,
                     )
                 except Exception:
                     _logger.debug("Portrait generation failed", exc_info=True)
@@ -353,7 +354,9 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
                 exported_at=datetime.now(UTC),
                 source="created",
             )
-            save_library_character(lib_char, portrait_bytes)
+            save_library_character(
+                lib_char, portrait_bytes, reference_bytes=request.reference_image
+            )
             if app_state.auto_open_art_enabled() and portrait_bytes is not PLACEHOLDER_PNG:
                 open_in_system_viewer(library_portrait_path(lib_char.id))
             self.notify(f"Created '{lib_char.name}'.", timeout=5)

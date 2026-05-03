@@ -12,6 +12,7 @@ from textual.app import App, ComposeResult
 from textual.widgets import Button, Static
 
 from storygen.screens._confirm_modal import ConfirmModal
+from storygen.screens._create_char_modal import CreateCharRequest
 from storygen.screens.library_browser import (
     CharacterCatalogScreen,
     LibraryPick,
@@ -541,3 +542,77 @@ async def test_remove_ref_clears_reference_path(
     reloaded = load_library_character(char.id)
     assert reloaded.reference_image_path is None
     assert not library_reference_path(char.id).exists()
+
+
+class _BrowseHarnessWithProviderAndAgent(App[None]):
+    """Browse mode with both a fake image provider and a fake character agent."""
+
+    def __init__(
+        self,
+        provider: _FakeImageProvider,
+        agent_cls: type,
+    ) -> None:
+        super().__init__()
+        self._provider = provider
+        self._agent_cls = agent_cls
+
+    def on_mount(self) -> None:
+        self.push_screen(
+            CharacterCatalogScreen(
+                browse=True,
+                image_provider=self._provider,
+                character_agent_factory=self._agent_cls,
+            )
+        )
+
+    def compose(self) -> ComposeResult:
+        yield from []
+
+
+@pytest.mark.asyncio
+async def test_create_character_with_ref_image_passes_to_portrait_gen(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Creating a character with a ref image passes bytes to generate_portrait."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    provider = _FakeImageProvider()
+
+    class _FakeAgent:
+        async def run(self, prompt: str) -> object:
+            from storygen.llm.models import Character as Char
+
+            return type(
+                "_R",
+                (),
+                {
+                    "output": [
+                        Char(
+                            id="c1",
+                            name="Test",
+                            backstory="b",
+                            personality="p",
+                            physical_description="desc",
+                            introduced_at_node_id="root",
+                        )
+                    ]
+                },
+            )()
+
+    app = _BrowseHarnessWithProviderAndAgent(provider, _FakeAgent)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, CharacterCatalogScreen)
+        ref_bytes = b"\x89PNG\r\n\x1a\n"
+        request = CreateCharRequest(
+            name="Test",
+            concept="a test character",
+            reference_image=ref_bytes,
+        )
+        screen._create_character_worker(request)  # pyright: ignore[reportPrivateUsage]
+        for _ in range(40):
+            await pilot.pause()
+            if provider.ref_calls:
+                break
+
+    assert provider.ref_calls == [ref_bytes]
