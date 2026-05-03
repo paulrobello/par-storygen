@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Graph prune subtree** — Press `p` in the story graph to delete a node and all its descendants. A confirmation dialog shows the node and image count before deletion. Pruning reverts the parent choice to "unexplored", cleans up image and TTS audio files from disk, and relocates the current position if it was inside the pruned branch. Root node cannot be pruned.
 - **Dynamic pacing control** — Choose Slow / Moderate / Fast pacing when creating a story. Slow produces longer narration with fewer but weightier choices. Fast produces shorter narration with more frequent choices. Pacing also adjusts story escalation thresholds. Configurable per-story in the wizard LENGTH step and as a default in Settings.
 - **Reference image support in library browser** — Set, change, or remove a reference image for any library character directly from the browser. Supports "use as-is" and "style transfer" modes. Reference images are stored per-character and passed to portrait regeneration and new character creation.
 - **Reference image in character creation modal** — New optional reference image input when creating a character from the library. Supports file browse with live preview and passes the reference to portrait generation.
