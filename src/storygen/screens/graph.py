@@ -17,8 +17,9 @@ from textual.widgets import Footer, Header, Static, Tree
 from textual.widgets.tree import TreeNode
 
 from storygen.llm.models import NodeId, StoryNode
+from storygen.screens._confirm_modal import ConfirmModal
 from storygen.screens.replay import ReplayScreen
-from storygen.storage.save import GameSave
+from storygen.storage.save import GameSave, prune_subtree
 
 # Maximum length (in characters) of the narration excerpt rendered for each
 # tree node. Anything longer is ellipsized so the tree stays scannable.
@@ -90,6 +91,7 @@ class GraphScreen(Screen[None]):
 
     BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
         ("r", "replay", "Replay"),
+        ("p", "prune", "Prune"),
         ("escape", "app.pop_screen", "Back"),
     ]
 
@@ -256,3 +258,61 @@ class GraphScreen(Screen[None]):
                 on_jump_to_live=self._jump_to,
             )
         )
+
+    def action_prune(self) -> None:
+        """Prune the subtree rooted at the currently highlighted node."""
+        cursor = self._tree.cursor_node
+        if cursor is None or cursor.data is None:
+            self.notify("Select a node to prune.", severity="warning", timeout=3)
+            return
+        data = cursor.data
+        if data.get("unexplored"):
+            self.notify(
+                "This branch hasn't been generated yet — nothing to prune.",
+                severity="warning",
+                timeout=3,
+            )
+            return
+        node_id = data.get("node_id")
+        if not isinstance(node_id, str):
+            return
+        if node_id == self._save.root_node_id:
+            self.notify("Cannot prune the root node.", severity="warning", timeout=3)
+            return
+        from storygen.storage.tree import descendants as _desc
+
+        doomed = _desc(self._save, node_id)
+        n_images = sum(1 for nid in doomed if self._save.nodes[nid].image_status == "done")
+        parts = [f"{len(doomed)} node{'s' if len(doomed) != 1 else ''}"]
+        if n_images:
+            parts.append(f"{n_images} image{'s' if n_images != 1 else ''}")
+        msg = f"Prune this branch? ({', '.join(parts)} will be deleted)"
+        self.app.push_screen(  # pyright: ignore[reportUnknownMemberType]
+            ConfirmModal(msg, confirm_label="Prune"),
+            self._on_prune_confirm,
+        )
+
+    def _on_prune_confirm(self, result: bool | None) -> None:
+        """Handle the prune confirmation dialog response."""
+        if not result:
+            return
+        cursor = self._tree.cursor_node
+        if cursor is None or cursor.data is None:
+            return
+        node_id = cursor.data.get("node_id")
+        if not isinstance(node_id, str):
+            return
+        try:
+            prune_subtree(self._save, node_id=node_id)
+        except Exception as exc:
+            self.notify(f"Prune failed: {exc}", severity="error", timeout=5)
+            return
+        self._apply_header()
+        # Rebuild the tree from scratch.
+        self._tree.clear()
+        self._node_widgets.clear()
+        self._build_tree()
+        self._tree.root.expand_all()
+        self._tree.focus()
+        self.call_after_refresh(self._focus_current_node)
+        self.notify("Branch pruned.", severity="information", timeout=3)

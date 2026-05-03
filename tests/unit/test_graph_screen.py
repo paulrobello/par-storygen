@@ -279,3 +279,72 @@ async def test_replay_jump_callback_invokes_node_selected() -> None:
         replay.action_jump_to_live()
         await pilot.pause()
         assert received == ["child"]
+
+
+@pytest.mark.asyncio
+async def test_prune_binding_present() -> None:
+    """`p` is registered in GraphScreen BINDINGS."""
+    keys = [b[0] for b in GraphScreen.BINDINGS]
+    assert "p" in keys
+
+
+@pytest.mark.asyncio
+async def test_action_prune_root_shows_warning() -> None:
+    """Pruning root shows a warning and does nothing."""
+    save = _root_save()
+    app = _Harness(save)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, GraphScreen)
+        screen.action_prune()
+        await pilot.pause()
+        assert isinstance(app.screen, GraphScreen)
+        assert "root" in save.nodes
+
+
+@pytest.mark.asyncio
+async def test_action_prune_unexplored_shows_warning() -> None:
+    """Pruning an unexplored leaf shows a warning."""
+    save = _root_save()
+    app = _Harness(save)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, GraphScreen)
+        tree = cast(Tree[dict[str, object]], screen.query_one(Tree))
+        unexplored = next(n for n in _walk(tree.root) if (n.data or {}).get("unexplored"))
+        tree.move_cursor(unexplored)
+        await pilot.pause()
+        screen.action_prune()
+        await pilot.pause()
+        assert isinstance(app.screen, GraphScreen)
+
+
+@pytest.mark.asyncio
+async def test_action_prune_with_visited_node_pushes_confirm() -> None:
+    """Pruning a visited node pushes a Confirm dialog."""
+    save = _root_save()
+    save.nodes["root"].choices[0].child_node_id = "child"
+    save.nodes["child"] = _make_child(
+        "child",
+        parent_id="root",
+        chosen_choice_id="c1",
+        narration="A second beat.",
+    )
+    app = _Harness(save)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, GraphScreen)
+        tree = cast(Tree[dict[str, object]], screen.query_one(Tree))
+        target = next(n for n in _walk(tree.root) if (n.data or {}).get("node_id") == "child")
+        tree.move_cursor(target)
+        await pilot.pause()
+        screen.action_prune()
+        await pilot.pause()
+        # ConfirmModal is pushed as a screen on top of GraphScreen.
+        from storygen.screens._confirm_modal import ConfirmModal
+
+        current = app.screen
+        assert isinstance(current, ConfirmModal)
