@@ -475,12 +475,20 @@ class PortraitsScreen(Screen[None]):
         button.disabled = True
         button.label = "Working…"
         try:
+            save_id = str(self._save.id)
+            ref_bytes: bytes | None = None
+            if char.reference_image_path:
+                ref_abs = paths.safe_join(
+                    paths.game_dir(save_id), char.reference_image_path
+                )
+                if ref_abs.exists():
+                    ref_bytes = ref_abs.read_bytes()
             png_bytes = await self._image_provider.generate_portrait(
                 char.physical_description,
                 transparent=True,
                 art_style=self._save.art_style,
+                reference_image=ref_bytes,
             )
-            save_id = str(self._save.id)
             paths.ensure_game_dirs(save_id)
             version = paths.next_portrait_version(save_id, char.id)
             dest = paths.character_portrait_path(save_id, char.id, version=version)

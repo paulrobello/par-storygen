@@ -44,6 +44,7 @@ from storygen.storage.save import GameSave, load_game, save_game
 class FakeImageProvider:
     def __init__(self) -> None:
         self.calls: list[str] = []
+        self.ref_calls: list[bytes | None] = []
 
     async def generate_portrait(
         self,
@@ -54,8 +55,9 @@ class FakeImageProvider:
         on_partial: Callable[[bytes], Awaitable[None]] | None = None,
         reference_image: bytes | None = None,
     ) -> bytes:
-        del reference_image, on_partial
+        del on_partial
         self.calls.append(description)
+        self.ref_calls.append(reference_image)
         return b"NEWPNG"
 
     async def generate_scene(
@@ -183,6 +185,42 @@ async def test_regenerate_writes_versioned_file_and_updates_save(
     assert reloaded.total_image_cost_usd == pytest.approx(  # pyright: ignore[reportUnknownMemberType]
         expected_cost
     )
+
+
+@pytest.mark.asyncio
+async def test_regenerate_uses_reference_image_when_present(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Regenerate passes stored reference_image bytes to generate_portrait."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    save = _save_with_portrait_on_disk()
+    save.character_image_config = ImageProviderConfig(
+        provider="gemini", model="gemini-3.1-flash-image-preview"
+    )
+    char = save.characters[0]
+    ref_rel = f"images/characters/{char.id}-ref.png"
+    save.characters = [
+        char.model_copy(update={"reference_image_path": ref_rel})
+    ]
+    save_game(save)
+    # Write the ref image to disk so the worker can load it.
+    ref_abs = paths.game_dir(str(save.id)) / ref_rel
+    ref_abs.parent.mkdir(parents=True, exist_ok=True)
+    ref_abs.write_bytes(_PNG_BYTES)
+
+    provider = FakeImageProvider()
+    app = _Harness(save, provider)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click(f"#regen-{char.id}")
+        for _ in range(30):
+            await pilot.pause()
+            expected = paths.game_dir(str(save.id)) / "images" / "characters" / f"{char.id}-v2.png"
+            if expected.exists():
+                break
+
+    # generate_portrait was called with reference_image=<bytes>
+    assert provider.ref_calls == [_PNG_BYTES]
 
 
 def _save_with_portrait_on_disk(portrait_bytes: bytes = b"PORTRAITDATA") -> GameSave:
