@@ -55,7 +55,7 @@ class ArtEditModal(Screen[ArtEditResult | None]):
     ArtEditModal #art-edit-box {
         width: 72;
         height: auto;
-        max-height: 36;
+        max-height: 80vh;
         border: round $primary;
         padding: 1 2;
         background: $surface;
@@ -76,8 +76,8 @@ class ArtEditModal(Screen[ArtEditResult | None]):
         color: $text-muted;
     }
     ArtEditModal #art-edit-original {
-        height: auto;
-        max-height: 4;
+        height: 3;
+        overflow-y: auto;
         color: $text-muted;
         margin-bottom: 1;
     }
