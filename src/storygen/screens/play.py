@@ -149,6 +149,9 @@ class PlayScreen(Screen[None]):
         self._loading: bool = False
         self._auto_selecting: bool = False
         self._image_displayed_at: float | None = None
+        # True while an edit-regen worker is in flight — prevents
+        # on_screen_resume from clobbering show_generating().
+        self._edit_regen_active: bool = False
         # Last node id we kicked off prefetch FROM. _maybe_start_prefetch
         # short-circuits when current_node_id matches this — the comparison
         # IS the reset, so picks/jumps that change current_node_id naturally
@@ -532,6 +535,7 @@ class PlayScreen(Screen[None]):
         def _on_result(result: ArtEditResult | None) -> None:
             if result is None:
                 return
+            self._edit_regen_active = True
             self._image.show_generating()
             self._choices.clear()
             self.notify("Generating edited image…", timeout=120)
@@ -571,6 +575,8 @@ class PlayScreen(Screen[None]):
             )
         except Exception:
             self.notify("Edit regen failed.", severity="error", timeout=10)
+        finally:
+            self._edit_regen_active = False
         self._render_current()
 
     def action_menu(self) -> None:
@@ -674,7 +680,12 @@ class PlayScreen(Screen[None]):
 
         Portrait regeneration mutates ``self._save.characters``, so the cast
         sidebar needs to reflect the new portrait paths.
+
+        Skipped while edit-regen is active to avoid overwriting the
+        generating throbber with the old on-disk image.
         """
+        if self._edit_regen_active:
+            return
         self._render_current()
         self._maybe_auto_start_select()
 

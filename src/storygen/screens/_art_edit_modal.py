@@ -20,8 +20,8 @@ from PIL import Image
 from pydantic import BaseModel
 from rich_pixels import Pixels
 from textual.app import ComposeResult
-from textual.events import Click
 from textual.containers import Horizontal, Vertical
+from textual.events import Click
 from textual.screen import Screen
 from textual.widgets import Button, Checkbox, RadioButton, RadioSet, Static, TextArea
 
@@ -144,9 +144,7 @@ class ArtEditModal(Screen[ArtEditResult | None]):
             if self._image_bytes:
                 thumb = _render_thumb(self._image_bytes)
                 if thumb:
-                    yield Static(
-                        thumb, id="art-edit-thumb", classes="clickable-thumb"
-                    )
+                    yield Static(thumb, id="art-edit-thumb", classes="clickable-thumb")
             # Mode selector
             yield Static("Mode:", id="art-edit-mode-label")
             yield self._mode_radios
