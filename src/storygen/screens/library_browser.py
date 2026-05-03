@@ -42,6 +42,7 @@ from storygen.storage.library import (
     LibrarySource,
     delete_library_character,
     library_portrait_path,
+    library_reference_path,
     list_library_characters,
     load_library_character,
     save_library_character,
@@ -235,6 +236,7 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
         # re-sorts in memory. NOT persisted — a user who prefers one over
         # the other just taps `s` once per session.
         self._sort_mode: SortMode = "newest"
+        self._creating: bool = False
         self._character_agent_factory = character_agent_factory
         self._image_provider = image_provider
 
@@ -278,69 +280,75 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
         """Callback from CreateCharacterModal; validate and dispatch the worker."""
         if not isinstance(request, CreateCharRequest):
             return
+        self._creating = True
+        self._rebuild()
+        self.notify("Generating character…", timeout=120)
         self._create_character_worker(request)
 
     @work(exit_on_error=False)
     async def _create_character_worker(self, request: CreateCharRequest) -> None:
         """Generate a character from a concept description via LLM + image provider."""
-        if self._character_agent_factory is None:
-            self.notify(
-                "Character creation unavailable — no agent configured.",
-                severity="error",
-                timeout=5,
-            )
-            return
         try:
-            agent = self._character_agent_factory()
-            prompt = request.concept
-            if request.name:
-                prompt = f"Create a character named '{request.name}'. {request.concept}"
-            result = await agent.run(prompt)
-            raw_output = getattr(result, "output", None)
-            if not isinstance(raw_output, list) or not raw_output:
-                self.notify("LLM returned no characters.", severity="error", timeout=5)
-                return
-            first = raw_output[0]  # type: ignore[reportUnknownVariableType]
-            if not isinstance(first, Character):
-                self.notify("LLM returned unexpected type.", severity="error", timeout=5)
-                return
-            char: Character = first
-            if request.name:
-                char = char.model_copy(update={"name": request.name})
-        except Exception:
-            _logger.debug("Character generation failed", exc_info=True)
-            self.notify("Character generation failed.", severity="error", timeout=5)
-            return
-
-        portrait_bytes: bytes | None = None
-        if self._image_provider is not None and app_state.art_enabled():
-            try:
-                portrait_bytes = await self._image_provider.generate_portrait(
-                    char.physical_description,
-                    transparent=True,
-                    art_style=app_state.DEFAULT_ART_STYLE,
+            if self._character_agent_factory is None:
+                self.notify(
+                    "Character creation unavailable — no agent configured.",
+                    severity="error",
+                    timeout=5,
                 )
+                return
+            try:
+                agent = self._character_agent_factory()
+                prompt = request.concept
+                if request.name:
+                    prompt = f"Create a character named '{request.name}'. {request.concept}"
+                result = await agent.run(prompt)
+                raw_output = getattr(result, "output", None)
+                if not isinstance(raw_output, list) or not raw_output:
+                    self.notify("LLM returned no characters.", severity="error", timeout=5)
+                    return
+                first = raw_output[0]  # type: ignore[reportUnknownVariableType]
+                if not isinstance(first, Character):
+                    self.notify("LLM returned unexpected type.", severity="error", timeout=5)
+                    return
+                char: Character = first
+                if request.name:
+                    char = char.model_copy(update={"name": request.name})
             except Exception:
-                _logger.debug("Portrait generation failed", exc_info=True)
-                self.notify("Portrait generation failed.", severity="warning", timeout=5)
-        if portrait_bytes is None:
-            portrait_bytes = PLACEHOLDER_PNG
+                _logger.debug("Character generation failed", exc_info=True)
+                self.notify("Character generation failed.", severity="error", timeout=5)
+                return
 
-        lib_char = LibraryCharacter(
-            id=uuid4().hex,
-            name=char.name,
-            backstory=char.backstory,
-            personality=char.personality,
-            physical_description=char.physical_description,
-            portrait_prompt=char.physical_description,
-            exported_at=datetime.now(UTC),
-            source="created",
-        )
-        save_library_character(lib_char, portrait_bytes)
-        if app_state.auto_open_art_enabled() and portrait_bytes is not PLACEHOLDER_PNG:
-            open_in_system_viewer(library_portrait_path(lib_char.id))
-        self._rebuild()
-        self.notify(f"Created '{lib_char.name}'.", timeout=5)
+            portrait_bytes: bytes | None = None
+            if self._image_provider is not None and app_state.art_enabled():
+                try:
+                    portrait_bytes = await self._image_provider.generate_portrait(
+                        char.physical_description,
+                        transparent=True,
+                        art_style=app_state.DEFAULT_ART_STYLE,
+                    )
+                except Exception:
+                    _logger.debug("Portrait generation failed", exc_info=True)
+                    self.notify("Portrait generation failed.", severity="warning", timeout=5)
+            if portrait_bytes is None:
+                portrait_bytes = PLACEHOLDER_PNG
+
+            lib_char = LibraryCharacter(
+                id=uuid4().hex,
+                name=char.name,
+                backstory=char.backstory,
+                personality=char.personality,
+                physical_description=char.physical_description,
+                portrait_prompt=char.physical_description,
+                exported_at=datetime.now(UTC),
+                source="created",
+            )
+            save_library_character(lib_char, portrait_bytes)
+            if app_state.auto_open_art_enabled() and portrait_bytes is not PLACEHOLDER_PNG:
+                open_in_system_viewer(library_portrait_path(lib_char.id))
+            self.notify(f"Created '{lib_char.name}'.", timeout=5)
+        finally:
+            self._creating = False
+            self._rebuild()
 
     def action_import_from_story(self) -> None:
         """Open the story import modal to pull characters from a saved story."""
@@ -470,7 +478,11 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
             self._scroll.mount(btn_row)
             btn_row.mount(Button("New Character", id="btn-catalog-new", variant="primary"))
             btn_row.mount(Button("Import from Story", id="btn-catalog-import-story"))
-        if not entries:
+        if self._creating:
+            creating_row = Horizontal(classes="library-row")
+            self._scroll.mount(creating_row)
+            creating_row.mount(Static("⏳ Creating new character…", classes="library-name"))
+        if not entries and not self._creating:
             self._scroll.mount(
                 Center(
                     Static(
@@ -479,7 +491,6 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
                     )
                 )
             )
-            return
         for entry in entries:
             self._mount_row(entry)
 
@@ -589,11 +600,17 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
         button.label = "Working…"
         self.notify(f"Regenerating portrait for '{entry.name}'...", timeout=5)
         prompt = entry.portrait_prompt or entry.physical_description
+        ref_bytes: bytes | None = None
+        if entry.reference_image_path:
+            ref_path = library_reference_path(entry.id)
+            if ref_path.exists():
+                ref_bytes = ref_path.read_bytes()
         try:
             portrait_bytes = await self._image_provider.generate_portrait(
                 prompt,
                 transparent=True,
                 art_style=app_state.DEFAULT_ART_STYLE,
+                reference_image=ref_bytes,
             )
         except Exception:
             _logger.debug("Portrait regeneration failed", exc_info=True)

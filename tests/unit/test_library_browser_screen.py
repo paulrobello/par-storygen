@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -19,6 +20,7 @@ from storygen.screens.library_browser import (
 from storygen.storage.library import (
     LibraryCharacter,
     LibrarySource,
+    library_reference_path,
     list_library_characters,
     save_library_character,
 )
@@ -419,3 +421,63 @@ async def test_pick_mode_title_says_library(
         assert isinstance(screen, CharacterCatalogScreen)
         title = screen.title or ""
         assert "Character Library" in title
+
+
+class _FakeImageProvider:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+        self.ref_calls: list[bytes | None] = []
+
+    async def generate_portrait(
+        self,
+        description: str,
+        *,
+        transparent: bool,
+        art_style: str = "children's story book",
+        on_partial: Callable[[bytes], Awaitable[None]] | None = None,
+        reference_image: bytes | None = None,
+    ) -> bytes:
+        del on_partial
+        self.calls.append(description)
+        self.ref_calls.append(reference_image)
+        return b"NEWPNG"
+
+
+class _BrowseHarnessWithProvider(App[None]):
+    """Pushes CharacterCatalogScreen in browse mode with a fake image provider."""
+
+    def __init__(self, provider: _FakeImageProvider) -> None:
+        super().__init__()
+        self._provider = provider
+
+    def on_mount(self) -> None:
+        self.push_screen(CharacterCatalogScreen(browse=True, image_provider=self._provider))
+
+    def compose(self) -> ComposeResult:
+        yield from []
+
+
+@pytest.mark.asyncio
+async def test_regenerate_uses_reference_image_when_present(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Regenerate in library browser passes stored reference bytes."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    char = _make_lib_char()
+    save_library_character(char, _PNG_BYTES, reference_bytes=_PNG_BYTES)
+    # save_library_character writes reference.png and sets reference_image_path
+    # in the on-disk JSON; the screen will reload it via list_library_characters.
+    assert library_reference_path(char.id).exists()
+
+    provider = _FakeImageProvider()
+    app = _BrowseHarnessWithProvider(provider)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click(f"#regen-{char.id}")
+        for _ in range(30):
+            await pilot.pause()
+            on_disk = library_reference_path(char.id)
+            if on_disk.exists() and on_disk.read_bytes() == b"NEWPNG":
+                break
+
+    assert provider.ref_calls == [_PNG_BYTES]
