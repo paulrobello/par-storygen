@@ -124,6 +124,11 @@ class PlayScreen(Screen[None]):
         ("7", "pick(7)", "Pick 7"),
         ("8", "pick(8)", "Pick 8"),
         ("9", "pick(9)", "Pick 9"),
+        ("j", "highlight_next", "▼ Choice"),
+        ("k", "highlight_prev", "▲ Choice"),
+        ("down", "highlight_next", "▼ Choice"),
+        ("up", "highlight_prev", "▲ Choice"),
+        ("enter", "pick_highlighted", "Pick ▸"),
         ("x", "export_book", "Export book"),
     ]
 
@@ -279,6 +284,8 @@ class PlayScreen(Screen[None]):
             "auto_select",
             "tts_stop",
             "tts_restart",
+            "highlight_next",
+            "highlight_prev",
         ):
             return False
         # During auto-select, only menu, auto_select, and TTS controls are available.
@@ -302,6 +309,10 @@ class PlayScreen(Screen[None]):
                 except (ValueError, TypeError):
                     return None
             return None
+        if action == "pick_highlighted":
+            return bool(node.choices) and self._choices.highlighted is not None
+        if action in ("highlight_next", "highlight_prev"):
+            return bool(node.choices)
         if action == "go_back":
             return node.parent_id is not None
         if action == "retry_image":
@@ -692,6 +703,17 @@ class PlayScreen(Screen[None]):
     async def action_pick(self, n: int) -> None:
         """Pick choice number n (1-indexed). Bound to number keys 1-9."""
         await self._pick(n)
+
+    def action_highlight_next(self) -> None:
+        self._choices.highlight_next()
+
+    def action_highlight_prev(self) -> None:
+        self._choices.highlight_prev()
+
+    async def action_pick_highlighted(self) -> None:
+        n = self._choices.highlighted
+        if n is not None:
+            await self._pick(n)
 
     def action_tts_toggle(self) -> None:
         """Read aloud / pause / resume based on current TTS state."""

@@ -1,8 +1,9 @@
 """Async TTS player with play / pause / resume / stop / restart controls.
 
 Wraps the synchronous ``par_tts`` library so it works inside Textual's async
-event loop. Audio playback uses ``asyncio.create_subprocess_exec`` (``afplay``
-on macOS) so the caller retains control via SIGSTOP / SIGCONT / SIGTERM.
+event loop. Audio playback uses ``asyncio.create_subprocess_exec`` with a
+runtime-detected backend (``ffplay`` or ``afplay``) so the caller retains
+control via SIGSTOP / SIGCONT / SIGTERM.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import shutil
 import signal
 import tempfile
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
@@ -23,6 +25,17 @@ from par_tts.providers.base import TTSProvider
 _logger = logging.getLogger(__name__)
 
 AudioResult = bytes | Iterator[bytes] | AsyncIterator[bytes]
+
+# Supported audio player backends, in priority order.
+_PLAYER_CANDIDATES: tuple[str, ...] = ("ffplay", "afplay")
+
+
+def _detect_player() -> str:
+    """Return the first available audio player binary, or empty string."""
+    for candidate in _PLAYER_CANDIDATES:
+        if shutil.which(candidate):
+            return candidate
+    return ""
 
 
 class TTSState(Enum):
@@ -364,25 +377,42 @@ class TTSPlayer:
                 f.write(chunk)
 
     async def _play_file(self, path: Path) -> None:
-        """Start ``afplay`` as an async subprocess and await completion."""
+        """Start audio playback with the detected backend subprocess."""
+        player = _detect_player()
+        if not player:
+            _logger.warning(
+                "No audio player found (tried %s) — TTS unavailable", ", ".join(_PLAYER_CANDIDATES)
+            )
+            return
+        args = self._player_args(player, path)
         self._state = TTSState.PLAYING
         try:
-            self._process = await asyncio.create_subprocess_exec(
-                "afplay",
-                "-v",
-                str(self._volume),
-                str(path),
-            )
+            self._process = await asyncio.create_subprocess_exec(*args)
             await self._process.wait()
         except FileNotFoundError:
-            _logger.warning("afplay not found — TTS playback unavailable")
+            _logger.warning("%s not found — TTS playback unavailable", player)
         except asyncio.CancelledError:
-            # Task was cancelled (e.g. stop() was called); clean up.
             if self._process and self._process.returncode is None:
                 self._process.kill()
         finally:
-            # State may have changed to PAUSED via SIGSTOP between setting
-            # PLAYING and reaching this finally block.
             if self._state == TTSState.PLAYING:  # pyright: ignore[reportUnnecessaryComparison]
                 self._state = TTSState.IDLE
             self._process = None
+
+    def _player_args(self, player: str, path: Path) -> list[str]:
+        """Build the subprocess argument list for the given player."""
+        if player == "ffplay":
+            # ffplay volume is 0-100 integer; clamp to valid range.
+            vol = max(0, min(100, int(self._volume * 100)))
+            return [
+                player,
+                "-nodisp",
+                "-autoexit",
+                "-loglevel",
+                "quiet",
+                "-volume",
+                str(vol),
+                str(path),
+            ]
+        # afplay (macOS default) -- volume is 0.0-1.0 float.
+        return [player, "-v", str(self._volume), str(path)]

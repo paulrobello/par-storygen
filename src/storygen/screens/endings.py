@@ -123,6 +123,10 @@ class EndingsScreen(Screen[None]):
 
     BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
         ("escape", "app.pop_screen", "Back"),
+        ("j", "focus_next_row", "▼ Next"),
+        ("k", "focus_prev_row", "▲ Prev"),
+        ("down", "focus_next_row", "▼ Next"),
+        ("up", "focus_prev_row", "▲ Prev"),
     ]
 
     def __init__(
@@ -133,6 +137,8 @@ class EndingsScreen(Screen[None]):
         super().__init__()
         self._save = save
         self._on_jump = on_jump
+        self._ending_ids: list[str] = [nid for nid in save.endings_reached if nid in save.nodes]
+        self._focused_idx: int = 0
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -164,6 +170,28 @@ class EndingsScreen(Screen[None]):
         self.title = self._save.theme.title
         n = len(self._save.endings_reached)
         self.sub_title = f"Endings ({n} reached)"
+
+    def action_focus_next_row(self) -> None:
+        if not self._ending_ids:
+            return
+        self._focused_idx = min(self._focused_idx + 1, len(self._ending_ids) - 1)
+        self._focus_row(self._focused_idx)
+
+    def action_focus_prev_row(self) -> None:
+        if not self._ending_ids:
+            return
+        self._focused_idx = max(self._focused_idx - 1, 0)
+        self._focus_row(self._focused_idx)
+
+    def _focus_row(self, idx: int) -> None:
+        if idx >= len(self._ending_ids):
+            return
+        node_id = self._ending_ids[idx]
+        try:
+            btn = self.query_one(f"#jump-{node_id}", Button)
+            btn.focus()
+        except Exception:
+            pass
 
     def _build_card(self, node: StoryNode) -> Horizontal:
         """Construct one card (image + narration + breadcrumb + jump button)."""

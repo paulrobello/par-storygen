@@ -7,7 +7,7 @@ After completing each item remove it from this list and update CHANGELOG.md
 ### Story Templates / Presets
 Pre-built story configurations (genre + tone + character archetypes) so users can skip the wizard and jump straight into popular setups like "Haunted Mansion Mystery" or "Space Opera Epic." Could ship 5-6 curated presets and allow user-created presets saved to `$XDG_CONFIG_HOME/storygen/presets/`.
 
- ### Per-Character TTS Voices
+### Per-Character TTS Voices
 Assign distinct TTS voices to individual characters in the character library. When auto-read is enabled and dialogue appears, switch voices per speaker. Store voice assignments in `LibraryCharacter` and pass character tags to the TTS layer.
 
 ### Story Tags / Bookmarks
@@ -51,9 +51,6 @@ Export/import library characters as portable JSON files that can be shared. Add 
 
 ### GitHub CI Pipeline
 Add a GitHub Actions workflow running `make checkall` on PRs and pushes to `main`. Include pyright, ruff, pytest with coverage reporting. Current `release.yml` handles releases but there are no PR quality gates.
-
-### Cross-Platform TTS Playback
-Replace the macOS-only `afplay` subprocess with a cross-platform audio player. Options: `pygame.mixer`, `simpleaudio`, or a `ffplay` subprocess (available on all platforms via ffmpeg). Detect available backends at runtime.
 
 ### Undo Stack
 Maintain an undo stack (last N choices) so users can go back without opening the full graph screen. Add a keybinding (`u`) that pops the stack and navigates to the parent node. Simple to implement given the existing tree structure.
@@ -135,6 +132,9 @@ Ship a Docker image with TUI access via `docker run -it`. Useful for running on 
 ---
 
 ## Completed
+
+### Cross-Platform TTS Playback
+*Completed 2026-05-03.* Replaced the macOS-only `afplay` subprocess with a runtime-detected audio backend. Priority: `ffplay` (cross-platform via ffmpeg) then `afplay` (macOS). Volume conversion handled per backend (ffplay: 0-100 integer, afplay: 0.0-1.0 float). Pause/resume still uses SIGSTOP/SIGCONT on POSIX. Also added vim-style keyboard navigation (j/k/up/down + Enter) to the choice list in PlayScreen, and j/k/up/down row navigation to LoadGameScreen, EndingsScreen, and CharacterCatalogScreen.
 
 ### Dynamic Difficulty / Pacing Control
 *Completed 2026-05-02.* Three-level pacing control (slow / moderate / fast) added to the wizard LENGTH step. Slow = 4-6 paragraph narration, 2 weighty choices. Fast = 1-3 paragraph narration, 3-5 frequent choices. Moderate = current defaults. Escalation thresholds scale per pacing level. Default configurable in Settings. Backward-compatible with existing saves.

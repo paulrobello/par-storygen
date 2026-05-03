@@ -87,6 +87,10 @@ class LoadGameScreen(Screen[None]):
 
     BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
         ("escape", "app.pop_screen", "Back"),
+        ("j", "focus_next_row", "▼ Next"),
+        ("k", "focus_prev_row", "▲ Prev"),
+        ("down", "focus_next_row", "▼ Next"),
+        ("up", "focus_prev_row", "▲ Prev"),
     ]
 
     def __init__(
@@ -107,6 +111,9 @@ class LoadGameScreen(Screen[None]):
         # Regenerate click (or a spurious auto-backfill) doesn't spawn a
         # duplicate generation for the same save.
         self._cover_busy: set[str] = set()
+        # Ordered list of save IDs currently rendered (for keyboard nav).
+        self._saves_order: list[str] = []
+        self._focused_idx: int = 0
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -130,8 +137,10 @@ class LoadGameScreen(Screen[None]):
             return
         self._empty_label.display = False
         self._scroll.display = True
+        self._saves_order: list[str] = []
         for save in saves:
             self._mount_row(save)
+            self._saves_order.append(str(save.id))
         self._auto_backfill_covers(saves)
 
     def _auto_backfill_covers(self, saves: list[GameSave]) -> None:
@@ -215,6 +224,28 @@ class LoadGameScreen(Screen[None]):
             return
         if button_id.startswith("delete-"):
             self._start_delete(button_id[len("delete-") :])
+
+    def action_focus_next_row(self) -> None:
+        if not self._saves_order:
+            return
+        self._focused_idx = min(self._focused_idx + 1, len(self._saves_order) - 1)
+        self._focus_row(self._focused_idx)
+
+    def action_focus_prev_row(self) -> None:
+        if not self._saves_order:
+            return
+        self._focused_idx = max(self._focused_idx - 1, 0)
+        self._focus_row(self._focused_idx)
+
+    def _focus_row(self, idx: int) -> None:
+        if idx >= len(self._saves_order):
+            return
+        game_id = self._saves_order[idx]
+        try:
+            btn = self._scroll.query_one(f"#load-{game_id}", Button)
+            btn.focus()
+        except Exception:
+            pass
 
     def _start_load(self, game_id: str) -> None:
         if self._loading or self._on_save_selected is None:

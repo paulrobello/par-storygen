@@ -227,6 +227,10 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
         ("n", "create_character", "New Char"),
         ("s", "toggle_sort", "Sort"),
         ("t", "import_from_story", "Import Story"),
+        ("j", "focus_next_row", "▼ Next"),
+        ("k", "focus_prev_row", "▲ Prev"),
+        ("down", "focus_next_row", "▼ Next"),
+        ("up", "focus_prev_row", "▲ Prev"),
     ]
 
     def __init__(
@@ -250,6 +254,7 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
         self._creating: bool = False
         self._character_agent_factory = character_agent_factory
         self._image_provider = image_provider
+        self._focused_idx: int = 0
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -270,6 +275,28 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
         """Cycle the sort order between newest-first and alphabetical."""
         self._sort_mode = "name" if self._sort_mode == "newest" else "newest"
         self._rebuild()
+
+    def action_focus_next_row(self) -> None:
+        if not self._entries:
+            return
+        entry_ids = list(self._entries.keys())
+        self._focused_idx = min(self._focused_idx + 1, len(entry_ids) - 1)
+        self._focus_entry_row(entry_ids[self._focused_idx])
+
+    def action_focus_prev_row(self) -> None:
+        if not self._entries:
+            return
+        entry_ids = list(self._entries.keys())
+        self._focused_idx = max(self._focused_idx - 1, 0)
+        self._focus_entry_row(entry_ids[self._focused_idx])
+
+    def _focus_entry_row(self, entry_id: str) -> None:
+        # Focus the Edit button (always present) in the target row.
+        try:
+            btn = self._scroll.query_one(f"#edit-{entry_id}", Button)
+            btn.focus()
+        except Exception:
+            pass
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         if action in ("create_character", "import_from_story"):
@@ -480,6 +507,7 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
     def _rebuild(self) -> None:
         """Re-populate the scroll container from the current library state."""
         self._scroll.remove_children()
+        self._focused_idx = 0
         entries = self._sort_entries(list_library_characters())
         # Cache entries keyed by id so click handlers can avoid a second
         # `list_library_characters()` round-trip (and the render/click race
