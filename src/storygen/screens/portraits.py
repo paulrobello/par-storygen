@@ -572,14 +572,13 @@ class PortraitsScreen(Screen[None]):
         save_id = str(self._save.id)
         try:
             ref_bytes: bytes | None = None
-            if result.use_current_as_ref:
-                if char.portrait_path:
-                    try:
-                        abs_path = paths.safe_join(paths.game_dir(save_id), char.portrait_path)
-                        if abs_path.exists():
-                            ref_bytes = abs_path.read_bytes()
-                    except ValueError:
-                        pass
+            if result.use_current_as_ref and char.portrait_path:
+                try:
+                    abs_path = paths.safe_join(paths.game_dir(save_id), char.portrait_path)
+                    if abs_path.exists():
+                        ref_bytes = abs_path.read_bytes()
+                except ValueError:
+                    pass
             png_bytes = await self._image_provider.generate_portrait(
                 description,
                 transparent=True,
