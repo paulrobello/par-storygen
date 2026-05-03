@@ -59,10 +59,7 @@ class StyleGalleryScreen(Screen[None]):
 
                 yield Label("Providers to compare:")
                 for pid, pname, default_model in _PROVIDER_OPTIONS:
-                    has_key = (
-                        pid == "ollama"
-                        or bool(os.environ.get(_API_KEY_ENV.get(pid, ""), ""))
-                    )
+                    has_key = pid == "ollama" or bool(os.environ.get(_API_KEY_ENV.get(pid, ""), ""))
                     label = f"{pname} ({default_model})"
                     if not has_key:
                         label += " — no API key"
@@ -143,8 +140,7 @@ class StyleGalleryScreen(Screen[None]):
             except Exception as exc:
                 elapsed = time.monotonic() - start
                 card.update(
-                    f"[bold]{pname}[/bold] ({default_model})\n"
-                    f"[red]Error: {exc}[/] ({elapsed:.1f}s)"
+                    f"[bold]{pname}[/bold] ({default_model})\n[red]Error: {exc}[/] ({elapsed:.1f}s)"
                 )
 
     def _get_api_key(self, provider: str) -> str | None:

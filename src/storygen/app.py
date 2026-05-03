@@ -581,3 +581,22 @@ class StoryGenApp(App[None]):
                 tts_player=self._tts_player,
             )
         )
+        # Show recap for loaded games (not fresh wizard saves)
+        has_progress = len(save.nodes) > 1
+        if has_progress:
+
+            async def _show_resume_recap() -> None:
+                await asyncio.sleep(0.5)
+                screen = self.screen
+                if isinstance(screen, PlayScreen):
+                    node = screen._save.nodes[screen._save.current_node_id]  # pyright: ignore[reportPrivateUsage]
+                    if node.recap_text:
+                        from storygen.screens._recap_modal import RecapModal
+
+                        self.push_screen(RecapModal(node.recap_text))  # pyright: ignore[reportUnknownMemberType]
+                    else:
+                        screen.run_worker(screen.action_recap(), name="resume-recap")
+
+            _recap_task: asyncio.Task[None] = asyncio.create_task(_show_resume_recap())
+            _background_tasks.add(_recap_task)
+            _recap_task.add_done_callback(_background_tasks.discard)
