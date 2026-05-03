@@ -289,18 +289,12 @@ class GraphScreen(Screen[None]):
         msg = f"Prune this branch? ({', '.join(parts)} will be deleted)"
         self.app.push_screen(  # pyright: ignore[reportUnknownMemberType]
             ConfirmModal(msg, confirm_label="Prune"),
-            self._on_prune_confirm,
+            lambda result: self._on_prune_confirm(result, node_id=node_id),
         )
 
-    def _on_prune_confirm(self, result: bool | None) -> None:
+    def _on_prune_confirm(self, result: bool | None, *, node_id: str) -> None:
         """Handle the prune confirmation dialog response."""
         if not result:
-            return
-        cursor = self._tree.cursor_node
-        if cursor is None or cursor.data is None:
-            return
-        node_id = cursor.data.get("node_id")
-        if not isinstance(node_id, str):
             return
         try:
             prune_subtree(self._save, node_id=node_id)
