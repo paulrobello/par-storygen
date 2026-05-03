@@ -585,9 +585,6 @@ class BeatPipeline:
             current_image_as_ref: If True, read the current image from disk and
                 prepend it to the reference portraits list.
             callbacks: Per-call UI callbacks.
-
-        Raises:
-            ValueError: if the node has no stored ``image_path`` to read.
         """
         cb = callbacks if callbacks is not None else self._callbacks
         node = save.nodes[node_id]

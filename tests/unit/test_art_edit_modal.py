@@ -7,7 +7,7 @@ from textual.app import App
 from textual.screen import Screen
 from textual.widgets import Button, Checkbox, RadioButton, RadioSet, TextArea
 
-from storygen.screens._art_edit_modal import ArtEditMode, ArtEditModal, ArtEditResult
+from storygen.screens._art_edit_modal import ArtEditModal, ArtEditMode, ArtEditResult
 
 _UNSET: ArtEditResult | None = None
 
