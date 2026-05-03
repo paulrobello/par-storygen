@@ -27,6 +27,7 @@ class MenuScreen(Screen[None]):
 
     BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
         ("n", "new_story", "New Story"),
+        ("k", "quick_start", "Quick Start"),
         ("l", "load_story", "Existing Stories"),
         ("c", "characters", "Characters"),
         ("s", "settings", "Settings"),
@@ -37,6 +38,7 @@ class MenuScreen(Screen[None]):
         yield Header(show_clock=False)
         with Vertical(id="menu"):
             yield Button("New Story", id="btn-new")
+            yield Button("Quick Start", id="btn-quick", variant="success")
             yield Button("Existing Stories", id="btn-load")
             yield Button("Characters", id="btn-characters")
             yield Button("Settings", id="btn-settings")
@@ -51,6 +53,14 @@ class MenuScreen(Screen[None]):
             app.push_screen(app._make_wizard())  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType]
         else:
             app.push_screen("wizard")  # pyright: ignore[reportUnknownMemberType]
+
+    def action_quick_start(self) -> None:
+        from storygen.core.presets import load_all_presets
+
+        if not load_all_presets():
+            self.notify("No presets available", severity="warning", timeout=5)
+            return
+        self.app.push_screen("preset_picker")  # pyright: ignore[reportUnknownMemberType]
 
     def action_load_story(self) -> None:
         self.app.push_screen("load")  # pyright: ignore[reportUnknownMemberType]
@@ -67,6 +77,7 @@ class MenuScreen(Screen[None]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         actions = {
             "btn-new": self.action_new_story,
+            "btn-quick": self.action_quick_start,
             "btn-load": self.action_load_story,
             "btn-characters": self.action_characters,
             "btn-settings": self.action_settings,

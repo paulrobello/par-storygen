@@ -34,6 +34,7 @@ from storygen.screens.library_browser import CharacterCatalogScreen
 from storygen.screens.load import LoadGameScreen
 from storygen.screens.menu import MenuScreen
 from storygen.screens.play import PlayScreen
+from storygen.screens.preset_picker import PresetPickerScreen
 from storygen.screens.settings import (
     ImageProviderChanged,
     SettingsScreen,
@@ -177,6 +178,7 @@ class StoryGenApp(App[None]):
 
     def on_mount(self) -> None:
         self.install_screen(MenuScreen(), name="menu")  # pyright: ignore[reportUnknownMemberType]
+        self.install_screen(PresetPickerScreen(), name="preset_picker")  # pyright: ignore[reportUnknownMemberType]
         self.install_screen(self._make_wizard, name="wizard")  # pyright: ignore[reportUnknownMemberType,reportArgumentType]
         self.install_screen(self._make_load, name="load")  # pyright: ignore[reportUnknownMemberType,reportArgumentType]
         self.install_screen(lambda: SettingsScreen(self._config, self._tts_player), name="settings")  # pyright: ignore[reportUnknownMemberType,reportArgumentType]
