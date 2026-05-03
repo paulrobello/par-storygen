@@ -12,6 +12,7 @@ from storygen.core.models import (
     NarrationStyle,
     Pacing,
     ReaderLevel,
+    Recap,
     StoryBeat,
     Summary,
     Theme,
@@ -109,6 +110,15 @@ def build_summary_agent(model: Model) -> Agent[None, Summary]:
         model=model,
         output_type=Summary,
         system_prompt=prompts.summary_system_prompt(),
+    )
+
+
+def build_recap_agent(model: Model) -> Agent[None, Recap]:
+    """Build an agent that writes a 'Previously on...' recap."""
+    return Agent(
+        model=model,
+        output_type=Recap,
+        system_prompt=prompts.recap_system_prompt(),
     )
 
 
