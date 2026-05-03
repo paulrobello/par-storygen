@@ -11,13 +11,16 @@ an :class:`ArtEditResult` on Generate, or ``None`` on Cancel/Escape.
 from __future__ import annotations
 
 import io
+import tempfile
 from enum import StrEnum
+from pathlib import Path
 from typing import ClassVar
 
 from PIL import Image
 from pydantic import BaseModel
 from rich_pixels import Pixels
 from textual.app import ComposeResult
+from textual.events import Click
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Checkbox, RadioButton, RadioSet, Static, TextArea
@@ -67,6 +70,9 @@ class ArtEditModal(Screen[ArtEditResult | None]):
     ArtEditModal #art-edit-thumb {
         height: auto;
         margin-bottom: 1;
+    }
+    ArtEditModal .clickable-thumb:hover {
+        background: $surface-lighten-1;
     }
     ArtEditModal #art-edit-mode-label {
         margin-top: 1;
@@ -134,11 +140,13 @@ class ArtEditModal(Screen[ArtEditResult | None]):
     def compose(self) -> ComposeResult:
         with Vertical(id="art-edit-box"):
             yield Static("Edit Art", id="art-edit-title")
-            # Thumbnail preview
+            # Thumbnail preview — clickable to open full-res
             if self._image_bytes:
                 thumb = _render_thumb(self._image_bytes)
                 if thumb:
-                    yield Static(thumb, id="art-edit-thumb")
+                    yield Static(
+                        thumb, id="art-edit-thumb", classes="clickable-thumb"
+                    )
             # Mode selector
             yield Static("Mode:", id="art-edit-mode-label")
             yield self._mode_radios
@@ -193,3 +201,15 @@ class ArtEditModal(Screen[ArtEditResult | None]):
 
     def action_cancel(self) -> None:
         self.dismiss(None)
+
+    def on_click(self, event: Click) -> None:
+        """Click the thumbnail to open the full-res image in system viewer."""
+        if self._image_bytes is None:
+            return
+        widget, _region = self.get_widget_at(event.screen_x, event.screen_y)
+        if widget.has_class("clickable-thumb"):
+            from storygen.util import open_in_system_viewer
+
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+                f.write(self._image_bytes)
+                open_in_system_viewer(Path(f.name))
