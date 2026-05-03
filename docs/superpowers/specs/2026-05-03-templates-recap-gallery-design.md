@@ -156,7 +156,7 @@ New `StyleGalleryScreen` installed in `app.py`. Accessible via a "Style Gallery"
    - Provider name + model name
    - Generation time (seconds)
    - Estimated cost (from `pricing.py`)
-   - "Use This Provider" button that writes the provider choice to app state and posts `ImageProviderChanged`
+   - "Use This Provider" button that sets the scene (art) image provider in app state and posts `ImageProviderChanged`. Portrait provider is not changed — that's a separate setting.
 
 ### Caching
 
