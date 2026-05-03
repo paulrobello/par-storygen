@@ -274,6 +274,8 @@ body {
   text-align: justify;
   hyphens: auto;
 }
+.narration p { margin-bottom: 1em; }
+.narration p:last-child { margin-bottom: 0; }
 
 /* ── Audio Player ──────────────────────────────────────────────── */
 .audio-player {
@@ -575,7 +577,7 @@ body {
 <!-- Bottom Navigation -->
 <nav class="bottom-nav">
   <button class="bottom-nav__btn" id="prevBtn" disabled>&larr; Previous</button>
-  <button class="bottom-nav__btn" id="autoReadBtn">Auto-Read</button>
+  <button class="bottom-nav__btn" id="autoReadBtn"{{ ' disabled' if not has_any_audio }}>Auto-Read</button>
   <button class="bottom-nav__btn" id="nextBtn">Next &rarr;</button>
 </nav>
 
@@ -628,16 +630,23 @@ function renderPage(index) {
   }
 
   // Narration
-  html += '<div class="narration">' + escapeHtml(p.narration) + '</div>';
-
-  // Audio player
-  html += '<div class="audio-player' + (p.audio_url ? ' visible' : '') + '" id="audioPlayer">';
-  html += '  <button class="audio-player__btn" id="audioPlayBtn">&#9654;</button>';
-  html += '  <div class="audio-player__seek-wrap">';
-  html += '    <input type="range" class="audio-player__seek" id="audioSeek" min="0" max="100" value="0" step="0.1" />';
-  html += '    <div class="audio-player__time" id="audioTime">0:00 / 0:00</div>';
-  html += '  </div>';
+  var paras = escapeHtml(p.narration).split(/\n\n+/);
+  html += '<div class="narration">';
+  for (var i = 0; i < paras.length; i++) {
+    html += '<p>' + paras[i].replace(/\n/g, '<br>') + '</p>';
+  }
   html += '</div>';
+
+  // Audio player (only when story has audio)
+  if (HAS_ANY_AUDIO) {
+    html += '<div class="audio-player' + (p.audio_url ? ' visible' : '') + '" id="audioPlayer">';
+    html += '  <button class="audio-player__btn" id="audioPlayBtn">&#9654;</button>';
+    html += '  <div class="audio-player__seek-wrap">';
+    html += '    <input type="range" class="audio-player__seek" id="audioSeek" min="0" max="100" value="0" step="0.1" />';
+    html += '    <div class="audio-player__time" id="audioTime">0:00 / 0:00</div>';
+    html += '  </div>';
+    html += '</div>';
+  }
 
   // The End marker
   if (p.is_ending) {
@@ -659,7 +668,7 @@ function renderPage(index) {
   currentAudioPlayed = false;
 
   // Wire audio
-  wireAudio(p);
+  if (HAS_ANY_AUDIO) wireAudio(p);
 }
 
 function escapeHtml(str) {
@@ -713,6 +722,10 @@ function wireAudio(page) {
     audioEl.currentTime = 0;
     if (autoReadActive && currentIndex < TOTAL - 1) {
       nextPage();
+    } else if (autoReadActive) {
+      autoReadActive = false;
+      autoReadBtn.textContent = 'Auto-Read';
+      autoReadBtn.classList.remove('bottom-nav__btn--active');
     }
   };
 
@@ -785,19 +798,18 @@ function handleAutoReadAdvance() {
   if (!autoReadActive) return;
 
   const page = PAGES[currentIndex];
-  if (page.is_ending) {
+
+  if (page.audio_url && !currentAudioPlayed) {
+    // Audio pages: autoplay; on 'ended' it advances or stops auto-read
+    currentAudioPlayed = true;
+    audioEl.play().catch(function() {});
+  } else if (page.is_ending) {
+    // Ending page (no audio or audio already played): stop auto-read
     autoReadActive = false;
     autoReadBtn.textContent = 'Auto-Read';
     autoReadBtn.classList.remove('bottom-nav__btn--active');
-    return;
-  }
-
-  if (page.audio_url && !currentAudioPlayed) {
-    // Audio pages: autoplay and advance on 'ended'
-    currentAudioPlayed = true;
-    audioEl.play().catch(function() {});
   } else {
-    // Non-audio pages: wait auto_read_delay seconds
+    // Non-audio, non-ending pages: wait auto_read_delay seconds then advance
     clearAutoReadTimer();
     autoReadTimer = setTimeout(function() {
       if (autoReadActive && currentIndex < TOTAL - 1) {

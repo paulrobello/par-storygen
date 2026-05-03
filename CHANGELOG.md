@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Dynamic pacing control** — Choose Slow / Moderate / Fast pacing when creating a story. Slow produces longer narration with fewer but weightier choices. Fast produces shorter narration with more frequent choices. Pacing also adjusts story escalation thresholds. Configurable per-story in the wizard LENGTH step and as a default in Settings.
+- **Reference image support in library browser** — Set, change, or remove a reference image for any library character directly from the browser. Supports "use as-is" and "style transfer" modes. Reference images are stored per-character and passed to portrait regeneration and new character creation.
+- **Reference image in character creation modal** — New optional reference image input when creating a character from the library. Supports file browse with live preview and passes the reference to portrait generation.
+- **Stored reference images passed to regeneration** — Portrait regeneration and outfit generation in both the portraits screen and library browser now load and pass stored reference images to the image provider, ensuring regenerated portraits stay visually consistent.
+
+### Fixed
+
+- **Auto-select setting starts auto-play** — The persisted "Auto-select choices" setting in Settings now actually triggers auto-play on mount and screen resume. Previously enabling it had no effect until the user manually pressed `a`.
+- **Export book auto-read on last page** — Auto-read now plays audio on the final (ending) page before stopping, instead of stopping immediately without reading it.
+- **Export book auto-read stops cleanly on last page** — When audio ends on the final page, auto-read now resets the button to "Auto-Read" instead of leaving it stuck on "Stop".
+- **Export book hides audio controls when story has no audio** — Auto-Read button is disabled and audio player HTML is omitted when the exported story has no TTS audio, avoiding empty UI elements.
 
 ## [0.3.1] - 2026-05-01
 
@@ -152,7 +162,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings screen** — persisted in-app configuration for provider defaults, art toggle, streaming, prefetch options, and wizard defaults
 - **Save/resume** — `--resume` flag re-opens the last-played save; full game state persistence
 
-[Unreleased]: https://github.com/paulrobello/par-storygen/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/paulrobello/par-storygen/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/paulrobello/par-storygen/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/paulrobello/par-storygen/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/paulrobello/par-storygen/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/paulrobello/par-storygen/compare/v0.2.0...v0.2.1
