@@ -566,6 +566,58 @@ class BeatPipeline:
             save, node_id, node.image_prompt, list(node.featured_character_ids), cb=cb
         )
 
+    async def edit_scene(
+        self,
+        save: GameSave,
+        *,
+        node_id: str,
+        new_prompt: str,
+        current_image_as_ref: bool = True,
+        callbacks: PipelineCallbacks | None = None,
+    ) -> StoryNode:
+        """Regenerate the scene image with a modified prompt.
+
+        Like :meth:`retry_scene` but accepts a new prompt and optionally uses
+        the current scene image as an additional reference for the provider.
+
+        Args:
+            new_prompt: The replacement image prompt.
+            current_image_as_ref: If True, read the current image from disk and
+                prepend it to the reference portraits list.
+            callbacks: Per-call UI callbacks.
+
+        Raises:
+            ValueError: if the node has no stored ``image_path`` to read.
+        """
+        cb = callbacks if callbacks is not None else self._callbacks
+        node = save.nodes[node_id]
+        if not app_state.art_enabled():
+            return node
+
+        save_id = str(save.id)
+        dest = paths.node_image_path(save_id, node_id)
+        rel_path = str(dest.relative_to(paths.game_dir(save_id)))
+
+        # Update the stored prompt before rendering.
+        updated = node.model_copy(
+            update={
+                "image_prompt": new_prompt,
+                "image_status": "generating",
+                "image_path": rel_path,
+            }
+        )
+        save.nodes[node_id] = updated
+        save_game(save)
+
+        return await self._render_scene(
+            save,
+            node_id,
+            new_prompt,
+            list(node.featured_character_ids),
+            cb=cb,
+            current_image_as_ref=current_image_as_ref,
+        )
+
     async def _run_stage_2_and_3(
         self,
         save: GameSave,
@@ -735,10 +787,11 @@ class BeatPipeline:
         featured_character_ids: list[str],
         *,
         cb: PipelineCallbacks,
+        current_image_as_ref: bool = False,
     ) -> StoryNode:
         """Stream a scene image to disk and fire UI callbacks; return final node.
 
-        Shared implementation for :meth:`retry_scene` and
+        Shared implementation for :meth:`retry_scene`, :meth:`edit_scene`, and
         :meth:`_stage_3_scene`. Both callers must pre-assign ``image_path``
         (and optionally ``image_status``) before calling this method.
 
@@ -759,6 +812,16 @@ class BeatPipeline:
 
         try:
             refs: list[bytes] = []
+            # Optionally prepend the current scene image as the first reference.
+            if current_image_as_ref:
+                cur_node = save.nodes[node_id]
+                if cur_node.image_path:
+                    try:
+                        cur_path = paths.safe_join(paths.game_dir(save_id), cur_node.image_path)
+                        if cur_path.exists():
+                            refs.append(cur_path.read_bytes())
+                    except ValueError:
+                        pass
             for cid in featured_character_ids:
                 for c in save.characters:
                     if c.id == cid and c.portrait_path:

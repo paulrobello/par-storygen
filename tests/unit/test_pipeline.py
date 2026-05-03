@@ -2008,3 +2008,195 @@ async def test_pipeline_no_llm_cache_when_disabled(
 
     # The llm/ directory should not have been created at all.
     assert not llm_cache_dir(str(save.id)).exists()
+
+
+# --- edit_scene tests ----------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_pipeline_edit_scene_replaces_prompt(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """edit_scene uses the new prompt and optionally passes current image as ref."""
+    save = _bootstrap_save(tmp_path, monkeypatch)
+    from datetime import datetime
+
+    failed_node = StoryNode(
+        id="edit-node",
+        parent_id="root",
+        chosen_choice_id="c1",
+        chosen_at=datetime.now(UTC),
+        narration="A stormy night.",
+        choices=[],
+        is_major=True,
+        is_ending=True,
+        image_prompt="dark castle on a hill",
+        image_path=None,
+        image_status="done",
+        illustration_reasoning="moody establishing shot",
+        featured_character_ids=[],
+        summary_to_here=None,
+        created_at=datetime.now(UTC),
+    )
+    save.nodes["edit-node"] = failed_node
+    save.nodes["root"].choices[0].child_node_id = "edit-node"
+    save_game(save)
+
+    image_provider = FakeImageProvider()
+    pipeline = BeatPipeline(
+        beat_agent=FakeBeatAgent(
+            StoryBeat(narration="x", choices=[], is_major=False, is_ending=True)
+        ),
+        illustration_agent=FakeIllustrationAgent(
+            IllustrationPlan(
+                should_illustrate=True,
+                image_prompt="",
+                featured_character_ids=[],
+                reasoning="",
+            )
+        ),
+        summary_agent=None,
+        image_provider=image_provider,
+        callbacks=PipelineCallbacks(),
+    )
+
+    result = await pipeline.edit_scene(
+        save,
+        node_id="edit-node",
+        new_prompt="dark castle on a hill with lightning",
+    )
+
+    assert len(image_provider.scenes) == 1
+    assert image_provider.scenes[0][0] == "dark castle on a hill with lightning"
+    assert result.image_status == "done"
+    assert result.image_path is not None
+    # The stored prompt should be updated.
+    assert save.nodes["edit-node"].image_prompt == "dark castle on a hill with lightning"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_edit_scene_includes_current_image_as_ref(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """edit_scene with current_image_as_ref=True prepends the existing image."""
+    save = _bootstrap_save(tmp_path, monkeypatch)
+    from datetime import datetime
+
+    edit_node = StoryNode(
+        id="edit-node",
+        parent_id="root",
+        chosen_choice_id="c1",
+        chosen_at=datetime.now(UTC),
+        narration="A stormy night.",
+        choices=[],
+        is_major=True,
+        is_ending=True,
+        image_prompt="dark castle",
+        image_path="images/nodes/edit-node.png",
+        image_status="done",
+        illustration_reasoning="",
+        featured_character_ids=[],
+        summary_to_here=None,
+        created_at=datetime.now(UTC),
+    )
+    save.nodes["edit-node"] = edit_node
+    save.nodes["root"].choices[0].child_node_id = "edit-node"
+    # Write a dummy existing image so edit_scene can read it.
+    from storygen.storage import paths as _paths
+
+    img_dir = _paths.game_dir(str(save.id)) / "images" / "nodes"
+    img_dir.mkdir(parents=True, exist_ok=True)
+    (img_dir / "edit-node.png").write_bytes(b"EXISTING-PNG")
+    save_game(save)
+
+    image_provider = FakeImageProvider()
+    pipeline = BeatPipeline(
+        beat_agent=FakeBeatAgent(
+            StoryBeat(narration="x", choices=[], is_major=False, is_ending=True)
+        ),
+        illustration_agent=FakeIllustrationAgent(
+            IllustrationPlan(
+                should_illustrate=True,
+                image_prompt="",
+                featured_character_ids=[],
+                reasoning="",
+            )
+        ),
+        summary_agent=None,
+        image_provider=image_provider,
+        callbacks=PipelineCallbacks(),
+    )
+
+    await pipeline.edit_scene(
+        save,
+        node_id="edit-node",
+        new_prompt="castle with moonlight",
+        current_image_as_ref=True,
+    )
+
+    assert len(image_provider.scenes) == 1
+    # 1 ref = the existing scene image prepended.
+    assert image_provider.scenes[0][1] == 1
+
+
+@pytest.mark.asyncio
+async def test_pipeline_edit_scene_skips_when_art_disabled(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """edit_scene must be a no-op when art is globally disabled."""
+    save = _bootstrap_save(tmp_path, monkeypatch)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    from datetime import datetime
+
+    from storygen.storage import app_state
+
+    edit_node = StoryNode(
+        id="edit-node",
+        parent_id="root",
+        chosen_choice_id="c1",
+        chosen_at=datetime.now(UTC),
+        narration="x",
+        choices=[],
+        is_major=True,
+        is_ending=True,
+        image_prompt="castle",
+        image_path=None,
+        image_status="done",
+        illustration_reasoning="",
+        featured_character_ids=[],
+        summary_to_here=None,
+        created_at=datetime.now(UTC),
+    )
+    save.nodes["edit-node"] = edit_node
+    save_game(save)
+
+    image_provider = FakeImageProvider()
+    pipeline = BeatPipeline(
+        beat_agent=FakeBeatAgent(
+            StoryBeat(narration="x", choices=[], is_major=False, is_ending=True)
+        ),
+        illustration_agent=FakeIllustrationAgent(
+            IllustrationPlan(
+                should_illustrate=True,
+                image_prompt="",
+                featured_character_ids=[],
+                reasoning="",
+            )
+        ),
+        summary_agent=None,
+        image_provider=image_provider,
+        callbacks=PipelineCallbacks(),
+    )
+
+    app_state.set_art_enabled(False)
+
+    result = await pipeline.edit_scene(
+        save,
+        node_id="edit-node",
+        new_prompt="castle with moonlight",
+    )
+    assert len(image_provider.scenes) == 0
+    assert result.image_status == "done"
+
+    # Restore
+    app_state.set_art_enabled(True)
