@@ -60,7 +60,9 @@ class ImagePanel(Static):
         self._image_path = None
         self.panel_state = ImagePanelState.GENERATING
         self.display = True
-        self.update("generating illustration...")
+        self.update(
+            "\n\n\n\n\n\n\n\n\n  generating illustration...\n"
+        )
         self._start_throbber()
 
     def show_failed(self) -> None:
