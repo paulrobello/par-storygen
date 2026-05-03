@@ -394,6 +394,7 @@ class SettingsScreen(Screen[None]):
             yield self._suggested
 
             yield Static("Art generation provider (scenes + covers)", classes="section")
+            yield Button("Open Style Gallery", id="btn-style-gallery", variant="primary")
             yield Label("Provider")
             yield self._image_provider_select
             yield Label("Model")
@@ -1064,6 +1065,9 @@ class SettingsScreen(Screen[None]):
         self._refresh_image_gating()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-style-gallery":
+            self.app.push_screen("style_gallery")
+            return
         bid = event.button.id
         if bid == "btn-save":
             self._save_settings()
