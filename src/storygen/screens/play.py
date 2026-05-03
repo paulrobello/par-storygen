@@ -169,6 +169,19 @@ class PlayScreen(Screen[None]):
     def on_mount(self) -> None:
         self._render_current()
         self._apply_header()
+        self._maybe_auto_start_select()
+
+    def _maybe_auto_start_select(self) -> None:
+        """Start auto-select if the persisted setting is enabled and not already running."""
+        if self._auto_selecting or self._loading or self._pipeline is None:
+            return
+        if not app_state.auto_select_enabled():
+            return
+        node = self._save.nodes.get(self._save.current_node_id)
+        if node is None or node.is_ending or not node.choices:
+            return
+        self._auto_selecting = True
+        self.run_worker(self._auto_select_next(), exclusive=True, name="auto-select")
 
     async def on_unmount(self) -> None:
         """Cancel any in-flight prefetch tasks and TTS before the screen tears down.
@@ -594,6 +607,7 @@ class PlayScreen(Screen[None]):
         sidebar needs to reflect the new portrait paths.
         """
         self._render_current()
+        self._maybe_auto_start_select()
 
     async def action_pick(self, n: int) -> None:
         """Pick choice number n (1-indexed). Bound to number keys 1-9."""

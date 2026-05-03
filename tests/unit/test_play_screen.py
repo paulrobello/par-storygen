@@ -579,7 +579,10 @@ async def test_speak_current_node_refreshes_stale_tts_audio_path_after_success(
 
 
 @pytest.mark.asyncio
-async def test_tts_controls_available_while_autoplay_loading() -> None:
+async def test_tts_controls_available_while_autoplay_loading(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(app_state, "auto_select_enabled", lambda: False)
     save = _minimal_save()
     player = _ConfiguredTTSPlayer()
     player._state = TTSState.PLAYING  # pyright: ignore[reportPrivateUsage]
