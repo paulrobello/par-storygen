@@ -4,17 +4,11 @@ After completing each item remove it from this list and update CHANGELOG.md
 
 ## Gameplay & Narrative
 
-### Story Templates / Presets
-Pre-built story configurations (genre + tone + character archetypes) so users can skip the wizard and jump straight into popular setups like "Haunted Mansion Mystery" or "Space Opera Epic." Could ship 5-6 curated presets and allow user-created presets saved to `$XDG_CONFIG_HOME/storygen/presets/`.
-
 ### Per-Character TTS Voices
 Assign distinct TTS voices to individual characters in the character library. When auto-read is enabled and dialogue appears, switch voices per speaker. Store voice assignments in `LibraryCharacter` and pass character tags to the TTS layer.
 
 ### Story Tags / Bookmarks
 Let players tag nodes with custom labels ("plot twist," "favorite scene," "scary part") for quick navigation via the graph screen. Tags persist in the save file as a `dict[str, list[str]]` mapping node IDs to user labels.
-
-### Narrative Recap / "Previously On..."
-Generate a short summary of the last N beats when resuming a saved game (or on demand via keybinding). The `build_summary_agent` already exists for cover blurbs — extend it to produce "previously on" recaps weighted toward recent events.
 
 ### Character Relationship Tracking
 Track relationships between characters (ally, rival, neutral, romantic) as the story progresses. The beat agent could maintain a relationship matrix and let the LLM evolve dynamics over time. Display relationships in the character sheet sidebar.
@@ -26,9 +20,6 @@ Layer background audio on top of TTS narration. Ship a few royalty-free ambient 
 
 ### Full-Color Image Rendering (kitty / iTerm2)
 Detect terminal protocol support (kitty graphics, iTerm2 inline images, sixel) and render full-color images instead of half-block when available. Fall back to half-block for unsupported terminals. Rich-pixels already supports some of these protocols.
-
-### Image Style Gallery
-A settings preview screen showing the same character portrait rendered in each available image provider/style so users can compare quality and pick the best fit before committing to a full story.
 
 ### Animated Scene Transitions
 Smooth fade or dissolve effect between scene images using terminal animation primitives. Could use a sequence of partial-image frames rendered in rapid succession on image swap.
@@ -132,6 +123,15 @@ Ship a Docker image with TUI access via `docker run -it`. Useful for running on 
 ---
 
 ## Completed
+
+### Story Templates / Presets
+*Completed 2026-05-03.* Six curated story presets (Haunted Mansion, Space Opera, Dragon's Quest, Noir Detective, Enchanted Forest, Zombie Apocalypse) bundled as TOML files. "Quick Start" button on menu screen launches directly into a preset. "Load Preset" button on wizard THEME step auto-fills all fields. "Save as Preset" on CONFIRM step saves custom presets to `$XDG_CONFIG_HOME/storygen/presets/`. Custom presets discovered alongside curated ones.
+
+### Narrative Recap / "Previously On..."
+*Completed 2026-05-03.* On-demand recap via `Shift+R` in PlayScreen generates a dramatic "Previously on..." summary of the story so far. Auto-recap (configurable in Settings) shows a recap every N major beats. Recap automatically shown when resuming a saved game. Generated recaps cached per-node in the save file. Save migration v1→v2 adds the `recap_text` field.
+
+### Image Style Gallery
+*Completed 2026-05-03.* New "Style Gallery" accessible from Settings. Users pick a character description, select 2-4 image providers to compare, and generate portraits side-by-side. Shows provider name, model, generation time, and estimated cost for each. Supports OpenAI, Gemini, Z.AI, and Ollama providers.
 
 ### Cross-Platform TTS Playback
 *Completed 2026-05-03.* Replaced the macOS-only `afplay` subprocess with a runtime-detected audio backend. Priority: `ffplay` (cross-platform via ffmpeg) then `afplay` (macOS). Volume conversion handled per backend (ffplay: 0-100 integer, afplay: 0.0-1.0 float). Pause/resume still uses SIGSTOP/SIGCONT on POSIX. Also added vim-style keyboard navigation (j/k/up/down + Enter) to the choice list in PlayScreen, and j/k/up/down row navigation to LoadGameScreen, EndingsScreen, and CharacterCatalogScreen.
