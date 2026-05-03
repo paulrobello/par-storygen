@@ -199,9 +199,7 @@ async def test_regenerate_uses_reference_image_when_present(
     )
     char = save.characters[0]
     ref_rel = f"images/characters/{char.id}-ref.png"
-    save.characters = [
-        char.model_copy(update={"reference_image_path": ref_rel})
-    ]
+    save.characters = [char.model_copy(update={"reference_image_path": ref_rel})]
     save_game(save)
     # Write the ref image to disk so the worker can load it.
     ref_abs = paths.game_dir(str(save.id)) / ref_rel
@@ -983,6 +981,43 @@ async def test_edit_modal_physical_change_notifies_warning(
     assert "Updated" in first_body
     assert "Portrait no longer matches" in second_body
     assert notifications[1][1].get("severity") == "warning"
+
+
+@pytest.mark.asyncio
+async def test_outfit_uses_reference_image_when_present(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Creating an outfit passes stored reference_image to generate_portrait."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    save = _save_with_portrait_on_disk()
+    save.character_image_config = ImageProviderConfig(
+        provider="gemini", model="gemini-3.1-flash-image-preview"
+    )
+    char = save.characters[0]
+    ref_rel = f"images/characters/{char.id}-ref.png"
+    save.characters = [char.model_copy(update={"reference_image_path": ref_rel})]
+    char = save.characters[0]  # updated copy with reference_image_path
+    save_game(save)
+    ref_abs = paths.game_dir(str(save.id)) / ref_rel
+    ref_abs.parent.mkdir(parents=True, exist_ok=True)
+    ref_abs.write_bytes(_PNG_BYTES)
+
+    provider = FakeImageProvider()
+    app = _Harness(save, provider)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = cast(PortraitsScreen, app.screen)
+        screen._create_outfit_worker(  # pyright: ignore[reportPrivateUsage]
+            char,
+            OutfitCreateRequest(name="Armor", description="shiny plate armor"),
+        )
+        for _ in range(40):
+            await pilot.pause()
+            reloaded = load_game(str(save.id))
+            if any(o.name == "Armor" for o in reloaded.characters[0].outfits):
+                break
+
+    assert provider.ref_calls == [_PNG_BYTES]
 
 
 # --------------------------------------------------------------------------
