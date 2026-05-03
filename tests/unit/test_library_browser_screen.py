@@ -481,3 +481,63 @@ async def test_regenerate_uses_reference_image_when_present(
                 break
 
     assert provider.ref_calls == [_PNG_BYTES]
+
+
+@pytest.mark.asyncio
+async def test_ref_image_button_renders_without_ref(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Character without ref shows 'Ref Image' button, no 'Rm Ref'."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    char = _make_lib_char()
+    save_library_character(char, _PNG_BYTES)
+
+    app = _BrowseHarness()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        ref_btn = app.screen.query_one(f"#ref-{char.id}", Button)
+        assert "Ref Image" in str(ref_btn.label)
+        rm_btns = app.screen.query(f"#rm-ref-{char.id}")
+        assert len(rm_btns) == 0
+
+
+@pytest.mark.asyncio
+async def test_ref_image_button_changes_label_with_ref(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Character with ref shows 'Change Ref' and 'Rm Ref' buttons."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    char = _make_lib_char()
+    save_library_character(char, _PNG_BYTES, reference_bytes=_PNG_BYTES)
+
+    app = _BrowseHarness()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        ref_btn = app.screen.query_one(f"#ref-{char.id}", Button)
+        assert "Change Ref" in str(ref_btn.label)
+        rm_btn = app.screen.query_one(f"#rm-ref-{char.id}", Button)
+        assert rm_btn is not None
+
+
+@pytest.mark.asyncio
+async def test_remove_ref_clears_reference_path(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Rm Ref button clears reference_image_path and deletes reference.png."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    char = _make_lib_char()
+    save_library_character(char, _PNG_BYTES, reference_bytes=_PNG_BYTES)
+
+    app = _BrowseHarness()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        rm_btn = app.screen.query_one(f"#rm-ref-{char.id}", Button)
+        rm_btn.press()
+        for _ in range(10):
+            await pilot.pause()
+
+    from storygen.storage.library import load_library_character
+
+    reloaded = load_library_character(char.id)
+    assert reloaded.reference_image_path is None
+    assert not library_reference_path(char.id).exists()

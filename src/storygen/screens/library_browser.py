@@ -17,12 +17,14 @@ responsible for turning the returned library character into a save-local
 
 from __future__ import annotations
 
+import io
 import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import ClassVar, Literal, Protocol, cast
 from uuid import uuid4
 
+from PIL import Image
 from pydantic import BaseModel
 from textual import work
 from textual.app import ComposeResult
@@ -34,6 +36,7 @@ from storygen.llm.models import Character
 from storygen.screens._confirm_modal import ConfirmModal
 from storygen.screens._create_char_modal import CreateCharRequest
 from storygen.screens._library_edit_modal import LibraryEditModal, LibraryEditResult
+from storygen.screens._ref_image_modals import ReferenceImageModal, ReferenceImageResult
 from storygen.screens._story_import_modal import StoryImportResult
 from storygen.storage import app_state, paths
 from storygen.storage.library import (
@@ -54,6 +57,14 @@ from storygen.widgets._image_util import render_image_thumbnail
 SortMode = Literal["newest", "name"]
 
 _logger = logging.getLogger(__name__)
+
+
+def _load_portrait_bytes(library_id: str) -> bytes:
+    """Read the portrait PNG for a library character (used by rm-ref to re-save without ref)."""
+    path = library_portrait_path(library_id)
+    if path.exists():
+        return path.read_bytes()
+    return PLACEHOLDER_PNG
 
 
 class _CharacterAgentLike(Protocol):
@@ -520,6 +531,12 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
         regen_btn = Button("Regenerate", id=f"regen-{entry.id}")
         regen_btn.disabled = self._image_provider is None
         photo_buttons.mount(regen_btn)
+        ref_label = "Change Ref" if entry.reference_image_path else "Ref Image"
+        ref_btn = Button(ref_label, id=f"ref-{entry.id}")
+        ref_btn.disabled = self._image_provider is None
+        photo_buttons.mount(ref_btn)
+        if entry.reference_image_path is not None:
+            photo_buttons.mount(Button("Rm Ref", id=f"rm-ref-{entry.id}"))
         action_buttons = Horizontal(classes="library-buttons")
         meta.mount(action_buttons)
         if not self._browse:
@@ -557,6 +574,14 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
         if button_id.startswith("regen-"):
             library_id = button_id[len("regen-") :]
             self._regenerate_worker(library_id, event.button)
+            return
+        if button_id.startswith("ref-"):
+            library_id = button_id[len("ref-") :]
+            self._open_ref_image_modal(library_id)
+            return
+        if button_id.startswith("rm-ref-"):
+            library_id = button_id[len("rm-ref-") :]
+            self._remove_reference_image(library_id)
             return
         if button_id.startswith("edit-"):
             library_id = button_id[len("edit-") :]
@@ -624,6 +649,89 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
             open_in_system_viewer(library_portrait_path(entry.id))
         self._rebuild()
         self.notify(f"Regenerated portrait for '{entry.name}'.", timeout=5)
+
+    def _open_ref_image_modal(self, library_id: str) -> None:
+        """Open the reference image picker for a library character."""
+        entry = self._entries.get(library_id)
+        if entry is None:
+            return
+        entry_name = entry.name
+
+        def _after(result: object) -> None:
+            if not isinstance(result, ReferenceImageResult):
+                return
+            self._apply_ref_image_worker(result, library_id)
+
+        self.app.push_screen(  # pyright: ignore[reportUnknownMemberType]
+            ReferenceImageModal(entry_name),
+            _after,
+        )
+
+    @work(exit_on_error=False)
+    async def _apply_ref_image_worker(self, result: ReferenceImageResult, library_id: str) -> None:
+        """Process a reference image for a library character."""
+        entry = self._entries.get(library_id)
+        if entry is None:
+            return
+        try:
+            with Image.open(result.source_path) as im:
+                im = im.convert("RGBA")
+                buf = io.BytesIO()
+                im.save(buf, format="PNG")
+                png_bytes = buf.getvalue()
+        except Exception:
+            _logger.debug("Failed to load reference image", exc_info=True)
+            self.notify("Failed to load image.", severity="error", timeout=5)
+            return
+
+        if result.mode == "use_as_is":
+            portrait_bytes = png_bytes
+            entry = entry.model_copy(
+                update={
+                    "portrait_prompt": "(from reference image)",
+                    "reference_image_path": "reference.png",
+                }
+            )
+        else:
+            if self._image_provider is None:
+                self.notify("No image provider configured.", severity="error", timeout=5)
+                return
+            try:
+                portrait_bytes = await self._image_provider.generate_portrait(
+                    entry.physical_description,
+                    transparent=True,
+                    art_style=app_state.DEFAULT_ART_STYLE,
+                    reference_image=png_bytes,
+                )
+            except Exception:
+                _logger.debug("Style-transfer failed", exc_info=True)
+                self.notify("Style-transfer failed.", severity="error", timeout=5)
+                return
+            entry = entry.model_copy(
+                update={
+                    "portrait_prompt": entry.physical_description,
+                    "reference_image_path": "reference.png",
+                }
+            )
+
+        save_library_character(entry, portrait_bytes, reference_bytes=png_bytes)
+        self._rebuild()
+        if app_state.auto_open_art_enabled():
+            open_in_system_viewer(library_portrait_path(entry.id))
+        self.notify(f"Reference image set for {entry.name}.", timeout=5)
+
+    def _remove_reference_image(self, library_id: str) -> None:
+        """Clear the reference image from a library character."""
+        entry = self._entries.get(library_id)
+        if entry is None:
+            return
+        ref_path = library_reference_path(library_id)
+        if ref_path.exists():
+            ref_path.unlink()
+        entry = entry.model_copy(update={"reference_image_path": None})
+        save_library_character(entry, _load_portrait_bytes(library_id))
+        self._rebuild()
+        self.notify(f"Reference image removed from {entry.name}.", timeout=5)
 
     def _start_import(self, library_id: str) -> None:
         """Open the import-mode modal; on Keep as-is, dismiss with the entry."""
