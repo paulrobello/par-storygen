@@ -60,6 +60,13 @@ def config_root() -> Path:
     return xdg_config_home() / _APP
 
 
+def presets_dir() -> Path:
+    """Return ``$XDG_CONFIG_HOME/storygen/presets``, creating if needed."""
+    d = config_root() / "presets"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
 def game_dir(game_id: str) -> Path:
     """Directory for a single game save."""
     return games_root() / game_id
