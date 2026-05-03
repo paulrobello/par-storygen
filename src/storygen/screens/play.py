@@ -21,6 +21,7 @@ from textual.widgets import Footer, Header
 from storygen.export.book import export_book
 from storygen.llm.models import NodeId, StoryNode
 from storygen.pipeline import BeatPipeline, PipelineCallbacks
+from storygen.screens._art_edit_modal import ArtEditModal, ArtEditMode, ArtEditResult
 from storygen.screens.endings import EndingsScreen
 from storygen.screens.graph import GraphScreen
 from storygen.screens.portraits import PortraitsScreen
@@ -103,6 +104,7 @@ class PlayScreen(Screen[None]):
     BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
         ("b", "go_back", "Back 1 node"),
         ("i", "retry_image", "Regen image"),
+        ("I", "edit_regen_image", "Edit regen"),
         ("r", "regenerate_node", "Regen beat"),
         ("p", "portraits", "Portraits"),
         ("g", "graph", "Graph"),
@@ -305,6 +307,12 @@ class PlayScreen(Screen[None]):
                 "done",
                 "not_planned",
             )
+        if action == "edit_regen_image":
+            return node.image_prompt is not None and node.image_status in (
+                "failed",
+                "done",
+                "not_planned",
+            )
         if action == "portraits":
             return bool(self._save.characters)
         if action == "graph":
@@ -502,6 +510,63 @@ class PlayScreen(Screen[None]):
             on_image_failed=self._on_image_failed,
         )
         await self._pipeline.retry_scene(self._save, node_id=node.id, callbacks=cb)
+        self._render_current()
+
+    async def action_edit_regen_image(self) -> None:
+        """Open the edit-regen modal for the current scene image."""
+        if self._pipeline is None:
+            return
+        node = self._save.nodes[self._save.current_node_id]
+        if not node.image_prompt:
+            return
+        save_id = str(self._save.id)
+        image_bytes: bytes | None = None
+        if node.image_path:
+            try:
+                abs_path = paths.safe_join(paths.game_dir(save_id), node.image_path)
+                if abs_path.exists():
+                    image_bytes = abs_path.read_bytes()
+            except ValueError:
+                pass
+
+        def _on_result(result: ArtEditResult | None) -> None:
+            if result is None:
+                return
+            self.run_worker(
+                self._do_edit_regen(node, result),
+                exclusive=True,
+                name="play-edit-regen",
+            )
+
+        self.app.push_screen(  # pyright: ignore[reportUnknownMemberType]
+            ArtEditModal(
+                original_prompt=node.image_prompt,
+                image_bytes=image_bytes,
+            ),
+            _on_result,
+        )
+
+    async def _do_edit_regen(self, node: StoryNode, result: ArtEditResult) -> None:
+        """Execute the edit-regen after the modal returns a result."""
+        if self._pipeline is None:
+            return
+        if result.mode == ArtEditMode.EDIT:
+            new_prompt = f"{node.image_prompt}\n\nEdit instructions: {result.text}"
+        else:
+            new_prompt = result.text
+        self._image.show_generating()
+        self._choices.clear()
+        cb = PipelineCallbacks(
+            on_image_committed=self._on_image_committed,
+            on_image_failed=self._on_image_failed,
+        )
+        await self._pipeline.edit_scene(
+            self._save,
+            node_id=node.id,
+            new_prompt=new_prompt,
+            current_image_as_ref=result.use_current_as_ref,
+            callbacks=cb,
+        )
         self._render_current()
 
     def action_menu(self) -> None:
