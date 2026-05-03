@@ -18,7 +18,7 @@ from storygen.llm.models import (
     Tone,
 )
 from storygen.storage import paths
-from storygen.storage.save import GameSave, load_game, save_game
+from storygen.storage.save import GameSave, load_game, prune_subtree, save_game
 
 
 def _make_save() -> GameSave:
@@ -270,3 +270,154 @@ def test_pacing_defaults_to_moderate_on_old_saves(
     path.write_text(json.dumps(data))
     restored = load_game(str(save.id))
     assert restored.pacing == "moderate"
+
+
+def _save_with_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> GameSave:
+    """Build a save with root -> a -> a1, root -> b, save it to disk."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    nodes = {
+        "root": StoryNode(
+            id="root",
+            parent_id=None,
+            chosen_choice_id=None,
+            chosen_at=None,
+            narration="root beat",
+            choices=[
+                StoredChoice(id="c1", text="go a", child_node_id="a"),
+                StoredChoice(id="c2", text="go b", child_node_id="b"),
+            ],
+            is_major=True,
+            is_ending=False,
+            image_prompt=None,
+            image_path=None,
+            image_status="not_planned",
+            illustration_reasoning=None,
+            featured_character_ids=[],
+            summary_to_here=None,
+            created_at=datetime.now(UTC),
+        ),
+        "a": StoryNode(
+            id="a",
+            parent_id="root",
+            chosen_choice_id="c1",
+            chosen_at=datetime.now(UTC),
+            narration="beat a",
+            choices=[StoredChoice(id="c3", text="go a1", child_node_id="a1")],
+            is_major=False,
+            is_ending=False,
+            image_prompt=None,
+            image_path="images/nodes/a.png",
+            image_status="done",
+            illustration_reasoning=None,
+            featured_character_ids=[],
+            summary_to_here=None,
+            created_at=datetime.now(UTC),
+        ),
+        "a1": StoryNode(
+            id="a1",
+            parent_id="a",
+            chosen_choice_id="c3",
+            chosen_at=datetime.now(UTC),
+            narration="beat a1",
+            choices=[],
+            is_major=False,
+            is_ending=True,
+            image_prompt=None,
+            image_path=None,
+            image_status="not_planned",
+            illustration_reasoning=None,
+            featured_character_ids=[],
+            summary_to_here=None,
+            tts_audio_path="audio/a1-legacy-abcd1234.mp3",
+            created_at=datetime.now(UTC),
+        ),
+        "b": StoryNode(
+            id="b",
+            parent_id="root",
+            chosen_choice_id="c2",
+            chosen_at=datetime.now(UTC),
+            narration="beat b",
+            choices=[],
+            is_major=False,
+            is_ending=False,
+            image_prompt=None,
+            image_path=None,
+            image_status="not_planned",
+            illustration_reasoning=None,
+            featured_character_ids=[],
+            summary_to_here=None,
+            created_at=datetime.now(UTC),
+        ),
+    }
+    save = GameSave(
+        version=1,
+        id=uuid4(),
+        theme=Theme(title="T", setting="S", premise="P", keywords=[]),
+        tone=Tone(preset="serious", custom_descriptor=None),
+        narration_style="third_person",
+        text_config=TextProviderConfig(provider="openai", model="gpt-4o-mini"),
+        image_config=ImageProviderConfig(provider="openai", model="gpt-image-2"),
+        characters=[],
+        nodes=nodes,
+        root_node_id="root",
+        current_node_id="a1",
+        endings_reached=["a1"],
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+    save_game(save)
+    return save
+
+
+def test_prune_subtree_removes_descendants(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    save = _save_with_tree(tmp_path, monkeypatch)
+    count = prune_subtree(save, node_id="a")
+    assert count == 2
+    assert set(save.nodes.keys()) == {"root", "b"}
+    assert save.nodes["root"].choices[0].child_node_id is None
+    assert save.nodes["root"].choices[1].child_node_id == "b"
+
+
+def test_prune_subtree_moves_current_to_parent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    save = _save_with_tree(tmp_path, monkeypatch)
+    assert save.current_node_id == "a1"
+    prune_subtree(save, node_id="a")
+    assert save.current_node_id == "root"
+
+
+def test_prune_subtree_cleans_endings_reached(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    save = _save_with_tree(tmp_path, monkeypatch)
+    assert "a1" in save.endings_reached
+    prune_subtree(save, node_id="a")
+    assert save.endings_reached == []
+
+
+def test_prune_subtree_deletes_image_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    save = _save_with_tree(tmp_path, monkeypatch)
+    img = paths.node_image_path(str(save.id), "a")
+    img.parent.mkdir(parents=True, exist_ok=True)
+    img.write_bytes(b"fake-png")
+    assert img.exists()
+    prune_subtree(save, node_id="a")
+    assert not img.exists()
+
+
+def test_prune_subtree_deletes_audio_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    save = _save_with_tree(tmp_path, monkeypatch)
+    paths.ensure_game_dirs(str(save.id))
+    audio = paths.game_dir(str(save.id)) / "audio" / "a1-legacy-abcd1234.mp3"
+    audio.parent.mkdir(parents=True, exist_ok=True)
+    audio.write_bytes(b"fake-audio")
+    assert audio.exists()
+    prune_subtree(save, node_id="a")
+    assert not audio.exists()
+
+
+def test_prune_subtree_root_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    save = _save_with_tree(tmp_path, monkeypatch)
+    with pytest.raises(ValueError):
+        prune_subtree(save, node_id="root")

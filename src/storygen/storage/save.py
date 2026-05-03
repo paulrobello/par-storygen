@@ -32,6 +32,7 @@ __all__ = [
     "ReaderLevel",
     "delete_game",
     "load_game",
+    "prune_subtree",
     "save_game",
 ]
 
@@ -117,6 +118,74 @@ def delete_game(game_id: str) -> None:
     if not directory.exists():
         raise FileNotFoundError(f"No save directory at {directory}")
     shutil.rmtree(directory)
+
+
+def prune_subtree(save: GameSave, *, node_id: NodeId) -> int:
+    """Remove *node_id* and all its descendants from the save and disk.
+
+    Mutates ``save`` in place: removes nodes from ``save.nodes``, clears
+    the parent's ``child_node_id`` link, relocates ``current_node_id`` if
+    it was inside the pruned subtree, removes pruned nodes from
+    ``endings_reached``, deletes associated image and audio files, and
+    persists the result.
+
+    Args:
+        save: The game save to mutate.
+        node_id: The root of the subtree to prune. Must not be the root node.
+
+    Returns:
+        The number of nodes removed (including ``node_id`` itself).
+
+    Raises:
+        ValueError: If ``node_id`` is the save's root node.
+    """
+    if node_id == save.root_node_id:
+        raise ValueError("Cannot prune the root node")
+
+    from storygen.storage.tree import descendants  # lazy import to avoid circular dependency
+
+    doomed = descendants(save, node_id)
+    doomed_set = set(doomed)
+
+    # Clear parent's child_node_id link so the choice reverts to unexplored.
+    target_node = save.nodes[node_id]
+    parent = save.nodes[target_node.parent_id]  # type: ignore[arg-type]
+    for choice in parent.choices:
+        if choice.child_node_id == node_id:
+            choice.child_node_id = None
+            break
+
+    # Relocate current_node_id if it was in the pruned subtree.
+    if save.current_node_id in doomed_set:
+        save.current_node_id = target_node.parent_id  # type: ignore[assignment]
+
+    # Clean endings_reached.
+    save.endings_reached = [e for e in save.endings_reached if e not in doomed_set]
+
+    # Delete image and audio files from disk.
+    game_id = str(save.id)
+    for nid in doomed:
+        node = save.nodes[nid]
+        # Scene illustration.
+        if node.image_path:
+            img_abs = paths.safe_join(paths.game_dir(game_id), node.image_path)
+            if img_abs.exists():
+                img_abs.unlink()
+        # TTS audio.
+        if node.tts_audio_path:
+            audio_abs = paths.safe_join(paths.game_dir(game_id), node.tts_audio_path)
+            if audio_abs.exists():
+                audio_abs.unlink()
+        else:
+            for p in paths.node_audio_glob(game_id, nid):
+                p.unlink(missing_ok=True)
+
+    # Remove nodes from the dict.
+    for nid in doomed:
+        del save.nodes[nid]
+
+    save_game(save)
+    return len(doomed)
 
 
 def load_game(game_id: str) -> GameSave:

@@ -236,3 +236,11 @@ def ensure_game_dirs(game_id: str) -> None:
     (gd / "images" / "nodes").mkdir(parents=True, exist_ok=True)
     (gd / "audio").mkdir(parents=True, exist_ok=True)
     os.chmod(gd, 0o700)
+
+
+def node_audio_glob(game_id: str, node_id: str) -> list[Path]:
+    """Return all TTS audio files matching a node id on disk."""
+    audio_dir = game_dir(game_id) / "audio"
+    if not audio_dir.is_dir():
+        return []
+    return sorted(audio_dir.glob(f"{node_id}-*.*"))
