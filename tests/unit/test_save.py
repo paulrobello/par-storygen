@@ -425,7 +425,7 @@ def test_prune_subtree_root_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
 
 
 def test_migrate_v1_to_v2_adds_recap_text() -> None:
-    from storygen.storage.save import _migrate
+    from storygen.storage.save import _migrate  # pyright: ignore[reportPrivateUsage]
 
     data: dict[str, Any] = {
         "version": 1,

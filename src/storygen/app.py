@@ -184,10 +184,10 @@ class StoryGenApp(App[None]):
         self.install_screen(self._make_load, name="load")  # pyright: ignore[reportUnknownMemberType,reportArgumentType]
         self.install_screen(lambda: SettingsScreen(self._config, self._tts_player), name="settings")  # pyright: ignore[reportUnknownMemberType,reportArgumentType]
         self.install_screen(self._make_catalog, name="catalog")  # pyright: ignore[reportUnknownMemberType,reportArgumentType]
-        self.install_screen(
-            lambda: StyleGalleryScreen(self._config, self._image_provider),
+        self.install_screen(  # pyright: ignore[reportUnknownMemberType]
+            lambda: StyleGalleryScreen(self._config, self._image_provider),  # pyright: ignore[reportArgumentType]
             name="style_gallery",
-        )  # pyright: ignore[reportUnknownMemberType,reportArgumentType]
+        )
         self.push_screen("menu")  # pyright: ignore[reportUnknownMemberType]
         if self._resume_last:
             self._auto_resume()

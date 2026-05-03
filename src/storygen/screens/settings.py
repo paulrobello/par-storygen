@@ -1066,7 +1066,7 @@ class SettingsScreen(Screen[None]):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-style-gallery":
-            self.app.push_screen("style_gallery")
+            self.app.push_screen("style_gallery")  # pyright: ignore[reportUnknownMemberType]
             return
         bid = event.button.id
         if bid == "btn-save":
