@@ -570,6 +570,7 @@ class PortraitsScreen(Screen[None]):
         else:
             description = result.text
         save_id = str(self._save.id)
+        self.notify(f"Generating edited portrait for {char.name}…", timeout=120)
         try:
             ref_bytes: bytes | None = None
             if result.use_current_as_ref and char.portrait_path:

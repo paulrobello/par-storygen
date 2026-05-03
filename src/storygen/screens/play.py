@@ -556,6 +556,7 @@ class PlayScreen(Screen[None]):
             new_prompt = result.text
         self._image.show_generating()
         self._choices.clear()
+        self.notify("Generating edited image…", timeout=120)
         cb = PipelineCallbacks(
             on_image_committed=self._on_image_committed,
             on_image_failed=self._on_image_failed,
