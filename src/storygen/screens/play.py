@@ -532,6 +532,9 @@ class PlayScreen(Screen[None]):
         def _on_result(result: ArtEditResult | None) -> None:
             if result is None:
                 return
+            self._image.show_generating()
+            self._choices.clear()
+            self.notify("Generating edited image…", timeout=120)
             self.run_worker(
                 self._do_edit_regen(node, result),
                 exclusive=True,
@@ -554,9 +557,6 @@ class PlayScreen(Screen[None]):
             new_prompt = f"{node.image_prompt}\n\nEdit instructions: {result.text}"
         else:
             new_prompt = result.text
-        self._image.show_generating()
-        self._choices.clear()
-        self.notify("Generating edited image…", timeout=120)
         cb = PipelineCallbacks(
             on_image_committed=self._on_image_committed,
             on_image_failed=self._on_image_failed,

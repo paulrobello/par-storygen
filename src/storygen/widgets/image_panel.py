@@ -32,10 +32,10 @@ class ImagePanel(Static):
     }
     ImagePanel Throbber {
         height: 1;
-        visibility: hidden;
+        display: none;
     }
     ImagePanel Throbber.-active {
-        visibility: visible;
+        display: block;
     }
     """
 
@@ -60,9 +60,7 @@ class ImagePanel(Static):
         self._image_path = None
         self.panel_state = ImagePanelState.GENERATING
         self.display = True
-        self.update(
-            "\n\n\n\n\n\n\n\n\n  generating illustration...\n"
-        )
+        self.update("generating illustration...")
         self._start_throbber()
 
     def show_failed(self) -> None:
