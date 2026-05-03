@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -421,3 +422,24 @@ def test_prune_subtree_root_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     save = _save_with_tree(tmp_path, monkeypatch)
     with pytest.raises(ValueError):
         prune_subtree(save, node_id="root")
+
+
+def test_migrate_v1_to_v2_adds_recap_text() -> None:
+    from storygen.storage.save import _migrate
+
+    data: dict[str, Any] = {
+        "version": 1,
+        "nodes": {
+            "n1": {"id": "n1", "narration": "Hello"},
+            "n2": {"id": "n2", "narration": "World"},
+        },
+    }
+    result = _migrate(data, from_version=1)
+    assert result["nodes"]["n1"]["recap_text"] is None
+    assert result["nodes"]["n2"]["recap_text"] is None
+    # v2 data passes through unchanged
+    result2 = _migrate(
+        {"version": 2, "nodes": {"n1": {"id": "n1", "recap_text": "Cached"}}},
+        from_version=2,
+    )
+    assert result2["nodes"]["n1"]["recap_text"] == "Cached"
