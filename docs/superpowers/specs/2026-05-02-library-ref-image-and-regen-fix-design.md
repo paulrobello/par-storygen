@@ -71,10 +71,10 @@ Extend the character creation modal to allow attaching a reference image.
 
 **UI additions to `CreateCharacterModal`:**
 
-- Add a path `Input` (placeholder: "Reference image path (optional)") and a "Browse" button below the concept area
-- "Browse" triggers `tkinter.filedialog.askopenfilename` (same pattern as `ReferenceImageModal`)
-- On path change, show a small preview thumbnail (reuse `render_image_thumbnail` or inline `Pixels`)
-- Store loaded PNG bytes in `self._ref_bytes: bytes | None`
+- Add a path `Input` (placeholder: "(optional) /path/to/reference.png") and a "Browse" button below the concept area
+- "Browse" triggers `_try_native_file_picker()` from `_ref_image_modals` (wraps `tkinter.filedialog.askopenfilename`, same pattern as `ReferenceImageModal`)
+- On path change, load the image, convert to RGBA PNG, and show a small preview thumbnail via inline `Pixels.from_image`
+- Store loaded PNG bytes in `self._loaded_ref_bytes: bytes | None`
 
 **Model change to `CreateCharRequest`:**
 
@@ -82,7 +82,7 @@ Extend the character creation modal to allow attaching a reference image.
 
 **Flow through to worker:**
 
-- On "Create" button press, include `reference_image=self._ref_bytes` in the `CreateCharRequest`
+- On "Create" button press, include `reference_image=self._loaded_ref_bytes` in the `CreateCharRequest`
 - In `_create_character_worker`, if `request.reference_image` is set:
   - For `"use_as_is"` mode not applicable here (always style-transfer during creation)
   - Pass `reference_image=request.reference_image` to `generate_portrait`

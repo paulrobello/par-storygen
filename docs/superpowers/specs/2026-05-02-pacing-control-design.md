@@ -8,7 +8,7 @@ Beat narration length and choice count are hardcoded in the beat system prompt (
 
 ## Solution
 
-Add a `Pacing` enum (`slow | moderate | fast`) set during the wizard's LENGTH step. The value flows through `GameSave` → `build_beat_agent()` → `beat_system_prompt()`, which dynamically adjusts paragraph-count ranges, choice-count ranges, and style guidance. Escalation thresholds in `_pacing_hint_for_depth()` also adapt per pacing level.
+Add a `Pacing` type alias (`Literal["slow", "moderate", "fast"]`) set during the wizard's LENGTH step. The value flows through `GameSave` → `build_beat_agent()` → `beat_system_prompt()`, which dynamically adjusts paragraph-count ranges, choice-count ranges, and style guidance. Escalation thresholds in `_pacing_hint_for_depth()` also adapt per pacing level.
 
 ## Type & Storage
 
@@ -31,9 +31,9 @@ Default: `"moderate"` (identical to current hardcoded behavior).
 
 | Pacing | Narration paragraphs | Choices | Extra prompt guidance |
 |--------|---------------------|---------|----------------------|
-| slow | 4–6 | 2 | "Take time with description, atmosphere, and inner thoughts. Choices should feel weighty." |
-| moderate | 2–5 | 2–4 | *(none — current behavior)* |
-| fast | 1–3 | 3–5 | "Keep the pace brisk — action over description. Give the player frequent choices." |
+| slow | 4--6 | 2 | "Take time with description, atmosphere, and inner thoughts. Choices should feel weighty -- every decision matters." |
+| moderate | 2--5 | 2--4 | *(none -- current behavior)* |
+| fast | 1--3 | 3--5 | "Keep the pace brisk -- action over description. Give the player frequent choices to maintain momentum." |
 
 The hardcoded strings `"2-5 paragraphs"` and `"2-4 meaningfully different options"` in the prompt become dynamic based on the pacing parameter.
 
@@ -49,12 +49,12 @@ This means a fast-paced story with `target_major_beats=5` starts tightening arou
 
 ## Wizard Integration
 
-The LENGTH step (`WizardStep.LENGTH`) gains a `RadioSet` with three options: Slow / Moderate / Fast. Default comes from `WizardDefaults.pacing`. The step header updates to "Length & Pacing". The existing `target_major_beats` slider remains unchanged — pacing and story length are orthogonal controls.
+The LENGTH step (`WizardStep.LENGTH`) gains a `RadioSet` with three options: Slow / Moderate / Fast. Default comes from `WizardDefaults.pacing`. The step header displays as `Step: LENGTH` (the enum name). The existing `target_major_beats` input remains unchanged — pacing and story length are orthogonal controls.
 
-Layout: RadioSet below the existing slider, with a one-line description for each option:
-- Slow: "Long narration, fewer but weightier choices"
-- Moderate: "Balanced narration and choices"
-- Fast: "Short narration, more frequent choices"
+Layout: RadioSet below the existing input, with a one-line description for each option:
+- Slow: "Slow — long narration, fewer but weightier choices"
+- Moderate: "Moderate — balanced narration and choices"
+- Fast: "Fast — short narration, more frequent choices"
 
 The selected value is passed through `WizardFlow` to `GameSave.pacing`.
 

@@ -1,6 +1,6 @@
 # New Story Wizard
 
-The new story wizard is a multi-step flow that configures your story before it begins. Each step has a hint at the top and a **Next** button at the bottom. Press **Escape** at any time to return to the main menu.
+The new story wizard is a multi-step flow that configures your story before it begins. Each step has a hint at the top and an action button at the bottom — **Next** on most steps, **Generate Characters** on the Characters step, and **Begin Story** on the Confirm step. Press **Escape** at any time to return to the main menu.
 
 ## Table of Contents
 
@@ -48,6 +48,12 @@ Describe the visual style for illustrations. This is applied to both character p
 
 Set the approximate number of major beats before the story reaches an ending. This guides pacing — a higher number means a longer story with more branching. Clamped to the configured min/max range.
 
+A **Pacing** radio group below the length input controls narration density:
+
+- **Slow** — long narration, fewer but weightier choices
+- **Moderate** — balanced narration and choices (default)
+- **Fast** — short narration, more frequent choices
+
 ## Step 6: Reader Level
 
 ![Reader level step](https://raw.githubusercontent.com/paulrobello/par-storygen/main/screenshots/sc_wizard_6_reader_level.png)
@@ -81,7 +87,7 @@ Pressing **Ctrl+L** opens the character catalog browser. Select a character and 
 
 After importing, the character appears in the cast list below the checkbox. Each entry shows the character name, a source tag (library, ref-image, or generated), and a clickable **x** to remove them.
 
-When you press **Next**, the LLM generates additional characters only if the story needs them. Imported characters are given prominent starring roles and are never duplicated by the LLM.
+When you press **Generate Characters**, the LLM generates additional characters only if the story needs them. Imported characters are given prominent starring roles and are never duplicated by the LLM.
 
 ## Step 8: Confirm
 
@@ -93,4 +99,4 @@ Review all your choices before the story begins. The summary shows theme, tone, 
 
 ![Story begins](https://raw.githubusercontent.com/paulrobello/par-storygen/main/screenshots/sc_wizard_11_begin.png)
 
-Press **Next** on the confirm step to build your story world. The app generates the opening beat, character portraits, and any scene illustrations. Once complete, you are dropped into the play screen.
+Press **Begin Story** on the confirm step to build your story world. The app generates the opening beat, character portraits, and any scene illustrations. Once complete, you are dropped into the play screen.

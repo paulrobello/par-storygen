@@ -11,14 +11,14 @@ Add the ability to delete a subtree from the story graph in GraphScreen. Selecti
 
 1. User navigates to a node in GraphScreen and presses `p`.
 2. Root node is guarded — shows a warning, does nothing.
-3. A `Confirm` dialog appears: "Prune this branch? (N nodes, M images will be deleted)"
+3. A `ConfirmModal` dialog appears: "Prune this branch? (N nodes, M images will be deleted)"
 4. On confirm:
    - Collect all descendant node IDs via BFS from the selected node.
    - Remove all collected nodes + the selected node from `save.nodes`.
    - Clear the parent's `StoredChoice.child_node_id` for the link pointing to the pruned node. The parent's choice reverts to unexplored.
    - If `save.current_node_id` was in the pruned subtree, set it to the parent of the pruned node.
    - Remove any entries in `save.endings_reached` that reference pruned nodes.
-   - Delete image files (`images/nodes/<node_id>.png`) and TTS audio files from disk for each pruned node.
+   - Delete image files (resolved via `node.image_path` through `paths.safe_join`) and TTS audio files from disk for each pruned node.
    - Persist via `save_game(save)`.
    - Rebuild the GraphScreen tree widget.
 
@@ -37,5 +37,5 @@ Add the ability to delete a subtree from the story graph in GraphScreen. Selecti
 | File | Change |
 |------|--------|
 | `src/storygen/storage/tree.py` | Add `descendants(save, node_id) -> list[NodeId]` — BFS collector |
-| `src/storygen/storage/save.py` | Add `prune_subtree(save, node_id) -> int` — mutates save, cleans disk, returns count of deleted nodes |
+| `src/storygen/storage/save.py` | Add `prune_subtree(save, *, node_id) -> int` — mutates save, cleans disk, returns count of deleted nodes |
 | `src/storygen/screens/graph.py` | Add `action_prune()` with Confirm dialog, tree rebuild after prune |
