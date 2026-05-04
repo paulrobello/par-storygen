@@ -58,6 +58,12 @@ class CreateCharacterModal(Screen[CreateCharRequest | None]):
         margin-top: 0;
         height: auto;
     }
+    CreateCharacterModal #create-char-ref-path {
+        width: 1fr;
+    }
+    CreateCharacterModal #create-char-ref-browse {
+        width: auto;
+    }
     CreateCharacterModal #create-char-buttons {
         height: auto;
         align-horizontal: right;
@@ -179,13 +185,18 @@ class CreateCharacterModal(Screen[CreateCharRequest | None]):
             preview.update("(failed to load)")
 
     def _browse_ref(self) -> None:
-        from storygen.screens._ref_image_modals import (
-            _try_native_file_picker,  # pyright: ignore[reportPrivateUsage]
+        from storygen.screens._ref_image_modals import ImageFilePickerModal
+
+        current = self._ref_path_input.value.strip()
+        start = Path(current).parent if current else Path.home()
+        self.app.push_screen(  # pyright: ignore[reportUnknownMemberType]
+            ImageFilePickerModal(start),
+            self._on_file_picked,
         )
 
-        selected = _try_native_file_picker()
-        if selected:
-            self._ref_path_input.value = selected
+    def _on_file_picked(self, result: Path | None) -> None:
+        if result is not None:
+            self._ref_path_input.value = str(result)
             self._try_ref_preview()
 
     def action_cancel(self) -> None:

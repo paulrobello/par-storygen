@@ -682,7 +682,7 @@ class PortraitsScreen(Screen[None]):
             self._apply_ref_image_worker(result, char)
 
         self.app.push_screen(  # pyright: ignore[reportUnknownMemberType]
-            ReferenceImageModal(char.name),
+            ReferenceImageModal(char.name, default_style=self._save.art_style),
             _after,
         )
 
@@ -723,11 +723,12 @@ class PortraitsScreen(Screen[None]):
             )
         else:
             # Style-transfer: generate portrait using reference image.
+            self.notify(f"Generating style-transfer portrait for {char.name}…", timeout=120)
             try:
                 generated = await self._image_provider.generate_portrait(
                     char.physical_description,
                     transparent=True,
-                    art_style=self._save.art_style,
+                    art_style=result.style_prompt or self._save.art_style,
                     reference_image=png_bytes,
                 )
             except Exception:

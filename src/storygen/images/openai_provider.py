@@ -69,6 +69,7 @@ def image_cost(
 
 class _EditKwargs(TypedDict, total=False):
     input_fidelity: Literal["high"]
+    background: Literal["transparent"]
 
 
 def _env_or_none(key: str) -> str | None:
@@ -154,6 +155,9 @@ class OpenAIImageProvider:
 
         if reference_image is not None:
             image_file = ("image", ("reference.png", io.BytesIO(reference_image), "image/png"))
+            edit_kwargs = self._edit_kwargs()
+            if transparent and not self._is_v2:
+                edit_kwargs["background"] = "transparent"
             resp = await self._client.images.edit(
                 model=self._model,
                 prompt=prompt,
@@ -161,7 +165,7 @@ class OpenAIImageProvider:
                 size=PORTRAIT_SIZE,
                 quality=PORTRAIT_QUALITY,
                 output_format="png",
-                **self._edit_kwargs(),
+                **edit_kwargs,
             )
             return _decode_b64(resp)
 

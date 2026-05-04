@@ -694,7 +694,7 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
             self._apply_ref_image_worker(result, library_id)
 
         self.app.push_screen(  # pyright: ignore[reportUnknownMemberType]
-            ReferenceImageModal(entry_name),
+            ReferenceImageModal(entry_name, default_style=app_state.DEFAULT_ART_STYLE),
             _after,
         )
 
@@ -727,11 +727,12 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
             if self._image_provider is None:
                 self.notify("No image provider configured.", severity="error", timeout=5)
                 return
+            self.notify(f"Generating style-transfer portrait for {entry.name}…", timeout=120)
             try:
                 portrait_bytes = await self._image_provider.generate_portrait(
                     entry.physical_description,
                     transparent=True,
-                    art_style=app_state.DEFAULT_ART_STYLE,
+                    art_style=result.style_prompt or app_state.DEFAULT_ART_STYLE,
                     reference_image=png_bytes,
                 )
             except Exception:

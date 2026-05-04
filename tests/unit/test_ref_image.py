@@ -172,6 +172,7 @@ class TestReferenceImageResult:
         )
         assert result.source_path == _Path("/tmp/test.png")
         assert result.mode == "use_as_is"
+        assert result.style_prompt == ""
 
     def test_style_transfer_mode(self) -> None:
         result = ReferenceImageResult(
@@ -179,6 +180,14 @@ class TestReferenceImageResult:
             mode="style_transfer",
         )
         assert result.mode == "style_transfer"
+
+    def test_style_prompt(self) -> None:
+        result = ReferenceImageResult(
+            source_path=_Path("/tmp/test.png"),
+            mode="style_transfer",
+            style_prompt="anime",
+        )
+        assert result.style_prompt == "anime"
 
 
 class TestBackwardCompat:

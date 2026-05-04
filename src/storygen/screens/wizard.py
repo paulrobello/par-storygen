@@ -793,7 +793,7 @@ class WizardScreen(Screen[None]):
         if self.current_step != WizardStep.CHARACTERS:
             return
         self.app.push_screen(  # pyright: ignore[reportUnknownMemberType]
-            ReferenceImageModal("New Character"),
+            ReferenceImageModal("New Character", default_style=self._art_style),
             self._on_ref_image_pick,
         )
 
@@ -849,7 +849,7 @@ class WizardScreen(Screen[None]):
                 generated = await image_provider.generate_portrait(  # type: ignore[union-attr]
                     "As shown in reference image",
                     transparent=True,
-                    art_style=self._art_style,
+                    art_style=result.style_prompt or self._art_style,
                     reference_image=png_bytes,
                 )
             except Exception as exc:

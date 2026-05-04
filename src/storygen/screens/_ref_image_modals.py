@@ -1,7 +1,10 @@
-"""Modal for selecting a reference image for character portrait generation.
+"""Modals for selecting a reference image for character portrait generation.
 
-Provides a file path input, optional native file picker (via tkinter on
-macOS/Windows), a thumbnail preview, and a use-as-is / style-transfer toggle.
+Provides:
+- :class:`ImageFilePickerModal` — a Textual-native directory tree browser
+  filtered to image files.
+- :class:`ReferenceImageModal` — path input with Browse button, thumbnail
+  preview, and a use-as-is / style-transfer toggle.
 
 Dismisses with a :class:`ReferenceImageResult` on confirm, or ``None`` on cancel.
 """
@@ -10,6 +13,7 @@ from __future__ import annotations
 
 import io
 import logging
+from collections.abc import Iterable
 from pathlib import Path
 from typing import ClassVar, Literal
 
@@ -17,9 +21,9 @@ from PIL import Image
 from pydantic import BaseModel
 from rich_pixels import Pixels
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Button, Input, RadioButton, RadioSet, Static
+from textual.widgets import Button, DirectoryTree, Input, RadioButton, RadioSet, Static
 
 _logger = logging.getLogger(__name__)
 
@@ -31,49 +35,97 @@ class ReferenceImageResult(BaseModel):
 
     source_path: Path
     mode: Literal["use_as_is", "style_transfer"]
+    style_prompt: str = ""
 
 
-def _try_native_file_picker() -> str | None:
-    """Attempt to open a native file dialog via tkinter.
+class _ImageDirectoryTree(DirectoryTree):
+    """DirectoryTree that only shows image files and directories."""
 
-    Returns the selected file path, or None if tkinter is unavailable or
-    the user cancelled.
+    def filter_paths(self, paths: Iterable[Path]) -> Iterable[Path]:
+        return [p for p in paths if p.is_dir() or p.suffix.lower() in _ACCEPTED_SUFFIXES]
+
+
+class ImageFilePickerModal(Screen[Path | None]):
+    """A Textual-native file picker filtered to image files.
+
+    Dismisses with the selected file path, or ``None`` on cancel.
     """
-    try:
-        import tkinter as tk
-        from tkinter import filedialog
 
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes("-topmost", True)  # type: ignore[arg-type]
-        path = filedialog.askopenfilename(
-            title="Select Reference Image",
-            filetypes=[
-                ("Image files", "*.png *.jpg *.jpeg *.webp"),
-                ("All files", "*.*"),
-            ],
-        )
-        root.destroy()
-        return path if path else None
-    except Exception:
-        _logger.debug("tkinter file dialog unavailable", exc_info=True)
-        return None
-
-
-def _load_and_convert(path: Path) -> tuple[bytes, Pixels]:
-    """Load an image file, convert to PNG, and create a thumbnail Pixels.
-
-    Returns (png_bytes, thumbnail_pixels).
+    DEFAULT_CSS = """
+    ImageFilePickerModal {
+        align: center middle;
+    }
+    ImageFilePickerModal #file-picker-box {
+        width: 80;
+        height: 30;
+        border: round $primary;
+        padding: 1 2;
+        background: $surface;
+    }
+    ImageFilePickerModal #file-picker-title {
+        text-style: bold;
+        margin-bottom: 1;
+    }
+    ImageFilePickerModal #file-picker-tree {
+        height: 1fr;
+    }
+    ImageFilePickerModal #file-picker-path-row {
+        height: auto;
+        margin-top: 1;
+    }
+    ImageFilePickerModal #file-picker-path-display {
+        width: 1fr;
+    }
+    ImageFilePickerModal #file-picker-buttons {
+        height: auto;
+        align-horizontal: right;
+        margin-top: 1;
+    }
+    ImageFilePickerModal #file-picker-ok {
+        margin-left: 1;
+    }
     """
-    with Image.open(path) as im:
-        im = im.convert("RGBA")
-        png_bytes_io = io.BytesIO()
-        im.save(png_bytes_io, format="PNG")
-        png_bytes = png_bytes_io.getvalue()
-        thumb = im.copy()
-        thumb.thumbnail((96, 48))
-        pixels = Pixels.from_image(thumb)
-    return png_bytes, pixels
+
+    BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
+        ("escape", "cancel", "Cancel"),
+    ]
+
+    def __init__(self, start_path: str | Path = ".") -> None:
+        super().__init__()
+        self._start_path = Path(start_path).expanduser().resolve()
+        if not self._start_path.is_dir():
+            self._start_path = Path.home()
+        self._selected: Path | None = None
+        self._ok_btn = Button("OK", id="file-picker-ok", variant="primary", disabled=True)
+        self._cancel_btn = Button("Cancel", id="file-picker-cancel")
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="file-picker-box"):
+            yield Static("Select Image File", id="file-picker-title")
+            with VerticalScroll(id="file-picker-tree"):
+                yield _ImageDirectoryTree(self._start_path)
+            with Horizontal(id="file-picker-path-row"):
+                yield Static(id="file-picker-path-display")
+            with Horizontal(id="file-picker-buttons"):
+                yield self._cancel_btn
+                yield self._ok_btn
+
+    def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
+        event.stop()
+        path = event.path
+        if path.suffix.lower() in _ACCEPTED_SUFFIXES:
+            self._selected = path
+            self.query_one("#file-picker-path-display", Static).update(str(path))
+            self._ok_btn.disabled = False
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "file-picker-ok" and self._selected is not None:
+            self.dismiss(self._selected)
+        elif event.button.id == "file-picker-cancel":
+            self.dismiss(None)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
 
 
 class ReferenceImageModal(Screen[ReferenceImageResult | None]):
@@ -106,6 +158,16 @@ class ReferenceImageModal(Screen[ReferenceImageResult | None]):
         margin-top: 1;
         height: auto;
     }
+    ReferenceImageModal #ref-image-path {
+        width: 1fr;
+    }
+    ReferenceImageModal #ref-image-browse {
+        width: auto;
+    }
+    ReferenceImageModal #ref-style-row {
+        margin-top: 1;
+        height: auto;
+    }
     ReferenceImageModal #ref-image-buttons {
         height: auto;
         align-horizontal: right;
@@ -120,7 +182,7 @@ class ReferenceImageModal(Screen[ReferenceImageResult | None]):
         ("escape", "cancel", "Cancel"),
     ]
 
-    def __init__(self, character_name: str) -> None:
+    def __init__(self, character_name: str, *, default_style: str = "") -> None:
         super().__init__()
         self._character_name = character_name
         self._path_input = Input(
@@ -128,6 +190,11 @@ class ReferenceImageModal(Screen[ReferenceImageResult | None]):
             id="ref-image-path",
         )
         self._browse_btn = Button("Browse", id="ref-image-browse")
+        self._style_input = Input(
+            value=default_style,
+            placeholder="e.g. anime, oil painting, watercolor…",
+            id="ref-style-input",
+        )
         self._ok_btn = Button("OK", id="ref-image-ok", variant="primary", disabled=True)
         self._cancel_btn = Button("Cancel", id="ref-image-cancel")
         self._preview: Static | None = None
@@ -150,6 +217,9 @@ class ReferenceImageModal(Screen[ReferenceImageResult | None]):
                 yield RadioButton(
                     "Style-transfer (regenerate in art style)", id="ref-mode-transfer"
                 )
+            with Vertical(id="ref-style-row"):
+                yield Static("Art style:", id="ref-style-label")
+                yield self._style_input
             with Horizontal(id="ref-image-buttons"):
                 yield self._cancel_btn
                 yield self._ok_btn
@@ -164,6 +234,19 @@ class ReferenceImageModal(Screen[ReferenceImageResult | None]):
         if event.button.id == "ref-image-cancel":
             self.dismiss(None)
 
+    def on_mount(self) -> None:
+        self._sync_style_row_visibility()
+
+    def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
+        if event.radio_set.id == "ref-image-radios":
+            self._sync_style_row_visibility()
+
+    def _sync_style_row_visibility(self) -> None:
+        radios = self.query_one("#ref-image-radios", RadioSet)
+        is_transfer = radios.pressed_index == 1
+        style_row = self.query_one("#ref-style-row", Vertical)
+        style_row.display = is_transfer
+
     def action_cancel(self) -> None:
         self.dismiss(None)
 
@@ -171,9 +254,16 @@ class ReferenceImageModal(Screen[ReferenceImageResult | None]):
         self._try_preview()
 
     def _browse(self) -> None:
-        selected = _try_native_file_picker()
-        if selected:
-            self._path_input.value = selected
+        current = self._path_input.value.strip()
+        start = Path(current).parent if current else Path.home()
+        self.app.push_screen(  # pyright: ignore[reportUnknownMemberType]
+            ImageFilePickerModal(start),
+            self._on_file_picked,
+        )
+
+    def _on_file_picked(self, result: Path | None) -> None:
+        if result is not None:
+            self._path_input.value = str(result)
             self._try_preview()
 
     def _try_preview(self) -> None:
@@ -186,14 +276,25 @@ class ReferenceImageModal(Screen[ReferenceImageResult | None]):
             self._ok_btn.disabled = True
             return
         try:
-            png_bytes, pixels = _load_and_convert(path)
+            with Image.open(path) as im:
+                im = im.convert("RGBA")
+                buf = io.BytesIO()
+                im.save(buf, format="PNG")
+                self._loaded_png_bytes = buf.getvalue()
         except Exception:
+            _logger.debug("Failed to load reference image for validation", exc_info=True)
             self._ok_btn.disabled = True
             return
-        self._loaded_png_bytes = png_bytes
-        preview = self.query_one("#ref-image-preview", Static)
-        preview.update(pixels)
         self._ok_btn.disabled = False
+        try:
+            thumb = Image.open(path)
+            thumb = thumb.convert("RGBA")
+            thumb.thumbnail((96, 48))
+            pixels = Pixels.from_image(thumb)
+            preview = self.query_one("#ref-image-preview", Static)
+            preview.update(pixels)
+        except Exception:
+            _logger.debug("Thumbnail preview failed (non-fatal)", exc_info=True)
 
     def _confirm(self) -> None:
         path_str = self._path_input.value.strip()
@@ -203,4 +304,9 @@ class ReferenceImageModal(Screen[ReferenceImageResult | None]):
         mode: Literal["use_as_is", "style_transfer"] = (
             "style_transfer" if radios.pressed_index == 1 else "use_as_is"
         )
-        self.dismiss(ReferenceImageResult(source_path=Path(path_str), mode=mode))
+        style_prompt = ""
+        if mode == "style_transfer":
+            style_prompt = self._style_input.value.strip()
+        self.dismiss(
+            ReferenceImageResult(source_path=Path(path_str), mode=mode, style_prompt=style_prompt)
+        )
