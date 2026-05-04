@@ -1247,14 +1247,20 @@ class WizardScreen(Screen[None]):
                     user_prompt=self._user_character_prompt,
                     imported_characters=imported,
                 )
-                # LLM may ignore the "don't duplicate" instruction — dedup by name.
-                seen_names: set[str] = set(imported_names)
+                # LLM may ignore the "don't duplicate" instruction — dedup by
+                # full name and first name so "Paul Robello" and "Paul" collide.
+                seen_full: set[str] = set(imported_names)
+                seen_first: set[str] = {n.split()[0] for n in imported_names if n}
                 deduped: list[Character] = []
                 for c in generated:
-                    key = c.name.lower()
-                    if key not in seen_names:
-                        seen_names.add(key)
-                        deduped.append(c)
+                    full = c.name.lower()
+                    first = full.split()[0] if full else ""
+                    if full in seen_full or (first and first in seen_first):
+                        continue
+                    seen_full.add(full)
+                    if first:
+                        seen_first.add(first)
+                    deduped.append(c)
                 self._characters = imported + deduped
                 self.current_step = WizardStep.CONFIRM
                 return
