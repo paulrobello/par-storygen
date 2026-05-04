@@ -827,7 +827,9 @@ class BeatPipeline:
                             )
                     except ValueError:
                         pass
-            for cid in featured_character_ids:
+            # Reserve slots for character portraits (OpenAI images.edit allows ≤16).
+            max_char_refs = 16 - len(refs)
+            for cid in featured_character_ids[:max_char_refs]:
                 for c in save.characters:
                     if c.id == cid and c.portrait_path:
                         try:
