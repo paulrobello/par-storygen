@@ -1247,9 +1247,15 @@ class WizardScreen(Screen[None]):
                     user_prompt=self._user_character_prompt,
                     imported_characters=imported,
                 )
-                # LLM may ignore the "don't duplicate" instruction — filter by name.
-                generated = [c for c in generated if c.name.lower() not in imported_names]
-                self._characters = imported + generated
+                # LLM may ignore the "don't duplicate" instruction — dedup by name.
+                seen_names: set[str] = set(imported_names)
+                deduped: list[Character] = []
+                for c in generated:
+                    key = c.name.lower()
+                    if key not in seen_names:
+                        seen_names.add(key)
+                        deduped.append(c)
+                self._characters = imported + deduped
                 self.current_step = WizardStep.CONFIRM
                 return
             if self.current_step == WizardStep.CONFIRM:
