@@ -245,18 +245,30 @@ def test_build_beat_prompt_includes_relationships_section() -> None:
     save = _empty_save({"root": root})
     save.characters = [
         Character(
-            id="alyx", name="Alyx", backstory="b", personality="p",
-            physical_description="d", introduced_at_node_id="root",
+            id="alyx",
+            name="Alyx",
+            backstory="b",
+            personality="p",
+            physical_description="d",
+            introduced_at_node_id="root",
         ),
         Character(
-            id="kael", name="Kael", backstory="b", personality="p",
-            physical_description="d", introduced_at_node_id="root",
+            id="kael",
+            name="Kael",
+            backstory="b",
+            personality="p",
+            physical_description="d",
+            introduced_at_node_id="root",
         ),
     ]
     save.relationships = [
         Relationship(
-            char_a_id="alyx", char_b_id="kael", type=RelationshipType.ALLY,
-            strength=4, context="bonded during ambush", updated_at_node_id="root",
+            char_a_id="alyx",
+            char_b_id="kael",
+            type=RelationshipType.ALLY,
+            strength=4,
+            context="bonded during ambush",
+            updated_at_node_id="root",
         ),
     ]
     prompt = _build_beat_prompt(save, "root", "go left")

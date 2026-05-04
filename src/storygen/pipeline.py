@@ -900,9 +900,7 @@ class BeatPipeline:
 # --- Beat prompt construction --------------------------------------------------
 
 
-def _merge_relationships(
-    save: GameSave, updates: list[Relationship], node_id: str
-) -> None:
+def _merge_relationships(save: GameSave, updates: list[Relationship], node_id: str) -> None:
     """Merge relationship deltas from a beat into the save's relationship list."""
     for update in updates:
         key = (update.char_a_id, update.char_b_id)
@@ -912,9 +910,7 @@ def _merge_relationships(
         )
         if existing is not None:
             save.relationships.remove(existing)
-        save.relationships.append(
-            update.model_copy(update={"updated_at_node_id": node_id})
-        )
+        save.relationships.append(update.model_copy(update={"updated_at_node_id": node_id}))
 
 
 def _build_beat_prompt(save: GameSave, from_node_id: str, choice_text: str) -> str:

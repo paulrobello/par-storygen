@@ -2220,13 +2220,20 @@ async def test_pipeline_merges_relationship_updates(
         is_ending=False,
         relationship_updates=[
             Relationship(
-                char_a_id="a", char_b_id="b", type=RelationshipType.ALLY,
-                strength=3, context="fought together", updated_at_node_id="pending",
+                char_a_id="a",
+                char_b_id="b",
+                type=RelationshipType.ALLY,
+                strength=3,
+                context="fought together",
+                updated_at_node_id="pending",
             ),
         ],
     )
     plan = IllustrationPlan(
-        should_illustrate=False, image_prompt="", featured_character_ids=[], reasoning="",
+        should_illustrate=False,
+        image_prompt="",
+        featured_character_ids=[],
+        reasoning="",
     )
     pipeline = BeatPipeline(
         beat_agent=FakeBeatAgent(beat),
@@ -2251,8 +2258,12 @@ async def test_pipeline_merges_relationship_update_existing(
 
     save.relationships.append(
         Relationship(
-            char_a_id="a", char_b_id="b", type=RelationshipType.NEUTRAL,
-            strength=1, context="strangers", updated_at_node_id="root",
+            char_a_id="a",
+            char_b_id="b",
+            type=RelationshipType.NEUTRAL,
+            strength=1,
+            context="strangers",
+            updated_at_node_id="root",
         )
     )
     beat = StoryBeat(
@@ -2262,13 +2273,20 @@ async def test_pipeline_merges_relationship_update_existing(
         is_ending=False,
         relationship_updates=[
             Relationship(
-                char_a_id="a", char_b_id="b", type=RelationshipType.ALLY,
-                strength=3, context="became friends", updated_at_node_id="pending",
+                char_a_id="a",
+                char_b_id="b",
+                type=RelationshipType.ALLY,
+                strength=3,
+                context="became friends",
+                updated_at_node_id="pending",
             ),
         ],
     )
     plan = IllustrationPlan(
-        should_illustrate=False, image_prompt="", featured_character_ids=[], reasoning="",
+        should_illustrate=False,
+        image_prompt="",
+        featured_character_ids=[],
+        reasoning="",
     )
     pipeline = BeatPipeline(
         beat_agent=FakeBeatAgent(beat),
@@ -2294,8 +2312,12 @@ async def test_pipeline_merges_relationship_no_updates(
 
     save.relationships.append(
         Relationship(
-            char_a_id="a", char_b_id="b", type=RelationshipType.RIVAL,
-            strength=2, context="tension", updated_at_node_id="root",
+            char_a_id="a",
+            char_b_id="b",
+            type=RelationshipType.RIVAL,
+            strength=2,
+            context="tension",
+            updated_at_node_id="root",
         )
     )
     beat = StoryBeat(
@@ -2306,7 +2328,10 @@ async def test_pipeline_merges_relationship_no_updates(
         relationship_updates=[],
     )
     plan = IllustrationPlan(
-        should_illustrate=False, image_prompt="", featured_character_ids=[], reasoning="",
+        should_illustrate=False,
+        image_prompt="",
+        featured_character_ids=[],
+        reasoning="",
     )
     pipeline = BeatPipeline(
         beat_agent=FakeBeatAgent(beat),
