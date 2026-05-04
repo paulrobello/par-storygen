@@ -198,7 +198,10 @@ def illustration_system_prompt() -> str:
         " should_illustrate=false. Return a concise image prompt (not the"
         " narration) describing the key visual: setting, action, lighting,"
         " mood. List featured_character_ids for characters visibly present"
-        " (at most four). Include a one-sentence reasoning."
+        " (at most four). Prioritize characters who are central to the"
+        " scene's action or are named most often in the narration. Every"
+        " character mentioned by name in the image prompt MUST appear in"
+        " featured_character_ids. Include a one-sentence reasoning."
     )
 
 
