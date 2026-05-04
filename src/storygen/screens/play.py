@@ -373,6 +373,8 @@ class PlayScreen(Screen[None]):
             return node is not None and node.is_ending
         if action == "relationships":
             return bool(self._save.relationships)
+        if action == "recap":
+            return True
         if action == "menu":
             return True
         return None
