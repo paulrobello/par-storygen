@@ -107,12 +107,21 @@ class RelationshipsScreen(ModalScreen[None]):
             return "No known relationships."
 
         char_map: dict[CharacterId, str] = {c.id: c.name for c in self._characters}
+        # Build a name-to-id reverse map for backward compat with saves
+        # where the LLM returned character names instead of IDs.
+        name_to_id: dict[str, CharacterId] = {c.name: c.id for c in self._characters}
+
+        def _resolve(key: str) -> CharacterId:
+            """Map a char_a_id / char_b_id to a real character ID."""
+            if key in char_map:
+                return key
+            return name_to_id.get(key, key)
 
         # Group relationships by character ID.
         by_char: dict[CharacterId, list[Relationship]] = defaultdict(list)
         for rel in self._relationships:
-            by_char[rel.char_a_id].append(rel)
-            by_char[rel.char_b_id].append(rel)
+            by_char[_resolve(rel.char_a_id)].append(rel)
+            by_char[_resolve(rel.char_b_id)].append(rel)
 
         lines: list[str] = []
         seen_chars: set[CharacterId] = set()
@@ -123,7 +132,7 @@ class RelationshipsScreen(ModalScreen[None]):
             seen_chars.add(char.id)
             lines.append(f"[bold]{char.name}[/bold]")
             for rel in by_char[char.id]:
-                other_id = rel.char_b_id if rel.char_a_id == char.id else rel.char_a_id
+                other_id = _resolve(rel.char_b_id if _resolve(rel.char_a_id) == char.id else rel.char_a_id)
                 other_name = char_map.get(other_id, other_id)
                 icon = _REL_TYPE_ICONS.get(rel.type, "?")
                 bar = _strength_bar(rel.strength)

@@ -933,17 +933,26 @@ def _build_beat_prompt(save: GameSave, from_node_id: str, choice_text: str) -> s
     # Cast - kept terse so the prompt doesn't bloat for stories with many chars.
     if save.characters:
         cast_lines = [
-            f"- {c.name}: {_one_sentence(c.personality)} ({_one_sentence(c.physical_description)})"
+            f"- [{c.id}] {c.name}: {_one_sentence(c.personality)} ({_one_sentence(c.physical_description)})"
             for c in save.characters
         ]
         sections.append("CAST:\n" + "\n".join(cast_lines))
 
     if save.relationships:
         char_names = {c.id: c.name for c in save.characters}
+        name_to_id = {c.name: c.id for c in save.characters}
+
+        def _resolve(key: str) -> str:
+            if key in char_names:
+                return char_names[key]
+            return key  # already a name or unknown
+
+        known = set(char_names) | set(name_to_id)
         rel_lines = [
-            f"- {char_names.get(r.char_a_id, r.char_a_id)} ↔ {char_names.get(r.char_b_id, r.char_b_id)}: {r.type.value} (strength {r.strength}) — {r.context}"
+            f"- {_resolve(r.char_a_id)} ↔ {_resolve(r.char_b_id)}:"
+            f" {r.type.value} (strength {r.strength}) — {r.context}"
             for r in save.relationships
-            if r.char_a_id in char_names and r.char_b_id in char_names
+            if r.char_a_id in known and r.char_b_id in known
         ]
         if rel_lines:
             sections.append("RELATIONSHIPS:\n" + "\n".join(rel_lines))
