@@ -528,6 +528,7 @@ class PlayScreen(Screen[None]):
             node.parent_id is not None
             and not any(c.child_node_id for c in node.choices)
         )
+        can_audio = self._tts_player is not None and self._tts_player.is_configured
 
         def _on_pick(action: str | None) -> None:
             if action == "retry_image":
@@ -536,12 +537,15 @@ class PlayScreen(Screen[None]):
                 self.run_worker(self.action_edit_regen_image(), name="regen-edit")
             elif action == "regenerate_node":
                 self.run_worker(self.action_regenerate_node(), name="regen-beat")
+            elif action == "regen_audio":
+                self.run_worker(self.action_regen_audio(), name="regen-audio")
 
         self.app.push_screen(  # pyright: ignore[reportUnknownMemberType]
             RegenPickerModal(
                 can_retry_image=can_retry,
                 can_edit_regen=can_edit,
                 can_regen_beat=can_beat,
+                can_regen_audio=can_audio,
             ),
             _on_pick,
         )
@@ -736,6 +740,33 @@ class PlayScreen(Screen[None]):
         save_game(self._save)
         self.app.pop_screen()  # pyright: ignore[reportUnknownMemberType]
         self._render_current()
+
+    async def action_regen_audio(self) -> None:
+        """Regenerate TTS audio for every node from root to the current node."""
+        if self._tts_player is None or not self._tts_player.is_configured:
+            return
+        await self._stop_tts()
+        from storygen.storage.tree import path_from_root
+
+        chain = path_from_root(self._save, self._save.current_node_id)
+        tts_prefs = app_state.read_tts_prefs()
+        self._tts_player.configure(
+            tts_prefs.provider, api_key=tts_prefs.api_key, voice=tts_prefs.voice
+        )
+        total = len(chain)
+        for idx, node in enumerate(chain, 1):
+            if not node.narration:
+                continue
+            cache = self._tts_cache_path(node.id, tts_prefs)
+            cache.unlink(missing_ok=True)
+            self.notify(f"Generating audio {idx}/{total}…", timeout=30)
+            ok = await self._tts_player.generate(node.narration, cache_path=cache)
+            if ok:
+                relative_cache = self._relative_tts_cache_path(node.id, tts_prefs)
+                if node.tts_audio_path != relative_cache:
+                    node.tts_audio_path = relative_cache
+                    save_game(self._save)
+        self.notify(f"Audio regenerated for {total} node(s).")
 
     def action_endings(self) -> None:
         """Push the EndingsScreen; on jump, set current node + re-render.

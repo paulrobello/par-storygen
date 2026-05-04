@@ -1,4 +1,4 @@
-"""RegenPickerModal: quick-pick modal for regen actions (image, edit, beat)."""
+"""RegenPickerModal: quick-pick modal for regen actions (image, edit, beat, audio)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ class RegenPickerModal(Screen[str | None]):
     """Modal picker for regen actions.
 
     Dismisses with one of ``"retry_image"``, ``"edit_regen_image"``,
-    ``"regenerate_node"``, or ``None`` (cancelled).
+    ``"regenerate_node"``, ``"regen_audio"``, or ``None`` (cancelled).
     """
 
     DEFAULT_CSS = """
@@ -50,6 +50,7 @@ class RegenPickerModal(Screen[str | None]):
         ("i", "pick_retry", "Regen image"),
         ("e", "pick_edit", "Edit regen"),
         ("b", "pick_beat", "Regen beat"),
+        ("a", "pick_audio", "Regen audio"),
     ]
 
     def __init__(
@@ -58,11 +59,13 @@ class RegenPickerModal(Screen[str | None]):
         can_retry_image: bool = True,
         can_edit_regen: bool = True,
         can_regen_beat: bool = True,
+        can_regen_audio: bool = True,
     ) -> None:
         super().__init__()
         self._can_retry = can_retry_image
         self._can_edit = can_edit_regen
         self._can_beat = can_regen_beat
+        self._can_audio = can_regen_audio
 
     def compose(self) -> ComposeResult:
         with Vertical(id="regen-box"):
@@ -71,6 +74,7 @@ class RegenPickerModal(Screen[str | None]):
                 yield Button("Regen image  [i]", id="btn-retry", disabled=not self._can_retry)
                 yield Button("Edit regen   [e]", id="btn-edit", disabled=not self._can_edit)
                 yield Button("Regen beat   [b]", id="btn-beat", disabled=not self._can_beat)
+                yield Button("Regen audio  [a]", id="btn-audio", disabled=not self._can_audio)
             with Vertical(id="regen-cancel"):
                 yield Button("Cancel", id="btn-cancel")
         yield Footer()
@@ -93,11 +97,16 @@ class RegenPickerModal(Screen[str | None]):
         if self._can_beat:
             self._pick("regenerate_node")
 
+    def action_pick_audio(self) -> None:
+        if self._can_audio:
+            self._pick("regen_audio")
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         mapping = {
             "btn-retry": "retry_image",
             "btn-edit": "edit_regen_image",
             "btn-beat": "regenerate_node",
+            "btn-audio": "regen_audio",
             "btn-cancel": None,
         }
         result = mapping.get(event.button.id or "")

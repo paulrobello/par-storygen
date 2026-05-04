@@ -172,6 +172,26 @@ class TTSPlayer:
     # Playback controls
     # ------------------------------------------------------------------
 
+    async def generate(self, text: str, cache_path: Path) -> bool:
+        """Generate audio for *text* and write to *cache_path* without playing.
+
+        If *cache_path* already exists, skips generation.
+
+        Returns ``True`` if audio was written (or already cached), ``False``
+        if generation failed.
+        """
+        if cache_path.exists():
+            return True
+        if self._provider is None:
+            return False
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            return await self._generate_and_write(text, cache_path)
+        except Exception as exc:
+            _logger.warning("TTS generation failed: %s", exc)
+            cache_path.unlink(missing_ok=True)
+            return False
+
     async def speak(self, text: str, cache_path: Path | None = None) -> bool:
         """Generate audio for *text* and play it.
 
