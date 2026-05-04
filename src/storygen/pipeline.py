@@ -931,16 +931,19 @@ def _build_beat_prompt(save: GameSave, from_node_id: str, choice_text: str) -> s
     """
     sections: list[str] = []
 
-    # Cast - kept terse so the prompt doesn't bloat for stories with many chars.
+    # Cast - one-liner for quick ID plus full backstory so the beat agent
+    # can naturally reference character history and relationships.
     if save.characters:
-        cast_lines = [
-            (
+        cast_lines: list[str] = []
+        for c in save.characters:
+            line = (
                 f"- [{c.id}] {c.name}: {_one_sentence(c.personality)}"
                 + (f" {_one_sentence(c.backstory_summary)}" if c.backstory_summary else "")
                 + f" ({_one_sentence(c.physical_description)})"
             )
-            for c in save.characters
-        ]
+            if c.backstory:
+                line += f"\n  Backstory: {c.backstory}"
+            cast_lines.append(line)
         sections.append("CAST:\n" + "\n".join(cast_lines))
 
     if save.relationships:
