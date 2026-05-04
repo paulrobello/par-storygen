@@ -53,12 +53,12 @@ class MenuScreen(Screen[None]):
         if last_story_id() is None:
             self.query_one("#btn-resume", Button).disabled = True
 
-    def action_resume_story(self) -> None:
+    async def action_resume_story(self) -> None:
         from storygen.app import StoryGenApp
 
         app = self.app  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
         if isinstance(app, StoryGenApp):
-            app.run_worker(app._auto_resume(), name="resume-from-menu")  # pyright: ignore[reportPrivateUsage]
+            await app._auto_resume()  # pyright: ignore[reportPrivateUsage]
 
     def action_new_story(self) -> None:
         from storygen.app import StoryGenApp
