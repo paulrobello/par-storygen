@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Consolidate info actions into modal picker** — Portraits, Graph, Endings, and Relationships bindings removed from the play footer. Press `i` to open an Info picker modal (same pattern as Regen) with per-option guards (disabled when unavailable). Frees 4 footer slots for a cleaner UI.
 - **Beat prompts include character backstory summary** — The CAST roster in beat prompts now includes a one-sentence backstory summary for each character, giving the LLM context to distinguish characters' origins and motivations. `backstory_summary` is auto-populated from the full backstory on load. Save migration v3→v4.
+- **Scene illustration featured character cap raised to 4** — The illustration agent can now include up to 4 characters as featured references (up from 3), reducing cases where a character appears in the scene image without a reference portrait.
 
 ### Added
 
@@ -45,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Concurrent portrait regeneration race** — Clicking Regenerate on multiple characters in quick succession fired parallel API requests with no throttling, risking rate-limit hits and data races. Both the portraits screen and library browser now track in-flight regenerations in a busy set; all Regenerate buttons are disabled while any regeneration is running.
 - **Duplicate characters in new story** — The LLM character agent could return characters with duplicate names (e.g. "Paul Robello" and "Paul" treated as two people). The wizard now deduplicates generated characters by both full name and first name (case-insensitive), keeping the first occurrence.
 - **Resume button stays enabled after deleting last story** — The Resume Last Story button and `r` keybinding were not refreshed when returning to the menu. Now checks that the game directory actually exists on mount and every screen resume, disabling both the button and binding when no story is resumable.
+- **Scene image reuses wrong character's face** — When the illustration agent described more characters than it featured (capped at 3), the image model would paint un-referenced characters by reusing a referenced character's face. Added explicit guidance to only render referenced characters and never reuse faces.
 
 ## [0.3.1] - 2026-05-01
 
