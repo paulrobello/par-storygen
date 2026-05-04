@@ -2200,3 +2200,121 @@ async def test_pipeline_edit_scene_skips_when_art_disabled(
 
     # Restore
     app_state.set_art_enabled(True)
+
+
+# --- Relationship merge tests ---
+
+
+@pytest.mark.asyncio
+async def test_pipeline_merges_relationship_updates(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """advance() merges relationship_updates from beat into save.relationships."""
+    save = _bootstrap_save(tmp_path, monkeypatch)
+    from storygen.core.models import Relationship, RelationshipType
+
+    beat = StoryBeat(
+        narration="They fought side by side.",
+        choices=[Choice(id="c1", text="onward")],
+        is_major=False,
+        is_ending=False,
+        relationship_updates=[
+            Relationship(
+                char_a_id="a", char_b_id="b", type=RelationshipType.ALLY,
+                strength=3, context="fought together", updated_at_node_id="pending",
+            ),
+        ],
+    )
+    plan = IllustrationPlan(
+        should_illustrate=False, image_prompt="", featured_character_ids=[], reasoning="",
+    )
+    pipeline = BeatPipeline(
+        beat_agent=FakeBeatAgent(beat),
+        illustration_agent=FakeIllustrationAgent(plan),
+        summary_agent=None,
+        image_provider=FakeImageProvider(),
+        callbacks=PipelineCallbacks(),
+    )
+    await pipeline.advance(save, from_node_id="root", choice_id="c1")
+    assert len(save.relationships) == 1
+    assert save.relationships[0].type == RelationshipType.ALLY
+    assert save.relationships[0].context == "fought together"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_merges_relationship_update_existing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Updating an existing relationship replaces type/strength/context."""
+    save = _bootstrap_save(tmp_path, monkeypatch)
+    from storygen.core.models import Relationship, RelationshipType
+
+    save.relationships.append(
+        Relationship(
+            char_a_id="a", char_b_id="b", type=RelationshipType.NEUTRAL,
+            strength=1, context="strangers", updated_at_node_id="root",
+        )
+    )
+    beat = StoryBeat(
+        narration="They became friends.",
+        choices=[Choice(id="c1", text="onward")],
+        is_major=False,
+        is_ending=False,
+        relationship_updates=[
+            Relationship(
+                char_a_id="a", char_b_id="b", type=RelationshipType.ALLY,
+                strength=3, context="became friends", updated_at_node_id="pending",
+            ),
+        ],
+    )
+    plan = IllustrationPlan(
+        should_illustrate=False, image_prompt="", featured_character_ids=[], reasoning="",
+    )
+    pipeline = BeatPipeline(
+        beat_agent=FakeBeatAgent(beat),
+        illustration_agent=FakeIllustrationAgent(plan),
+        summary_agent=None,
+        image_provider=FakeImageProvider(),
+        callbacks=PipelineCallbacks(),
+    )
+    await pipeline.advance(save, from_node_id="root", choice_id="c1")
+    assert len(save.relationships) == 1
+    assert save.relationships[0].type == RelationshipType.ALLY
+    assert save.relationships[0].strength == 3
+    assert save.relationships[0].context == "became friends"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_merges_relationship_no_updates(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A beat with empty relationship_updates leaves existing relationships unchanged."""
+    save = _bootstrap_save(tmp_path, monkeypatch)
+    from storygen.core.models import Relationship, RelationshipType
+
+    save.relationships.append(
+        Relationship(
+            char_a_id="a", char_b_id="b", type=RelationshipType.RIVAL,
+            strength=2, context="tension", updated_at_node_id="root",
+        )
+    )
+    beat = StoryBeat(
+        narration="A quiet moment.",
+        choices=[Choice(id="c1", text="onward")],
+        is_major=False,
+        is_ending=False,
+        relationship_updates=[],
+    )
+    plan = IllustrationPlan(
+        should_illustrate=False, image_prompt="", featured_character_ids=[], reasoning="",
+    )
+    pipeline = BeatPipeline(
+        beat_agent=FakeBeatAgent(beat),
+        illustration_agent=FakeIllustrationAgent(plan),
+        summary_agent=None,
+        image_provider=FakeImageProvider(),
+        callbacks=PipelineCallbacks(),
+    )
+    await pipeline.advance(save, from_node_id="root", choice_id="c1")
+    assert len(save.relationships) == 1
+    assert save.relationships[0].type == RelationshipType.RIVAL

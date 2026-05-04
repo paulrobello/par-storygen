@@ -30,6 +30,7 @@ from storygen.llm.models import (
     Character,
     Choice,
     IllustrationPlan,
+    Relationship,
     StoredChoice,
     StoryBeat,
     StoryNode,
@@ -311,6 +312,10 @@ class BeatPipeline:
         for idx, c in enumerate(save.characters):
             if c.id in new_characters_ids and c.introduced_at_node_id == "pending":
                 save.characters[idx] = c.model_copy(update={"introduced_at_node_id": new_node_id})
+
+        # Merge relationship updates from the beat.
+        if beat.relationship_updates:
+            _merge_relationships(save, beat.relationship_updates, new_node_id)
 
         new_node = StoryNode(
             id=new_node_id,
@@ -893,6 +898,23 @@ class BeatPipeline:
 
 
 # --- Beat prompt construction --------------------------------------------------
+
+
+def _merge_relationships(
+    save: GameSave, updates: list[Relationship], node_id: str
+) -> None:
+    """Merge relationship deltas from a beat into the save's relationship list."""
+    for update in updates:
+        key = (update.char_a_id, update.char_b_id)
+        existing = next(
+            (r for r in save.relationships if (r.char_a_id, r.char_b_id) == key),
+            None,
+        )
+        if existing is not None:
+            save.relationships.remove(existing)
+        save.relationships.append(
+            update.model_copy(update={"updated_at_node_id": node_id})
+        )
 
 
 def _build_beat_prompt(save: GameSave, from_node_id: str, choice_text: str) -> str:
