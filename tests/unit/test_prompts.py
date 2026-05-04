@@ -177,3 +177,13 @@ def test_beat_prompt_moderate_pacing_matches_default() -> None:
     assert out_default == out_moderate
     assert "2-5" in out_moderate
     assert "2-4" in out_moderate
+
+
+def test_beat_system_prompt_includes_relationship_tracking() -> None:
+    prompt = beat_system_prompt(
+        theme=Theme(title="T", setting="S", premise="P", keywords=[]),
+        tone=Tone(preset="serious", custom_descriptor=None),
+        narration_style="third_person",
+    )
+    assert "relationship_updates" in prompt
+    assert "relationship" in prompt.lower()
