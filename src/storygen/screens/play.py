@@ -371,6 +371,8 @@ class PlayScreen(Screen[None]):
         if action == "export_book":
             node = self._save.nodes.get(self._save.current_node_id)
             return node is not None and node.is_ending
+        if action == "relationships":
+            return bool(self._save.relationships)
         if action == "menu":
             return True
         return None
