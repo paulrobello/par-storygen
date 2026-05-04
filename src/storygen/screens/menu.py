@@ -9,6 +9,8 @@ from textual.containers import Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header
 
+from storygen.storage.app_state import last_story_id
+
 
 class MenuScreen(Screen[None]):
     """Top-level menu shown at app start."""
@@ -26,6 +28,7 @@ class MenuScreen(Screen[None]):
     """
 
     BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
+        ("r", "resume_story", "Resume Last"),
         ("n", "new_story", "New Story"),
         ("k", "quick_start", "Quick Start"),
         ("l", "load_story", "Existing Stories"),
@@ -37,6 +40,7 @@ class MenuScreen(Screen[None]):
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
         with Vertical(id="menu"):
+            yield Button("Resume Last Story", id="btn-resume", variant="primary")
             yield Button("New Story", id="btn-new")
             yield Button("Quick Start", id="btn-quick", variant="success")
             yield Button("Existing Stories", id="btn-load")
@@ -44,6 +48,17 @@ class MenuScreen(Screen[None]):
             yield Button("Settings", id="btn-settings")
             yield Button("Quit", id="btn-quit")
         yield Footer()
+
+    def on_mount(self) -> None:
+        if last_story_id() is None:
+            self.query_one("#btn-resume", Button).disabled = True
+
+    def action_resume_story(self) -> None:
+        from storygen.app import StoryGenApp
+
+        app = self.app  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
+        if isinstance(app, StoryGenApp):
+            app.run_worker(app._auto_resume(), name="resume-from-menu")  # pyright: ignore[reportPrivateUsage]
 
     def action_new_story(self) -> None:
         from storygen.app import StoryGenApp
@@ -76,6 +91,7 @@ class MenuScreen(Screen[None]):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         actions = {
+            "btn-resume": self.action_resume_story,
             "btn-new": self.action_new_story,
             "btn-quick": self.action_quick_start,
             "btn-load": self.action_load_story,
