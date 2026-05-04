@@ -112,7 +112,15 @@ def build_scene_ref_guidance(reference_portraits: list[ReferencePortrait]) -> st
     if not reference_portraits:
         return ""
     lines = [f"  Image {i + 1}: {rp.name}" for i, rp in enumerate(reference_portraits)]
-    return "\n\nReference images provided:\n" + "\n".join(lines)
+    names = ", ".join(rp.name for rp in reference_portraits)
+    return (
+        "\n\nReference images provided:\n"
+        + "\n".join(lines)
+        + f"\n\nCRITICAL: Only render the characters listed above ({names}). "
+        "If the prompt mentions other named characters, omit them from the "
+        "illustration or replace them with unnamed background figures. Do not "
+        "reuse a reference portrait's face for a different character."
+    )
 
 
 def build_scene_prompt(
