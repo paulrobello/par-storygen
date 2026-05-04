@@ -58,7 +58,14 @@ class MenuScreen(Screen[None]):
 
         app = self.app  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
         if isinstance(app, StoryGenApp):
-            app.run_worker(app._auto_resume, name="resume-from-menu", group="resume")  # pyright: ignore[reportPrivateUsage]
+            self.run_worker(self._do_resume, name="resume-from-menu")  # pyright: ignore[reportUnknownMemberType]
+
+    async def _do_resume(self) -> None:
+        from storygen.app import StoryGenApp
+
+        app = self.app  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
+        if isinstance(app, StoryGenApp):
+            await app._auto_resume()  # pyright: ignore[reportPrivateUsage]
 
     def action_new_story(self) -> None:
         from storygen.app import StoryGenApp
