@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Default character image model to gpt-image-2** — New stories and the character library now default to `gpt-image-2` instead of `gpt-image-1.5`. Existing saves keep their configured model. The older models remain available in the settings dropdown.
 - **Named reference portraits in scene generation** — Scene image generation now passes character names alongside portrait images so the LLM can identify which reference belongs to which character. The edit-regen flow labels the current scene artwork and each featured character by name, grounding character-appearance changes during art edits. Introduced `ReferencePortrait(name, data)` type across the image provider protocol and all backends (OpenAI, Gemini, Z.AI, Ollama).
 
 ### Added

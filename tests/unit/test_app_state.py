@@ -416,7 +416,7 @@ def test_character_image_provider_prefs_empty_state_returns_defaults(
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     prefs = app_state.read_character_image_provider_prefs()
     assert prefs.provider == "openai"
-    assert prefs.model == "gpt-image-1.5"
+    assert prefs.model == "gpt-image-2"
     assert prefs.base_url == ""
 
 

@@ -33,7 +33,7 @@ def test_loads_defaults_when_no_env(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     assert cfg.image_config.provider == "openai"
     assert cfg.image_config.model == "gpt-image-2"
     assert cfg.character_image_config.provider == "openai"
-    assert cfg.character_image_config.model == "gpt-image-1.5"
+    assert cfg.character_image_config.model == "gpt-image-2"
     assert cfg.openai_api_key == ""
 
 

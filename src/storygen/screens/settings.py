@@ -281,7 +281,7 @@ class SettingsScreen(Screen[None]):
         )
         self._character_image_model_input = Input(
             value=app_state.DEFAULT_CHARACTER_IMAGE_MODEL,
-            placeholder="e.g. gpt-image-1.5",
+            placeholder="e.g. gpt-image-2",
             id="character-image-provider-model",
         )
         self._character_image_base_url_input = Input(

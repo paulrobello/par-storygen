@@ -21,7 +21,7 @@ _CFG = AppConfig(
     openai_api_key="k",
     text_config=TextProviderConfig(provider="openai", model="gpt-4o-mini"),
     image_config=ImageProviderConfig(provider="openai", model="gpt-image-2"),
-    character_image_config=ImageProviderConfig(provider="openai", model="gpt-image-1.5"),
+    character_image_config=ImageProviderConfig(provider="openai", model="gpt-image-2"),
 )
 
 

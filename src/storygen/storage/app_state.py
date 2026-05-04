@@ -74,7 +74,7 @@ _ALLOWED_PROVIDERS: frozenset[str] = frozenset(pid for _, pid in PROVIDER_CHOICE
 DEFAULT_IMAGE_PROVIDER: str = "openai"
 DEFAULT_IMAGE_MODEL: str = "gpt-image-2"
 DEFAULT_CHARACTER_IMAGE_PROVIDER: str = "openai"
-DEFAULT_CHARACTER_IMAGE_MODEL: str = "gpt-image-1.5"
+DEFAULT_CHARACTER_IMAGE_MODEL: str = "gpt-image-2"
 
 # UI-facing (label, provider-id) pairs — consumed by the Settings screen Select widget.
 IMAGE_PROVIDER_CHOICES: tuple[tuple[str, str], ...] = (

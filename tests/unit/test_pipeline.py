@@ -135,7 +135,7 @@ def _bootstrap_save(
         text_config=TextProviderConfig(provider="openai", model="gpt-4o-mini"),
         image_config=image_config or ImageProviderConfig(provider="openai", model="gpt-image-2"),
         character_image_config=character_image_config
-        or ImageProviderConfig(provider="openai", model="gpt-image-1.5"),
+        or ImageProviderConfig(provider="openai", model="gpt-image-2"),
         characters=[],
         nodes={"root": root},
         root_node_id="root",
@@ -413,7 +413,7 @@ async def test_pipeline_scene_cost_uses_art_config_when_character_config_differs
         tmp_path,
         monkeypatch,
         image_config=ImageProviderConfig(provider="gemini", model="gemini-3.1-flash-image-preview"),
-        character_image_config=ImageProviderConfig(provider="openai", model="gpt-image-1.5"),
+        character_image_config=ImageProviderConfig(provider="openai", model="gpt-image-2"),
     )
     from datetime import datetime
 

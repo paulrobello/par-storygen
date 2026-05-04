@@ -185,7 +185,7 @@ def test_character_image_config_defaults_to_openai_v15_on_legacy_save(
     restored = load_game(str(save.id))
 
     assert restored.character_image_config.provider == "openai"
-    assert restored.character_image_config.model == "gpt-image-1.5"
+    assert restored.character_image_config.model == "gpt-image-2"
 
 
 def test_art_style_round_trip(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

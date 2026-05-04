@@ -154,7 +154,7 @@ class WizardFlow:
         self._text_config = text_config
         self._image_config = image_config
         self._character_image_config = character_image_config or ImageProviderConfig(
-            provider="openai", model="gpt-image-1.5"
+            provider="openai", model="gpt-image-2"
         )
         self._theme_agent = theme_agent
         self._character_agent_factory = character_agent_factory

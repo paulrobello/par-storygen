@@ -55,7 +55,7 @@ class GameSave(BaseModel):
     text_config: TextProviderConfig
     image_config: ImageProviderConfig
     character_image_config: ImageProviderConfig = Field(
-        default_factory=lambda: ImageProviderConfig(provider="openai", model="gpt-image-1.5")
+        default_factory=lambda: ImageProviderConfig(provider="openai", model="gpt-image-2")
     )
     characters: list[Character]
     relationships: list[Relationship] = Field(default_factory=list[Relationship])
