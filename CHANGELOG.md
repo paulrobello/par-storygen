@@ -43,7 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Export book hides audio controls when story has no audio** — Auto-Read button is disabled and audio player HTML is omitted when the exported story has no TTS audio, avoiding empty UI elements.
 - **Blank screen on escape from play** — Pressing Escape to return to the main menu from the play screen showed a blank screen. Fixed by switching to the menu screen instead of popping the play screen off the stack.
 - **Concurrent portrait regeneration race** — Clicking Regenerate on multiple characters in quick succession fired parallel API requests with no throttling, risking rate-limit hits and data races. Both the portraits screen and library browser now track in-flight regenerations in a busy set; all Regenerate buttons are disabled while any regeneration is running.
-- **Duplicate characters in new story** — The LLM character agent could return characters with duplicate names. The wizard now deduplicates generated characters by name (case-insensitive), keeping the first occurrence.
+- **Duplicate characters in new story** — The LLM character agent could return characters with duplicate names (e.g. "Paul Robello" and "Paul" treated as two people). The wizard now deduplicates generated characters by both full name and first name (case-insensitive), keeping the first occurrence.
+- **Resume button stays enabled after deleting last story** — The Resume Last Story button and `r` keybinding were not refreshed when returning to the menu. Now checks that the game directory actually exists on mount and every screen resume, disabling both the button and binding when no story is resumable.
 
 ## [0.3.1] - 2026-05-01
 
