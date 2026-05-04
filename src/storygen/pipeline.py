@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
+from storygen.core.models import one_sentence as _one_sentence
 from storygen.images.base import ReferencePortrait
 from storygen.images.constants import (
     OPENAI_PARTIAL_IMAGES,
@@ -933,7 +934,11 @@ def _build_beat_prompt(save: GameSave, from_node_id: str, choice_text: str) -> s
     # Cast - kept terse so the prompt doesn't bloat for stories with many chars.
     if save.characters:
         cast_lines = [
-            f"- [{c.id}] {c.name}: {_one_sentence(c.personality)} ({_one_sentence(c.physical_description)})"
+            (
+                f"- [{c.id}] {c.name}: {_one_sentence(c.personality)}"
+                + (f" {_one_sentence(c.backstory_summary)}" if c.backstory_summary else "")
+                + f" ({_one_sentence(c.physical_description)})"
+            )
             for c in save.characters
         ]
         sections.append("CAST:\n" + "\n".join(cast_lines))
@@ -1009,17 +1014,6 @@ def _pacing_hint_for_depth(depth: int, target: int, pacing: str = "moderate") ->
         " consider resolving the central conflict in this beat or the next."
         " Set is_ending=true once the resolution lands."
     )
-
-
-def _one_sentence(text: str) -> str:
-    """Return text up to the first sentence terminator, trimmed."""
-    text = text.strip()
-    for sep in (". ", "! ", "? "):
-        idx = text.find(sep)
-        if idx != -1:
-            return text[: idx + 1].strip()
-    # Fallback: clip to a reasonable length so it stays one line in the prompt.
-    return text if len(text) <= 160 else text[:157] + "…"
 
 
 def _resolve_chosen_text(save: GameSave, node: StoryNode) -> str:

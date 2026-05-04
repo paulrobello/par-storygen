@@ -377,6 +377,7 @@ class SettingsScreen(Screen[None]):
         )
         self._tts_api_key_status = Static("", id="tts-api-key-status")
         self._tts_auto_read_switch = Switch(value=False, id="tts-auto-read-switch")
+        self._tts_auto_read_recap_switch = Switch(value=False, id="tts-auto-read-recap-switch")
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -518,6 +519,12 @@ class SettingsScreen(Screen[None]):
                 yield self._tts_auto_read_switch
                 yield Static(
                     "Auto-read story beats aloud when generated",
+                    classes="switch-label",
+                )
+            with Horizontal(classes="switch-row"):
+                yield self._tts_auto_read_recap_switch
+                yield Static(
+                    "Auto-read recaps aloud when shown",
                     classes="switch-label",
                 )
 
@@ -804,10 +811,13 @@ class SettingsScreen(Screen[None]):
             self._tts_provider_select.prevent(Select.Changed),
             self._tts_api_key_input.prevent(Input.Changed),
             self._tts_auto_read_switch.prevent(Switch.Changed),
+            self._tts_auto_read_recap_switch.prevent(Switch.Changed),
         ):
             self._tts_provider_select.value = tts_prefs.provider
             self._tts_api_key_input.value = tts_prefs.api_key
             self._tts_auto_read_switch.value = tts_prefs.auto_read
+            self._tts_auto_read_recap_switch.value = tts_prefs.auto_read_recap
+            self._tts_auto_read_recap_switch.value = tts_prefs.auto_read_recap
         self._refresh_tts_api_key_status(tts_prefs.provider)
         self._populate_tts_voices(tts_prefs.voice)
 
@@ -1215,11 +1225,13 @@ class SettingsScreen(Screen[None]):
         tts_voice_raw = self._tts_voice_select.value
         tts_voice = tts_voice_raw if isinstance(tts_voice_raw, str) else ""
         tts_auto_read = self._tts_auto_read_switch.value
+        tts_auto_read_recap = self._tts_auto_read_recap_switch.value
         tts_prefs = TTSPrefs(
             provider=tts_provider,
             api_key=tts_api_key,
             voice=tts_voice,
             auto_read=tts_auto_read,
+            auto_read_recap=tts_auto_read_recap,
         )
 
         # Single atomic write so a crash mid-save can't leave partial persistence.
@@ -1262,6 +1274,7 @@ class SettingsScreen(Screen[None]):
             self._fallback_select.prevent(Select.Changed),
             self._tts_provider_select.prevent(Select.Changed),
             self._tts_auto_read_switch.prevent(Switch.Changed),
+            self._tts_auto_read_recap_switch.prevent(Switch.Changed),
         ):
             # Text-provider section.
             self._provider_select.value = app_state.DEFAULT_TEXT_PROVIDER
@@ -1312,6 +1325,7 @@ class SettingsScreen(Screen[None]):
             self._tts_provider_select.value = app_state.DEFAULT_TTS_PROVIDER
             self._tts_api_key_input.value = ""
             self._tts_auto_read_switch.value = False
+            self._tts_auto_read_recap_switch.value = False
         self._refresh_api_key_status(app_state.DEFAULT_TEXT_PROVIDER)
         self._refresh_suggested(app_state.DEFAULT_TEXT_PROVIDER)
         self._refresh_image_api_key_status(app_state.DEFAULT_IMAGE_PROVIDER)

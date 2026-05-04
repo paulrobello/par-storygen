@@ -27,7 +27,7 @@ from storygen.core.models import (
 from storygen.storage import paths
 from storygen.storage.app_state import DEFAULT_ART_STYLE, DEFAULT_TARGET_MAJOR_BEATS
 
-SAVE_VERSION: int = 3
+SAVE_VERSION: int = 4
 
 __all__ = [
     "GameSave",
@@ -103,6 +103,9 @@ def _migrate(data: dict[str, Any], *, from_version: int) -> dict[str, Any]:
             node.setdefault("recap_text", None)
     if from_version < 3:
         data.setdefault("relationships", [])
+    if from_version < 4:
+        for char in data.get("characters", []):
+            char.setdefault("backstory_summary", None)
     return data
 
 

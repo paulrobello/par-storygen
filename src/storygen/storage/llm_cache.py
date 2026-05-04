@@ -2,8 +2,9 @@
 
 When ``app_state.llm_cache_enabled()`` is True, the pipeline dumps every
 agent exchange (beat/illustration/summary/blurb) to a sidecar JSON file
-keyed by (node_id, agent_name) under the save's directory. Disabled by
-default; no player-visible behavior.
+keyed by (node_id, agent_name) under the save's directory. Wizard-stage
+exchanges (theme/characters/adapt/blurb) are also cached using
+``node_id="wizard"``. Disabled by default; no player-visible behavior.
 
 Layout::
 
@@ -12,9 +13,10 @@ Layout::
         <node-id>-illustration.json
         <node-id>-summary.json
         <node-id>-blurb.json  (root-node blurb backfill only)
-
-Wizard-stage agents (theme / characters / adapt-backstory) pre-date the
-save directory and are out of scope — the cache is strictly per-node.
+        wizard-theme.json
+        wizard-characters.json
+        wizard-adapt.json
+        wizard-blurb.json
 """
 
 from __future__ import annotations

@@ -114,6 +114,7 @@ _ALLOWED_IMAGE_PROVIDERS: frozenset[str] = frozenset(pid for _, pid in IMAGE_PRO
 DEFAULT_TTS_PROVIDER: str = "openai"
 DEFAULT_TTS_VOICE: str = ""
 DEFAULT_TTS_AUTO_READ: bool = False
+DEFAULT_TTS_AUTO_READ_RECAP: bool = False
 DEFAULT_AUTO_RECAP: bool = False
 DEFAULT_RECAP_INTERVAL: int = 3
 
@@ -211,6 +212,7 @@ class TTSPrefs:
     api_key: str = ""  # blank → fall back to provider env var
     voice: str = ""  # blank → use provider default
     auto_read: bool = DEFAULT_TTS_AUTO_READ
+    auto_read_recap: bool = DEFAULT_TTS_AUTO_READ_RECAP
 
 
 def _state_file() -> Path:
@@ -610,6 +612,7 @@ def read_tts_prefs() -> TTSPrefs:
         api_key=str(raw.get("api_key", "")),
         voice=str(raw.get("voice", "")),
         auto_read=bool(raw.get("auto_read", DEFAULT_TTS_AUTO_READ)),
+        auto_read_recap=bool(raw.get("auto_read_recap", DEFAULT_TTS_AUTO_READ_RECAP)),
     )
 
 
@@ -620,6 +623,7 @@ def _serialize_tts_prefs(prefs: TTSPrefs) -> dict[str, Any]:
         "api_key": prefs.api_key,
         "voice": prefs.voice,
         "auto_read": prefs.auto_read,
+        "auto_read_recap": prefs.auto_read_recap,
     }
 
 

@@ -10,8 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Consolidate info actions into modal picker** — Portraits, Graph, Endings, and Relationships bindings removed from the play footer. Press `i` to open an Info picker modal (same pattern as Regen) with per-option guards (disabled when unavailable). Frees 4 footer slots for a cleaner UI.
+- **Beat prompts include character backstory summary** — The CAST roster in beat prompts now includes a one-sentence backstory summary for each character, giving the LLM context to distinguish characters' origins and motivations. `backstory_summary` is auto-populated from the full backstory on load. Save migration v3→v4.
 
 ### Added
+
+- **Recap read-aloud hotkey** — Press `t` in the recap modal to read the recap text aloud via TTS.
+- **Auto-read recaps** — New TTS setting "Auto-read recaps aloud when shown" automatically speaks recap text when the recap modal appears (matching the existing auto-read behavior for story beats).
+- **Web export audio speed control** — The exported HTML book's audio player now has a speed button that cycles through 0.75x, 1x, 1.25x, 1.5x, and 2x playback rates.
+- **Wizard LLM debug caching** — Wizard-stage LLM exchanges (theme, characters, adapt-backstory, blurb) are now cached to `wizard-*.json` files in the LLM debug cache directory, alongside the existing per-node pipeline caches.
 
 - **Character Relationship Tracking** — Pairwise relationships between characters (ally, rival, neutral, romantic, mentor, student, family, stranger) are tracked as the story progresses. The beat agent extracts relationship changes inline during beat generation. Current relationships are fed back into beat prompts for narrative consistency. Press `f` during gameplay to view all relationships in a modal with strength bars (1-5) and context. Save migration v2→v3 adds the `relationships` field.
 - **Story Templates / Presets** — Six curated story presets (Haunted Mansion Mystery, Space Opera Epic, Dragon's Quest, Noir Detective, Enchanted Forest, Zombie Apocalypse) bundled as TOML. "Quick Start" button on the main menu launches directly into a preset. "Load Preset" button on the wizard THEME step auto-fills all wizard fields. "Save as Preset" on the CONFIRM step saves custom presets to `$XDG_CONFIG_HOME/storygen/presets/`. Custom and curated presets are discovered alongside each other.
@@ -35,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Export book auto-read on last page** — Auto-read now plays audio on the final (ending) page before stopping, instead of stopping immediately without reading it.
 - **Export book auto-read stops cleanly on last page** — When audio ends on the final page, auto-read now resets the button to "Auto-Read" instead of leaving it stuck on "Stop".
 - **Export book hides audio controls when story has no audio** — Auto-Read button is disabled and audio player HTML is omitted when the exported story has no TTS audio, avoiding empty UI elements.
+- **Blank screen on escape from play** — Pressing Escape to return to the main menu from the play screen showed a blank screen. Fixed by switching to the menu screen instead of popping the play screen off the stack.
 
 ## [0.3.1] - 2026-05-01
 

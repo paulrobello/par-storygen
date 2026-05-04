@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
+
+from storygen.storage import app_state
+
+if TYPE_CHECKING:
+    from storygen.tts.player import TTSPlayer
 
 
 class RecapModal(Screen[None]):
@@ -15,11 +20,16 @@ class RecapModal(Screen[None]):
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("escape", "close", "Close"),
         Binding("enter", "close", "Close"),
+        Binding("t", "read_aloud", "Read aloud"),
     ]
 
-    def __init__(self, recap_text: str) -> None:
+    def __init__(
+        self, recap_text: str, *, tts_player: TTSPlayer | None = None, tts_cache_path: str = ""
+    ) -> None:
         super().__init__()
         self._recap_text = recap_text
+        self._tts_player = tts_player
+        self._tts_cache_path = tts_cache_path
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -34,6 +44,26 @@ class RecapModal(Screen[None]):
 
     def action_close(self) -> None:
         self.dismiss(None)
+
+    def action_read_aloud(self) -> None:
+        if self._tts_player is None or not self._recap_text:
+            return
+        tts_prefs = app_state.read_tts_prefs()
+        self._tts_player.configure(
+            tts_prefs.provider,
+            api_key=tts_prefs.api_key,
+            voice=tts_prefs.voice,
+        )
+        from pathlib import Path
+
+        cache = Path(self._tts_cache_path) if self._tts_cache_path else None
+        if cache and not cache.exists():
+            self.notify("Generating speech…", timeout=15)  # pyright: ignore[reportUnknownMemberType]
+        self.run_worker(  # pyright: ignore[reportUnknownMemberType]
+            self._tts_player.speak(self._recap_text, cache_path=cache),
+            exclusive=True,
+            name="recap-tts",
+        )
 
     CSS = """
     #recap-modal-box {

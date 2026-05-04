@@ -13,7 +13,7 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from enum import Enum, auto
 from typing import ClassVar, Literal, Protocol, cast
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from PIL import Image as PILImage
 from textual import work
@@ -57,6 +57,7 @@ from storygen.screens._ref_image_modals import ReferenceImageModal, ReferenceIma
 from storygen.screens.library_browser import CharacterCatalogScreen, LibraryPick
 from storygen.storage import app_state, paths
 from storygen.storage.library import LibraryCharacter, library_portrait_path, load_library_character
+from storygen.storage.llm_cache import dump_llm_exchange
 from storygen.storage.save import GameSave, NarrationStyle, Pacing, ReaderLevel, save_game
 
 
@@ -165,6 +166,21 @@ class WizardFlow:
         self._adapt_agent_factory = adapt_agent_factory
         self._image_provider = image_provider
         self._usage_totals = UsageTotals()
+        # Pre-generate the game ID so wizard-stage LLM exchanges can be
+        # cached to the same llm/ directory that build_initial_save uses.
+        self._game_id: str = str(uuid4())
+
+    def _dump_llm(self, agent_name: str, result: object) -> None:
+        """Best-effort dump of an LLM exchange to the debug cache."""
+        if not app_state.llm_cache_enabled():
+            return
+        with contextlib.suppress(Exception):
+            dump_llm_exchange(
+                self._game_id,
+                "wizard",
+                agent_name,
+                result.all_messages_json(),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType,reportAttributeAccessIssue]
+            )
 
     @property
     def image_provider(self) -> object:
@@ -194,6 +210,7 @@ class WizardFlow:
         prompt = user_prompt.strip() or "Propose a theme."
         result = await self._theme_agent.run(prompt)
         self._record_result_usage(result)
+        self._dump_llm("theme", result)
         return result.output  # type: ignore[union-attr]
 
     async def generate_characters(
@@ -232,6 +249,7 @@ class WizardFlow:
             )
         result = await agent.run(request)
         self._record_result_usage(result)
+        self._dump_llm("characters", result)
         return list(result.output)  # type: ignore[union-attr]
 
     async def adapt_library_character(
@@ -262,6 +280,7 @@ class WizardFlow:
         )
         result = await agent.run(user_prompt)
         self._record_result_usage(result)
+        self._dump_llm("adapt", result)
         adapted = getattr(result, "output", None)
         new_backstory = str(getattr(adapted, "backstory", "")).strip()
         if not new_backstory:
@@ -307,7 +326,7 @@ class WizardFlow:
                 image and portrait bytes are written to disk instead of
                 generated.
         """
-        game_id = uuid4()
+        game_id = UUID(self._game_id)
         paths.ensure_game_dirs(str(game_id))
 
         art_on = app_state.art_enabled()
@@ -414,6 +433,7 @@ class WizardFlow:
         blurb_agent = self._blurb_agent_factory(theme, enriched, narration_style)
         blurb_result = await blurb_agent.run("Write the back-cover blurb.")
         self._record_result_usage(blurb_result)
+        self._dump_llm("blurb", blurb_result)
         blurb = str(blurb_result.output)  # type: ignore[union-attr]
 
         root = StoryNode(

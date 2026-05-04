@@ -638,7 +638,20 @@ class PlayScreen(Screen[None]):
         self._render_current()
 
     def action_menu(self) -> None:
-        self.app.pop_screen()  # pyright: ignore[reportUnknownMemberType]
+        self.app.switch_screen("menu")  # pyright: ignore[reportUnknownMemberType]
+
+    def _make_recap_modal(self, recap_text: str) -> RecapModal:
+        """Build a RecapModal with TTS player and cache path wired in."""
+        tts_prefs = app_state.read_tts_prefs()
+        node = self._save.nodes.get(self._save.current_node_id)
+        cache_str = ""
+        if node and self._tts_player is not None:
+            cache_str = str(self._tts_cache_path(f"{node.id}-recap", tts_prefs))
+        return RecapModal(
+            recap_text,
+            tts_player=self._tts_player,
+            tts_cache_path=cache_str,
+        )
 
     async def action_recap(self) -> None:
         """Show a 'Previously on...' recap for the current story."""
@@ -647,7 +660,8 @@ class PlayScreen(Screen[None]):
         node = self._save.nodes[self._save.current_node_id]
 
         if node.recap_text:
-            self.app.push_screen(RecapModal(node.recap_text))  # pyright: ignore[reportUnknownMemberType]
+            self.app.push_screen(self._make_recap_modal(node.recap_text))  # pyright: ignore[reportUnknownMemberType]
+            await self._maybe_speak_recap(node.recap_text)
             return
 
         self.notify("Generating recap…", timeout=30)
@@ -659,7 +673,8 @@ class PlayScreen(Screen[None]):
 
         node.recap_text = recap.text
         save_game(self._save)
-        self.app.push_screen(RecapModal(recap.text))  # pyright: ignore[reportUnknownMemberType]
+        self.app.push_screen(self._make_recap_modal(recap.text))  # pyright: ignore[reportUnknownMemberType]
+        await self._maybe_speak_recap(recap.text)
 
     async def _generate_recap(self) -> Recap:
         from storygen.llm.agents import build_recap_agent
@@ -947,6 +962,27 @@ class PlayScreen(Screen[None]):
             if not cache.exists():
                 self.notify("Generating speech…", timeout=15)
         await self._speak_current_node()
+
+    async def _maybe_speak_recap(self, recap_text: str) -> None:
+        """If auto-read-recap is enabled, speak the recap text aloud."""
+        if self._tts_player is None:
+            return
+        tts_prefs = app_state.read_tts_prefs()
+        if not tts_prefs.auto_read_recap:
+            return
+        node = self._save.nodes.get(self._save.current_node_id)
+        if not node or not recap_text:
+            return
+        self._tts_player.configure(
+            tts_prefs.provider,
+            api_key=tts_prefs.api_key,
+            voice=tts_prefs.voice,
+        )
+        cache = self._tts_cache_path(f"{node.id}-recap", tts_prefs)
+        if not cache.exists():
+            self.notify("Generating recap speech…", timeout=15)
+        await self._tts_player.speak(recap_text, cache_path=cache)
+        self.refresh_bindings()
 
     def action_auto_select(self) -> None:
         """Toggle auto-select on/off."""

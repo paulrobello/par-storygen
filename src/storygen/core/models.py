@@ -27,6 +27,17 @@ NarrationStyle = Literal["first_person", "third_person", "fourth_wall"]
 Pacing = Literal["slow", "moderate", "fast"]
 ReaderLevel = Literal["ages_0_5", "ages_6_10", "ages_11_15", "ages_15_plus"]
 
+
+def one_sentence(text: str) -> str:
+    """Return text up to the first sentence terminator, trimmed."""
+    text = text.strip()
+    for sep in (". ", "! ", "? "):
+        idx = text.find(sep)
+        if idx != -1:
+            return text[: idx + 1].strip()
+    return text if len(text) <= 160 else text[:157] + "…"
+
+
 # ---------------------------------------------------------------------------
 # Provider configuration
 # ---------------------------------------------------------------------------
@@ -156,6 +167,7 @@ class Character(BaseModel):
     id: CharacterId
     name: str
     backstory: str
+    backstory_summary: str | None = None
     personality: str
     physical_description: str
     portrait_path: str | None = None
@@ -164,6 +176,12 @@ class Character(BaseModel):
     outfits: list[CharacterOutfit] = Field(default_factory=list[CharacterOutfit])
     current_outfit_id: str | None = None
     reference_image_path: str | None = None
+
+    @model_validator(mode="after")
+    def _ensure_backstory_summary(self) -> Character:
+        if not self.backstory_summary and self.backstory:
+            self.backstory_summary = one_sentence(self.backstory)
+        return self
 
 
 class Choice(BaseModel):

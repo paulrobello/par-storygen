@@ -355,6 +355,26 @@ body {
   color: var(--text-muted);
 }
 
+.audio-player__speed {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all var(--transition-speed);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.audio-player__speed:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 /* ── The End ───────────────────────────────────────────────────── */
 .the-end {
   text-align: center;
@@ -600,6 +620,8 @@ let isAnimating = false;
 let autoReadActive = false;
 let autoReadTimer = null;
 let currentAudioPlayed = false;
+let audioSpeed = 1;
+const SPEED_OPTIONS = [0.75, 1, 1.25, 1.5, 2];
 
 // ── DOM References ───────────────────────────────────────────────
 const pageEl        = document.getElementById('pageEl');
@@ -644,6 +666,7 @@ function renderPage(index) {
     html += '  <div class="audio-player__seek-wrap">';
     html += '    <input type="range" class="audio-player__seek" id="audioSeek" min="0" max="100" value="0" step="0.1" />';
     html += '    <div class="audio-player__time" id="audioTime">0:00 / 0:00</div>';
+    html += '    <button class="audio-player__speed" id="audioSpeedBtn">1x</button>';
     html += '  </div>';
     html += '</div>';
   }
@@ -690,7 +713,19 @@ function wireAudio(page) {
   }
 
   audioEl.src = page.audio_url;
+  audioEl.playbackRate = audioSpeed;
   audioEl.load();
+
+  const speedBtn = document.getElementById('audioSpeedBtn');
+  if (speedBtn) {
+    speedBtn.textContent = audioSpeed + 'x';
+    speedBtn.onclick = function() {
+      var idx = SPEED_OPTIONS.indexOf(audioSpeed);
+      audioSpeed = SPEED_OPTIONS[(idx + 1) % SPEED_OPTIONS.length];
+      audioEl.playbackRate = audioSpeed;
+      speedBtn.textContent = audioSpeed + 'x';
+    };
+  }
 
   if (playBtn) {
     playBtn.onclick = function() {
