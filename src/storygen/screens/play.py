@@ -556,6 +556,8 @@ class PlayScreen(Screen[None]):
         node = self._save.nodes[self._save.current_node_id]
         if not node.image_prompt:
             return
+        self._save.nodes[node.id] = node.model_copy(update={"image_status": "generating"})
+        save_game(self._save)
         self._image.show_generating()
         cb = PipelineCallbacks(
             on_image_committed=self._on_image_committed,
