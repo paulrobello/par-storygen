@@ -443,3 +443,47 @@ def test_migrate_v1_to_v2_adds_recap_text() -> None:
         from_version=2,
     )
     assert result2["nodes"]["n1"]["recap_text"] == "Cached"
+
+
+def test_migrate_v2_to_v3_adds_relationships() -> None:
+    from storygen.storage.save import _migrate  # pyright: ignore[reportPrivateUsage]
+
+    data: dict[str, Any] = {
+        "version": 2,
+        "characters": [{"id": "a"}, {"id": "b"}],
+    }
+    result = _migrate(data, from_version=2)
+    assert result["relationships"] == []
+    # v3 data passes through unchanged
+    v3_data: dict[str, Any] = {
+        "version": 3,
+        "relationships": [
+            {
+                "char_a_id": "a",
+                "char_b_id": "b",
+                "type": "ally",
+                "strength": 3,
+                "context": "",
+                "updated_at_node_id": "n1",
+            }
+        ],
+    }
+    result2 = _migrate(v3_data, from_version=3)
+    assert len(result2["relationships"]) == 1
+
+
+def test_relationships_default_empty_on_legacy_save(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A save JSON without relationships field loads with empty list."""
+    import json
+
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    save = _make_save()
+    save_game(save)
+    path = paths.game_save_file(str(save.id))
+    data = json.loads(path.read_text())
+    del data["relationships"]
+    path.write_text(json.dumps(data))
+    restored = load_game(str(save.id))
+    assert restored.relationships == []

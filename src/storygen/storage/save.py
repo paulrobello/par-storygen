@@ -18,6 +18,7 @@ from storygen.core.models import (
     NodeId,
     Pacing,
     ReaderLevel,
+    Relationship,
     StoryNode,
     TextProviderConfig,
     Theme,
@@ -26,7 +27,7 @@ from storygen.core.models import (
 from storygen.storage import paths
 from storygen.storage.app_state import DEFAULT_ART_STYLE, DEFAULT_TARGET_MAJOR_BEATS
 
-SAVE_VERSION: int = 2
+SAVE_VERSION: int = 3
 
 __all__ = [
     "GameSave",
@@ -57,6 +58,7 @@ class GameSave(BaseModel):
         default_factory=lambda: ImageProviderConfig(provider="openai", model="gpt-image-1.5")
     )
     characters: list[Character]
+    relationships: list[Relationship] = Field(default_factory=list[Relationship])
     nodes: dict[NodeId, StoryNode]
     root_node_id: NodeId
     current_node_id: NodeId
@@ -99,6 +101,8 @@ def _migrate(data: dict[str, Any], *, from_version: int) -> dict[str, Any]:
     if from_version < 2:
         for node in data.get("nodes", {}).values():
             node.setdefault("recap_text", None)
+    if from_version < 3:
+        data.setdefault("relationships", [])
     return data
 
 
