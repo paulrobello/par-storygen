@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Named reference portraits in scene generation** — Scene image generation now passes character names alongside portrait images so the LLM can identify which reference belongs to which character. The edit-regen flow labels the current scene artwork and each featured character by name, grounding character-appearance changes during art edits. Introduced `ReferencePortrait(name, data)` type across the image provider protocol and all backends (OpenAI, Gemini, Z.AI, Ollama).
+
 ### Added
 
 - **Character Relationship Tracking** — Pairwise relationships between characters (ally, rival, neutral, romantic, mentor, student, family, stranger) are tracked as the story progresses. The beat agent extracts relationship changes inline during beat generation. Current relationships are fed back into beat prompts for narrative consistency. Press `f` during gameplay to view all relationships in a modal with strength bars (1-5) and context. Save migration v2→v3 adds the `relationships` field.

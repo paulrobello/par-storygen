@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable
 
 import pytest
 
-from storygen.images.base import ImageProvider
+from storygen.images.base import ImageProvider, ReferencePortrait
 from storygen.images.split_provider import SplitImageProvider
 
 
@@ -15,7 +15,7 @@ class _FakeProvider:
         self._portrait_bytes = portrait_bytes
         self._scene_bytes = scene_bytes
         self.portrait_calls: list[tuple[str, bool, str, bytes | None]] = []
-        self.scene_calls: list[tuple[str, list[bytes], str]] = []
+        self.scene_calls: list[tuple[str, list[ReferencePortrait], str]] = []
 
     async def generate_portrait(
         self,
@@ -34,7 +34,7 @@ class _FakeProvider:
         self,
         prompt: str,
         *,
-        reference_portraits: list[bytes],
+        reference_portraits: list[ReferencePortrait],
         art_style: str = "children's story book",
         on_partial: Callable[[bytes], Awaitable[None]] | None = None,
     ) -> bytes:
@@ -77,10 +77,16 @@ async def test_generate_scene_delegates_to_art_provider() -> None:
 
     result = await provider.generate_scene(
         "castle at dawn",
-        reference_portraits=[b"p1", b"p2"],
+        reference_portraits=[ReferencePortrait("p1", b"p1"), ReferencePortrait("p2", b"p2")],
         art_style="watercolor",
     )
 
     assert result == b"ART"
-    assert art.scene_calls == [("castle at dawn", [b"p1", b"p2"], "watercolor")]
+    assert art.scene_calls == [
+        (
+            "castle at dawn",
+            [ReferencePortrait("p1", b"p1"), ReferencePortrait("p2", b"p2")],
+            "watercolor",
+        )
+    ]
     assert character.scene_calls == []

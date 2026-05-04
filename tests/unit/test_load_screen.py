@@ -11,6 +11,7 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Button
 
+from storygen.images.base import ReferencePortrait
 from storygen.llm.models import (
     ImageProviderConfig,
     StoredChoice,
@@ -287,7 +288,7 @@ class _FakeProvider:
         self,
         prompt: str,
         *,
-        reference_portraits: list[bytes],
+        reference_portraits: list[ReferencePortrait],
         art_style: str = "children's story book",
     ) -> bytes:
         self.calls.append(prompt)

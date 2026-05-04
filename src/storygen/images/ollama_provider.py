@@ -27,6 +27,7 @@ from openai import AsyncOpenAI, NotFoundError
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from storygen.images._prompts import build_portrait_prompt, build_scene_prompt
+from storygen.images.base import ReferencePortrait
 
 DEFAULT_BASE_URL = "http://localhost:11434/v1/"
 DEFAULT_MODEL = "x/z-image-turbo"
@@ -141,7 +142,7 @@ class OllamaImageProvider:
         self,
         prompt: str,
         *,
-        reference_portraits: list[bytes],
+        reference_portraits: list[ReferencePortrait],
         art_style: str = "children's story book",
         on_partial: Callable[[bytes], Awaitable[None]] | None = None,
     ) -> bytes:

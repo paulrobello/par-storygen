@@ -9,6 +9,7 @@ import httpx
 import pytest
 from openai import AsyncOpenAI
 
+from storygen.images.base import ReferencePortrait
 from storygen.images.zai_provider import IMAGE_SIZE, ZaiImageProvider
 
 
@@ -99,9 +100,23 @@ async def test_generate_scene_with_refs_fires_ref_loss_once() -> None:
     on_ref_loss = MagicMock()
     provider, _client, _http = _make_provider(on_ref_loss=on_ref_loss)
 
-    await provider.generate_scene("scene 1", reference_portraits=[b"ref-a", b"ref-b"])
-    await provider.generate_scene("scene 2", reference_portraits=[b"ref-c"])
-    await provider.generate_scene("scene 3", reference_portraits=[b"ref-d", b"ref-e"])
+    await provider.generate_scene(
+        "scene 1",
+        reference_portraits=[
+            ReferencePortrait("ref-a", b"ref-a"),
+            ReferencePortrait("ref-b", b"ref-b"),
+        ],
+    )
+    await provider.generate_scene(
+        "scene 2", reference_portraits=[ReferencePortrait("ref-c", b"ref-c")]
+    )
+    await provider.generate_scene(
+        "scene 3",
+        reference_portraits=[
+            ReferencePortrait("ref-d", b"ref-d"),
+            ReferencePortrait("ref-e", b"ref-e"),
+        ],
+    )
 
     # Fires exactly once per provider instance, even across multiple calls.
     on_ref_loss.assert_called_once()
@@ -113,7 +128,9 @@ async def test_generate_scene_without_on_ref_loss_callback_still_drops_refs() ->
     are supplied — it silently drops them."""
     provider, client, _http = _make_provider(on_ref_loss=None)
 
-    out = await provider.generate_scene("scene", reference_portraits=[b"ref"])
+    out = await provider.generate_scene(
+        "scene", reference_portraits=[ReferencePortrait("ref", b"ref")]
+    )
 
     assert out == b"fake-png"
     # No reference data was forwarded to the API.

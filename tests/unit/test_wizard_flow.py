@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from storygen.images.base import ReferencePortrait
 from storygen.images.constants import PORTRAIT_QUALITY, PORTRAIT_SIZE, SCENE_QUALITY, SCENE_SIZE
 from storygen.images.pricing import image_cost
 from storygen.llm.models import Character, ImageProviderConfig, TextProviderConfig, Theme
@@ -67,7 +68,7 @@ class FakeImageProvider:
         self,
         prompt: str,
         *,
-        reference_portraits: list[bytes],
+        reference_portraits: list[ReferencePortrait],
         art_style: str = "children's story book",
     ) -> bytes:
         return b"SCENE"
@@ -587,7 +588,7 @@ async def test_build_initial_save_library_import_does_not_call_provider_that_rai
             self,
             prompt: str,
             *,
-            reference_portraits: list[bytes],
+            reference_portraits: list[ReferencePortrait],
             art_style: str = "children's story book",
         ) -> bytes:
             raise RuntimeError("should not be called")

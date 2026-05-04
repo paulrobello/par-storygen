@@ -14,6 +14,7 @@ from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 
 from storygen.images._prompts import build_cover_prompt
+from storygen.images.base import ReferencePortrait
 from storygen.images.constants import SCENE_QUALITY, SCENE_SIZE
 from storygen.images.pricing import image_cost
 from storygen.screens._confirm_modal import ConfirmModal
@@ -32,7 +33,7 @@ class _CoverImageProvider(Protocol):
         self,
         prompt: str,
         *,
-        reference_portraits: list[bytes],
+        reference_portraits: list[ReferencePortrait],
         art_style: str = "children's story book",
     ) -> bytes: ...
 

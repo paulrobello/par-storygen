@@ -20,6 +20,8 @@ Ollama have no such flag, so the prompt sentence is the only signal they get.
 
 from __future__ import annotations
 
+from storygen.images.base import ReferencePortrait
+
 
 def _is_v2_model(model: str | None) -> bool:
     """Return True if the model is gpt-image-2 (or a snapshot thereof).
@@ -101,7 +103,21 @@ def build_portrait_prompt(
     )
 
 
-def build_scene_prompt(prompt: str, *, art_style: str, model: str | None = None) -> str:
+def build_scene_ref_guidance(reference_portraits: list[ReferencePortrait]) -> str:
+    """Build reference image identification text for scene prompts."""
+    if not reference_portraits:
+        return ""
+    lines = [f"  Image {i + 1}: {rp.name}" for i, rp in enumerate(reference_portraits)]
+    return "\n\nReference images provided:\n" + "\n".join(lines)
+
+
+def build_scene_prompt(
+    prompt: str,
+    *,
+    art_style: str,
+    model: str | None = None,
+    reference_portraits: list[ReferencePortrait] | None = None,
+) -> str:
     """Wrap a raw scene prompt with art-style framing.
 
     gpt-image-2: style is prepended (``Art style: …``) so the model anchors
@@ -111,13 +127,21 @@ def build_scene_prompt(prompt: str, *, art_style: str, model: str | None = None)
         prompt: The raw scene description.
         art_style: Visual style guidance so renders match portraits.
         model: Optional model id to select the prompt format.
+        reference_portraits: Optional reference portraits with names to identify
+            in the prompt so the image model can match characters.
 
     Returns:
         The styled scene prompt.
     """
     if _is_v2_model(model):
-        return f"Art style: {art_style} illustration.\n\n{prompt}"
-    return f"{prompt}\n\nRendered in {art_style} style."
+        result = f"Art style: {art_style} illustration.\n\n{prompt}"
+    else:
+        result = f"{prompt}\n\nRendered in {art_style} style."
+
+    if reference_portraits:
+        result += build_scene_ref_guidance(reference_portraits)
+
+    return result
 
 
 def build_cover_prompt(

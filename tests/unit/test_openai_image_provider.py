@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from openai import AsyncOpenAI
 
+from storygen.images.base import ReferencePortrait
 from storygen.images.openai_provider import OpenAIImageProvider
 
 
@@ -60,7 +61,10 @@ async def test_generate_scene_passes_reference_images() -> None:
 
     out = await provider.generate_scene(
         "rooftop chase at night, neon rain",
-        reference_portraits=[b"ref-1", b"ref-2"],
+        reference_portraits=[
+            ReferencePortrait("ref-1", b"ref-1"),
+            ReferencePortrait("ref-2", b"ref-2"),
+        ],
     )
 
     assert out == b"PNG-SCENE"
@@ -130,7 +134,7 @@ async def test_generate_scene_appends_art_style_to_prompt_with_refs() -> None:
     provider = OpenAIImageProvider(model="gpt-image-2", client=cast(AsyncOpenAI, client))
     await provider.generate_scene(
         "a rooftop chase",
-        reference_portraits=[b"ref1"],
+        reference_portraits=[ReferencePortrait("ref1", b"ref1")],
         art_style="noir comic",
     )
     assert client.images.edit.await_args is not None
@@ -171,7 +175,9 @@ async def test_v15_edit_passes_input_fidelity() -> None:
     client = MagicMock()
     client.images.edit = AsyncMock(return_value=_make_image_response(b"PNG"))
     provider = OpenAIImageProvider(model="gpt-image-1.5", client=cast(AsyncOpenAI, client))
-    await provider.generate_scene("a chase", reference_portraits=[b"ref1"])
+    await provider.generate_scene(
+        "a chase", reference_portraits=[ReferencePortrait("ref1", b"ref1")]
+    )
     assert client.images.edit.await_args is not None
     kwargs = client.images.edit.await_args.kwargs
     assert kwargs["input_fidelity"] == "high"
@@ -215,7 +221,7 @@ async def test_generate_scene_no_partial_callback_uses_non_streaming() -> None:
     provider = OpenAIImageProvider(model="gpt-image-2", client=cast(AsyncOpenAI, client))
 
     out = await provider.generate_scene(
-        "scene prompt", reference_portraits=[b"ref"], on_partial=None
+        "scene prompt", reference_portraits=[ReferencePortrait("ref", b"ref")], on_partial=None
     )
 
     assert out == b"FINAL"
@@ -247,7 +253,9 @@ async def test_generate_scene_with_refs_streams_when_callback_provided() -> None
     async def cb(payload: bytes) -> None:
         seen.append(payload)
 
-    out = await provider.generate_scene("scene prompt", reference_portraits=[b"ref"], on_partial=cb)
+    out = await provider.generate_scene(
+        "scene prompt", reference_portraits=[ReferencePortrait("ref", b"ref")], on_partial=cb
+    )
 
     assert out == final_bytes
     assert seen == [partial_bytes_1, partial_bytes_2]
@@ -305,7 +313,9 @@ async def test_generate_scene_stream_without_completed_event_raises() -> None:
         del payload
 
     with pytest.raises(RuntimeError, match="without a final image"):
-        await provider.generate_scene("p", reference_portraits=[b"r"], on_partial=cb)
+        await provider.generate_scene(
+            "p", reference_portraits=[ReferencePortrait("r", b"r")], on_partial=cb
+        )
 
 
 @pytest.mark.asyncio

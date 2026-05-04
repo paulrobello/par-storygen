@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from storygen.images.base import ImageProvider
+from storygen.images.base import ImageProvider, ReferencePortrait
 from storygen.images.routed_provider import RoutedImageProvider
 
 
@@ -46,7 +46,7 @@ class _FakeProvider:
         self,
         prompt: str,
         *,
-        reference_portraits: list[bytes],
+        reference_portraits: list[ReferencePortrait],
         art_style: str = "children's story book",
         on_partial: Any = None,
     ) -> bytes:
@@ -156,7 +156,7 @@ async def test_on_fallback_callback_exception_is_swallowed() -> None:
 @pytest.mark.asyncio
 async def test_generate_scene_forwards_reference_portraits() -> None:
     """Reference portraits reach the selected provider unchanged."""
-    captured: list[list[bytes]] = []
+    captured: list[list[ReferencePortrait]] = []
 
     class _Capture:
         async def generate_portrait(
@@ -175,7 +175,7 @@ async def test_generate_scene_forwards_reference_portraits() -> None:
             self,
             prompt: str,
             *,
-            reference_portraits: list[bytes],
+            reference_portraits: list[ReferencePortrait],
             art_style: str = "children's story book",
             on_partial: Any = None,
         ) -> bytes:
@@ -184,5 +184,13 @@ async def test_generate_scene_forwards_reference_portraits() -> None:
             return b"ok"
 
     routed = RoutedImageProvider(_Capture())
-    await routed.generate_scene("prompt", reference_portraits=[b"a", b"b"])
-    assert captured == [[b"a", b"b"]]
+    await routed.generate_scene(
+        "prompt",
+        reference_portraits=[ReferencePortrait("a", b"a"), ReferencePortrait("b", b"b")],
+    )
+    assert len(captured) == 1
+    assert len(captured[0]) == 2
+    assert captured[0][0].name == "a"
+    assert captured[0][0].data == b"a"
+    assert captured[0][1].name == "b"
+    assert captured[0][1].data == b"b"

@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from storygen.images.base import ReferencePortrait
 from storygen.llm.models import (
     Character,
     Choice,
@@ -88,7 +89,7 @@ class FakeImageProvider:
         self,
         prompt: str,
         *,
-        reference_portraits: list[bytes],
+        reference_portraits: list[ReferencePortrait],
         art_style: str = "children's story book",
         on_partial: Any = None,
     ) -> bytes:
@@ -1721,7 +1722,7 @@ class _StreamingFakeImageProvider:
         self,
         prompt: str,
         *,
-        reference_portraits: list[bytes],
+        reference_portraits: list[ReferencePortrait],
         art_style: str = "children's story book",
         on_partial: Any = None,
     ) -> bytes:

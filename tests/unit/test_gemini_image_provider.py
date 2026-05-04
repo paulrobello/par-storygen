@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import google.genai as genai
 import pytest
 
+from storygen.images.base import ReferencePortrait
 from storygen.images.gemini_provider import GeminiImageProvider
 
 
@@ -112,7 +113,10 @@ async def test_generate_scene_two_refs_builds_string_plus_parts() -> None:
 
     await provider.generate_scene(
         "a rooftop chase",
-        reference_portraits=[b"ref-a", b"ref-b"],
+        reference_portraits=[
+            ReferencePortrait("ref-a", b"ref-a"),
+            ReferencePortrait("ref-b", b"ref-b"),
+        ],
         art_style="noir comic",
     )
 
@@ -137,7 +141,7 @@ async def test_generate_scene_caps_references_at_14() -> None:
     client = _make_client(_fake_response(b"PNG"))
     provider = GeminiImageProvider(client=cast(genai.Client, client))
 
-    refs = [f"ref-{i}".encode() for i in range(20)]
+    refs = [ReferencePortrait(f"ref-{i}", f"ref-{i}".encode()) for i in range(20)]
     await provider.generate_scene("panorama", reference_portraits=refs)
 
     contents = cast(list[object], client.aio.models.generate_content.await_args.kwargs["contents"])

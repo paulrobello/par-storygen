@@ -9,6 +9,7 @@ from uuid import uuid4
 import pytest
 from pytest import MonkeyPatch
 
+from storygen.images.base import ReferencePortrait
 from storygen.llm.models import (
     IllustrationPlan,
     ImageProviderConfig,
@@ -61,7 +62,7 @@ class StubImageProvider:
         self,
         prompt: str,
         *,
-        reference_portraits: list[bytes],
+        reference_portraits: list[ReferencePortrait],
         art_style: str = "children's story book",
         on_partial: object = None,
     ) -> bytes:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from storygen.images.base import ImageProvider
+from storygen.images.base import ImageProvider, ReferencePortrait
 from storygen.images.gemini_provider import GeminiImageProvider
 from storygen.images.ollama_provider import OllamaImageProvider
 from storygen.images.provider_factory import (
@@ -279,7 +279,7 @@ async def test_routed_threads_ref_loss_to_nonref_primary(
         fallback_cfg=None,
         on_ref_loss=fired.append,
     )
-    await router.generate_scene("p", reference_portraits=[b"ref"])
+    await router.generate_scene("p", reference_portraits=[ReferencePortrait("ref", b"ref")])
     assert fired == ["zai"]
 
 

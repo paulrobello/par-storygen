@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from openai import AsyncOpenAI
 
+from storygen.images.base import ReferencePortrait
 from storygen.images.ollama_provider import IMAGE_SIZE, OllamaImageProvider
 
 
@@ -69,8 +70,16 @@ async def test_generate_scene_with_refs_fires_ref_loss_once() -> None:
     on_ref_loss = MagicMock()
     provider, _client = _make_provider(on_ref_loss=on_ref_loss)
 
-    await provider.generate_scene("scene 1", reference_portraits=[b"ref-a", b"ref-b"])
-    await provider.generate_scene("scene 2", reference_portraits=[b"ref-c"])
+    await provider.generate_scene(
+        "scene 1",
+        reference_portraits=[
+            ReferencePortrait("ref-a", b"ref-a"),
+            ReferencePortrait("ref-b", b"ref-b"),
+        ],
+    )
+    await provider.generate_scene(
+        "scene 2", reference_portraits=[ReferencePortrait("ref-c", b"ref-c")]
+    )
 
     on_ref_loss.assert_called_once()
 

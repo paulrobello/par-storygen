@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
+from storygen.images.base import ReferencePortrait
 from storygen.images.constants import (
     OPENAI_PARTIAL_IMAGES,
     PORTRAIT_QUALITY,
@@ -105,7 +106,7 @@ class ImageProviderLike(Protocol):
         self,
         prompt: str,
         *,
-        reference_portraits: list[bytes],
+        reference_portraits: list[ReferencePortrait],
         art_style: str = "children's story book",
         on_partial: Callable[[bytes], Awaitable[None]] | None = None,
     ) -> bytes: ...
@@ -813,7 +814,7 @@ class BeatPipeline:
             await cb.on_image_committed(save.nodes[node_id])
 
         try:
-            refs: list[bytes] = []
+            refs: list[ReferencePortrait] = []
             # Optionally prepend the current scene image as the first reference.
             if current_image_as_ref:
                 cur_node = save.nodes[node_id]
@@ -821,7 +822,9 @@ class BeatPipeline:
                     try:
                         cur_path = paths.safe_join(paths.game_dir(save_id), cur_node.image_path)
                         if cur_path.exists():
-                            refs.append(cur_path.read_bytes())
+                            refs.append(
+                                ReferencePortrait("current scene artwork", cur_path.read_bytes())
+                            )
                     except ValueError:
                         pass
             for cid in featured_character_ids:
@@ -829,7 +832,7 @@ class BeatPipeline:
                     if c.id == cid and c.portrait_path:
                         try:
                             ref_path = paths.safe_join(paths.game_dir(save_id), c.portrait_path)
-                            refs.append(ref_path.read_bytes())
+                            refs.append(ReferencePortrait(c.name, ref_path.read_bytes()))
                         except ValueError:
                             pass
             scene_bytes = await self._image.generate_scene(

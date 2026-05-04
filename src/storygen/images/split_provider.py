@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 
-from storygen.images.base import ImageProvider
+from storygen.images.base import ImageProvider, ReferencePortrait
 
 
 class SplitImageProvider:
@@ -35,7 +35,7 @@ class SplitImageProvider:
         self,
         prompt: str,
         *,
-        reference_portraits: list[bytes],
+        reference_portraits: list[ReferencePortrait],
         art_style: str = "children's story book",
         on_partial: Callable[[bytes], Awaitable[None]] | None = None,
     ) -> bytes:

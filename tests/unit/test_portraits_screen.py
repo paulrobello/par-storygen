@@ -11,6 +11,7 @@ from uuid import uuid4
 import pytest
 from textual.app import App, ComposeResult
 
+from storygen.images.base import ReferencePortrait
 from storygen.images.openai_provider import (
     PORTRAIT_QUALITY,
     PORTRAIT_SIZE,
@@ -64,7 +65,7 @@ class FakeImageProvider:
         self,
         prompt: str,
         *,
-        reference_portraits: list[bytes],
+        reference_portraits: list[ReferencePortrait],
         art_style: str = "children's story book",
         on_partial: Callable[[bytes], Awaitable[None]] | None = None,
     ) -> bytes:

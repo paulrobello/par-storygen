@@ -23,6 +23,7 @@ from openai import AsyncOpenAI
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from storygen.images._prompts import build_portrait_prompt, build_scene_prompt
+from storygen.images.base import ReferencePortrait
 from storygen.images.constants import (
     OPENAI_PARTIAL_IMAGES,
     PORTRAIT_QUALITY,
@@ -191,7 +192,7 @@ class OpenAIImageProvider:
         self,
         prompt: str,
         *,
-        reference_portraits: list[bytes],
+        reference_portraits: list[ReferencePortrait],
         art_style: str = "children's story book",
         on_partial: Callable[[bytes], Awaitable[None]] | None = None,
     ) -> bytes:
@@ -199,7 +200,7 @@ class OpenAIImageProvider:
 
         Args:
             prompt: Narrative description of the scene to render.
-            reference_portraits: PNG bytes of character portraits to preserve
+            reference_portraits: Named character reference images to preserve
                 appearance via the edit endpoint's ``input_fidelity="high"`` mode.
                 Pass an empty list to use the standard generate endpoint.
             art_style: Visual style guidance (default: children's story book).
@@ -216,8 +217,8 @@ class OpenAIImageProvider:
         """
         styled_prompt = build_scene_prompt(prompt, art_style=art_style, model=self._model)
         image_files = [
-            ("image", (f"ref-{i}.png", io.BytesIO(portrait), "image/png"))
-            for i, portrait in enumerate(reference_portraits)
+            ("image", (f"ref-{ref.name}.png", io.BytesIO(ref.data), "image/png"))
+            for ref in reference_portraits
         ]
 
         if on_partial is not None:
