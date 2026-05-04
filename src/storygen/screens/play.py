@@ -563,9 +563,12 @@ class PlayScreen(Screen[None]):
         node = self._save.nodes[self._save.current_node_id]
         if not node.image_prompt:
             return
-        self._save.nodes[node.id] = node.model_copy(update={"image_status": "generating"})
+        self._save.nodes[node.id] = node.model_copy(
+            update={"image_status": "generating", "image_path": None}
+        )
         save_game(self._save)
         self._image.show_generating()
+        self.notify("Regenerating scene image…", timeout=60)  # pyright: ignore[reportUnknownMemberType]
         cb = PipelineCallbacks(
             on_image_committed=self._on_image_committed,
             on_image_failed=self._on_image_failed,
