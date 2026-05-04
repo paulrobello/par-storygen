@@ -219,7 +219,9 @@ class OpenAIImageProvider:
         Returns:
             PNG image bytes.
         """
-        styled_prompt = build_scene_prompt(prompt, art_style=art_style, model=self._model, reference_portraits=reference_portraits)
+        styled_prompt = build_scene_prompt(
+            prompt, art_style=art_style, model=self._model, reference_portraits=reference_portraits
+        )
         image_files = [
             ("image", (f"ref-{ref.name}.png", io.BytesIO(ref.data), "image/png"))
             for ref in reference_portraits

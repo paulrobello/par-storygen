@@ -622,13 +622,13 @@ async def test_check_action_hides_unavailable_choices_and_back() -> None:
 
 @pytest.mark.asyncio
 async def test_graph_action_hidden_when_only_root_exists() -> None:
-    """A save with only the root node has no useful graph view."""
+    """Graph lives in InfoPickerModal now; info_picker is always enabled on PlayScreen."""
     app = _Harness()
     async with app.run_test() as pilot:
         await pilot.pause()
         screen = app.screen
         assert isinstance(screen, PlayScreen)
-        assert screen.check_action("graph", ()) is False
+        assert screen.check_action("info_picker", ()) is True
 
 
 @pytest.mark.asyncio
@@ -668,8 +668,8 @@ async def test_regenerate_check_action_for_leaf_with_parent() -> None:
         screen._save.current_node_id = "child"  # pyright: ignore[reportPrivateUsage]
         # regen_picker is always enabled (modal handles per-option checks).
         assert screen.check_action("regen_picker", ()) is True
-        # Two nodes now exist → graph action is enabled.
-        assert screen.check_action("graph", ()) is True
+        # info_picker is always enabled on PlayScreen.
+        assert screen.check_action("info_picker", ()) is True
 
 
 # ----- EndingsScreen integration tests below -----
@@ -760,7 +760,8 @@ async def test_play_endings_binding_hidden_with_no_endings() -> None:
         await pilot.pause()
         screen = app.screen
         assert isinstance(screen, PlayScreen)
-        assert screen.check_action("endings", ()) is False
+        # endings lives in InfoPickerModal now; info_picker is always enabled.
+        assert screen.check_action("info_picker", ()) is True
 
 
 @pytest.mark.asyncio
@@ -779,7 +780,8 @@ async def test_play_endings_binding_visible_with_endings() -> None:
         await pilot.pause()
         screen = app.screen
         assert isinstance(screen, PlayScreen)
-        assert screen.check_action("endings", ()) is True
+        # endings lives in InfoPickerModal now; info_picker is always enabled.
+        assert screen.check_action("info_picker", ()) is True
 
 
 class _FakePipelineForPrefetch:

@@ -107,10 +107,8 @@ class PlayScreen(Screen[None]):
     BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
         ("b", "go_back", "Back 1 node"),
         ("r", "regen_picker", "Regen"),
-        ("p", "portraits", "Portraits"),
-        ("g", "graph", "Graph"),
+        ("i", "info_picker", "Info"),
         ("R", "recap", "Previously on..."),
-        ("e", "endings", "Endings"),
         ("a", "auto_select", "Auto play"),
         ("t", "tts_toggle", "Read aloud"),
         ("T", "tts_restart", "Restart TTS"),
@@ -132,7 +130,6 @@ class PlayScreen(Screen[None]):
         ("up", "highlight_prev", "▲ Choice"),
         ("enter", "pick_highlighted", "Pick ▸"),
         ("x", "export_book", "Export book"),
-        ("f", "relationships", "Relationships"),
     ]
 
     def __init__(
@@ -322,17 +319,8 @@ class PlayScreen(Screen[None]):
             return node.parent_id is not None
         if action == "regen_picker":
             return True
-        if action == "portraits":
-            return bool(self._save.characters)
-        if action == "graph":
-            # Only meaningful once at least one beat beyond the root exists;
-            # otherwise the graph would just show the root and its unexplored
-            # choices, which the user already sees on the play screen.
-            return len(self._save.nodes) > 1
-        if action == "endings":
-            # The endings gallery has no useful content until at least one
-            # ending has been reached.
-            return len(self._save.endings_reached) > 0
+        if action == "info_picker":
+            return True
         if action == "tts_toggle":
             return self._tts_player is not None and self._tts_player.is_configured
         if action == "tts_restart":
@@ -352,8 +340,6 @@ class PlayScreen(Screen[None]):
         if action == "export_book":
             node = self._save.nodes.get(self._save.current_node_id)
             return node is not None and node.is_ending
-        if action == "relationships":
-            return bool(self._save.relationships)
         if action == "recap":
             return True
         if action == "menu":
@@ -519,15 +505,13 @@ class PlayScreen(Screen[None]):
         node = self._save.nodes.get(self._save.current_node_id)
         if node is None:
             return
-        can_retry = (
-            node.image_prompt is not None
-            and node.image_status in ("failed", "done", "not_planned")
+        can_retry = node.image_prompt is not None and node.image_status in (
+            "failed",
+            "done",
+            "not_planned",
         )
         can_edit = can_retry
-        can_beat = (
-            node.parent_id is not None
-            and not any(c.child_node_id for c in node.choices)
-        )
+        can_beat = node.parent_id is not None and not any(c.child_node_id for c in node.choices)
         can_audio = self._tts_player is not None and self._tts_player.is_configured
 
         def _on_pick(action: str | None) -> None:
@@ -546,6 +530,29 @@ class PlayScreen(Screen[None]):
                 can_edit_regen=can_edit,
                 can_regen_beat=can_beat,
                 can_regen_audio=can_audio,
+            ),
+            _on_pick,
+        )
+
+    def action_info_picker(self) -> None:
+        from storygen.screens._info_picker import InfoPickerModal
+
+        def _on_pick(action: str | None) -> None:
+            if action == "portraits":
+                self.run_worker(self.action_portraits(), name="info-portraits")
+            elif action == "graph":
+                self.action_graph()
+            elif action == "endings":
+                self.action_endings()
+            elif action == "relationships":
+                self.action_relationships()
+
+        self.app.push_screen(  # pyright: ignore[reportUnknownMemberType]
+            InfoPickerModal(
+                can_portraits=bool(self._save.characters) and self._image_provider is not None,
+                can_graph=len(self._save.nodes) > 1,
+                can_endings=len(self._save.endings_reached) > 0,
+                can_relationships=bool(self._save.relationships),
             ),
             _on_pick,
         )

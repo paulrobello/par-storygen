@@ -132,7 +132,9 @@ class RelationshipsScreen(ModalScreen[None]):
             seen_chars.add(char.id)
             lines.append(f"[bold]{char.name}[/bold]")
             for rel in by_char[char.id]:
-                other_id = _resolve(rel.char_b_id if _resolve(rel.char_a_id) == char.id else rel.char_a_id)
+                other_id = _resolve(
+                    rel.char_b_id if _resolve(rel.char_a_id) == char.id else rel.char_a_id
+                )
                 other_name = char_map.get(other_id, other_id)
                 icon = _REL_TYPE_ICONS.get(rel.type, "?")
                 bar = _strength_bar(rel.strength)
