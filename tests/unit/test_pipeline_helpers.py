@@ -232,3 +232,43 @@ def test_pacing_hint_fast_climax_earlier() -> None:
     # target=5, fast -> climax=3
     result = _pacing_hint_for_depth(3, 5, "fast")
     assert "tightening" in result
+
+
+# --- _build_beat_prompt with relationships ---
+
+
+def test_build_beat_prompt_includes_relationships_section() -> None:
+    """When save has relationships, _build_beat_prompt includes a RELATIONSHIPS section."""
+    from storygen.core.models import Character, Relationship, RelationshipType
+
+    root = _node("root", None, narration="Start.")
+    save = _empty_save({"root": root})
+    save.characters = [
+        Character(
+            id="alyx", name="Alyx", backstory="b", personality="p",
+            physical_description="d", introduced_at_node_id="root",
+        ),
+        Character(
+            id="kael", name="Kael", backstory="b", personality="p",
+            physical_description="d", introduced_at_node_id="root",
+        ),
+    ]
+    save.relationships = [
+        Relationship(
+            char_a_id="alyx", char_b_id="kael", type=RelationshipType.ALLY,
+            strength=4, context="bonded during ambush", updated_at_node_id="root",
+        ),
+    ]
+    prompt = _build_beat_prompt(save, "root", "go left")
+    assert "RELATIONSHIPS:" in prompt
+    assert "Alyx ↔ Kael" in prompt
+    assert "ally" in prompt
+    assert "bonded during ambush" in prompt
+
+
+def test_build_beat_prompt_omits_relationships_when_empty() -> None:
+    """When save has no relationships, no RELATIONSHIPS section appears."""
+    root = _node("root", None, narration="Start.")
+    save = _empty_save({"root": root})
+    prompt = _build_beat_prompt(save, "root", "go left")
+    assert "RELATIONSHIPS:" not in prompt

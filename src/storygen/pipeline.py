@@ -915,6 +915,16 @@ def _build_beat_prompt(save: GameSave, from_node_id: str, choice_text: str) -> s
         ]
         sections.append("CAST:\n" + "\n".join(cast_lines))
 
+    if save.relationships:
+        char_names = {c.id: c.name for c in save.characters}
+        rel_lines = [
+            f"- {char_names.get(r.char_a_id, r.char_a_id)} ↔ {char_names.get(r.char_b_id, r.char_b_id)}: {r.type.value} (strength {r.strength}) — {r.context}"
+            for r in save.relationships
+            if r.char_a_id in char_names and r.char_b_id in char_names
+        ]
+        if rel_lines:
+            sections.append("RELATIONSHIPS:\n" + "\n".join(rel_lines))
+
     prev_summary, segment = segment_since_last_summary(save, from_node_id)
     if prev_summary:
         sections.append(f"STORY-SO-FAR SUMMARY:\n{prev_summary}")
