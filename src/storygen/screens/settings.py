@@ -514,6 +514,7 @@ class SettingsScreen(Screen[None]):
             yield Label("Voice")
             with Horizontal(classes="switch-row"):
                 yield self._tts_voice_select
+                yield Button("Preview", id="btn-preview-voice", variant="default")
                 yield Button("Refresh", id="btn-refresh-tts-voices", variant="default")
             with Horizontal(classes="switch-row"):
                 yield self._tts_auto_read_switch
@@ -1067,6 +1068,34 @@ class SettingsScreen(Screen[None]):
         else:
             self._populate_tts_voices()
             self.notify("No voices found.", severity="warning", timeout=3)
+
+    @on(Button.Pressed, "#btn-preview-voice")
+    def _on_preview_voice(self, event: Button.Pressed) -> None:
+        del event
+        if self._tts_player is None:
+            self.notify("TTS player not available.", severity="warning", timeout=3)
+            return
+        voice = self._tts_voice_select.value
+        if not voice or str(voice) == "":
+            self.notify("Select a voice first.", severity="warning", timeout=3)
+            return
+        provider = cast(str, self._tts_provider_select.value)
+        api_key = self._tts_api_key_input.value.strip()
+        self._tts_player.configure(provider, api_key=api_key, voice=str(voice))
+        self.notify("Generating voice preview...", timeout=10)
+        self.run_worker(self._preview_voice_worker(), exclusive=True, name="tts-preview")
+
+    async def _preview_voice_worker(self) -> None:
+        assert self._tts_player is not None  # guarded by _on_preview_voice
+        ok = await self._tts_player.speak(
+            "Hello! This is a preview of the selected voice for your story."
+        )
+        if not ok:
+            self.notify(
+                "Voice preview failed. Check your API key and voice selection.",
+                severity="error",
+                timeout=5,
+            )
 
     @on(Switch.Changed, "#prefetch-enabled-switch")
     def _on_prefetch_switch_changed(self, event: Switch.Changed) -> None:

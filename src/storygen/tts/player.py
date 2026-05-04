@@ -132,6 +132,12 @@ class TTSPlayer:
         self._voice = voice
         self._provider_name = provider
         self._voices = []
+        # Invalidate temp cache so a new voice/keys regenerates audio.
+        if self._audio_file and not self._audio_file.exists():
+            self._audio_file = None
+        elif self._audio_file:
+            self._audio_file.unlink(missing_ok=True)
+            self._audio_file = None
         try:
             cls = get_provider(provider)
             resolved_key = api_key or None
