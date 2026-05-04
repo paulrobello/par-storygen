@@ -359,6 +359,40 @@ def test_relationship_round_trip() -> None:
     assert restored == r
 
 
+def test_relationship_directional_types_unchanged_when_already_ordered() -> None:
+    """MENTOR and STUDENT are preserved when char_a_id < char_b_id."""
+    r_mentor = Relationship(
+        char_a_id="a",
+        char_b_id="b",
+        type=RelationshipType.MENTOR,
+        strength=3,
+        context="",
+        updated_at_node_id="n1",
+    )
+    assert r_mentor.type == RelationshipType.MENTOR
+    r_student = Relationship(
+        char_a_id="a",
+        char_b_id="b",
+        type=RelationshipType.STUDENT,
+        strength=3,
+        context="",
+        updated_at_node_id="n1",
+    )
+    assert r_student.type == RelationshipType.STUDENT
+
+
+def test_relationship_rejects_self_relationship() -> None:
+    with pytest.raises(ValidationError):
+        Relationship(
+            char_a_id="a",
+            char_b_id="a",
+            type=RelationshipType.ALLY,
+            strength=3,
+            context="",
+            updated_at_node_id="n1",
+        )
+
+
 def test_story_beat_has_relationship_updates_default_empty() -> None:
     beat = StoryBeat(narration="x", choices=[], is_major=True, is_ending=True)
     assert beat.relationship_updates == []

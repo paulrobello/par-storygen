@@ -139,6 +139,8 @@ class Relationship(BaseModel):
 
     @model_validator(mode="after")
     def _normalize_order(self) -> Relationship:
+        if self.char_a_id == self.char_b_id:
+            raise ValueError("char_a_id and char_b_id must be different")
         if self.char_a_id > self.char_b_id:
             self.char_a_id, self.char_b_id = self.char_b_id, self.char_a_id
             if self.type == RelationshipType.MENTOR:
