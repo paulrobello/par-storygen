@@ -10,9 +10,6 @@ Assign distinct TTS voices to individual characters in the character library. Wh
 ### Story Tags / Bookmarks
 Let players tag nodes with custom labels ("plot twist," "favorite scene," "scary part") for quick navigation via the graph screen. Tags persist in the save file as a `dict[str, list[str]]` mapping node IDs to user labels.
 
-### Character Relationship Tracking
-Track relationships between characters (ally, rival, neutral, romantic) as the story progresses. The beat agent could maintain a relationship matrix and let the LLM evolve dynamics over time. Display relationships in the character sheet sidebar.
-
 ## Visual & Audio
 
 ### Ambient Sound / Music System
@@ -123,6 +120,9 @@ Ship a Docker image with TUI access via `docker run -it`. Useful for running on 
 ---
 
 ## Completed
+
+### Character Relationship Tracking
+*Completed 2026-05-03.* Pairwise character relationships (ally, rival, neutral, romantic, mentor, student, family, stranger) tracked as the story progresses. The beat agent extracts relationship changes inline and they're fed back into subsequent beat prompts for narrative consistency. Press `f` during gameplay to view all relationships in a modal with strength bars and context. Relationships persisted in the save file with save migration v2→v3.
 
 ### Story Templates / Presets
 *Completed 2026-05-03.* Six curated story presets (Haunted Mansion, Space Opera, Dragon's Quest, Noir Detective, Enchanted Forest, Zombie Apocalypse) bundled as TOML files. "Quick Start" button on menu screen launches directly into a preset. "Load Preset" button on wizard THEME step auto-fills all fields. "Save as Preset" on CONFIRM step saves custom presets to `$XDG_CONFIG_HOME/storygen/presets/`. Custom presets discovered alongside curated ones.
