@@ -23,6 +23,7 @@ from storygen.llm.models import (
 from storygen.pipeline import PipelineCallbacks
 from storygen.screens.endings import EndingsScreen
 from storygen.screens.play import PlayScreen
+from storygen.screens.relationships import RelationshipsScreen
 from storygen.storage import app_state, paths
 from storygen.storage.save import GameSave
 from storygen.tts.player import TTSPlayer, TTSState
@@ -1076,6 +1077,31 @@ async def test_play_action_endings_pushes_screen(
         screen.action_endings()
         await pilot.pause()
         assert isinstance(app.screen, EndingsScreen)
+
+
+@pytest.mark.asyncio
+async def test_play_action_relationships_pushes_screen(
+    tmp_path: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+
+    save = _minimal_save()
+
+    class _PlayHarness(App[None]):
+        def on_mount(self) -> None:
+            self.push_screen(PlayScreen(save, pipeline=None, image_provider=None))  # type: ignore[arg-type]
+
+        def compose(self) -> ComposeResult:
+            yield from []
+
+    app = _PlayHarness()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, PlayScreen)
+        screen.action_relationships()
+        await pilot.pause()
+        assert isinstance(app.screen, RelationshipsScreen)
 
 
 @pytest.mark.asyncio

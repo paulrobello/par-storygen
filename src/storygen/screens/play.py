@@ -27,6 +27,7 @@ from storygen.screens._recap_modal import RecapModal
 from storygen.screens.endings import EndingsScreen
 from storygen.screens.graph import GraphScreen
 from storygen.screens.portraits import PortraitsScreen
+from storygen.screens.relationships import RelationshipsScreen
 from storygen.storage import app_state, paths
 from storygen.storage.save import GameSave, save_game
 from storygen.tts.player import TTSPlayer, TTSState
@@ -133,6 +134,7 @@ class PlayScreen(Screen[None]):
         ("up", "highlight_prev", "▲ Choice"),
         ("enter", "pick_highlighted", "Pick ▸"),
         ("x", "export_book", "Export book"),
+        ("f", "relationships", "Relationships"),
     ]
 
     def __init__(
@@ -738,6 +740,18 @@ class PlayScreen(Screen[None]):
         self._save.current_node_id = node_id
         save_game(self._save)
         self._render_current()
+
+    def action_relationships(self) -> None:
+        """Push the RelationshipsScreen modal."""
+        if self._loading:
+            return
+        save = self._save
+        self.app.push_screen(  # pyright: ignore[reportUnknownMemberType]
+            RelationshipsScreen(
+                characters=save.characters,
+                relationships=save.relationships,
+            )
+        )
 
     async def action_portraits(self) -> None:
         if not self._save.characters or self._image_provider is None:
