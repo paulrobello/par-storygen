@@ -106,9 +106,7 @@ class PlayScreen(Screen[None]):
     # hidden, but the bindings exist for the rare case the model returns more.
     BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
         ("b", "go_back", "Back 1 node"),
-        ("i", "retry_image", "Regen image"),
-        ("I", "edit_regen_image", "Edit regen"),
-        ("r", "regenerate_node", "Regen beat"),
+        ("r", "regen_picker", "Regen"),
         ("p", "portraits", "Portraits"),
         ("g", "graph", "Graph"),
         ("R", "recap", "Previously on..."),
@@ -322,18 +320,8 @@ class PlayScreen(Screen[None]):
             return bool(node.choices)
         if action == "go_back":
             return node.parent_id is not None
-        if action == "retry_image":
-            return node.image_prompt is not None and node.image_status in (
-                "failed",
-                "done",
-                "not_planned",
-            )
-        if action == "edit_regen_image":
-            return node.image_prompt is not None and node.image_status in (
-                "failed",
-                "done",
-                "not_planned",
-            )
+        if action == "regen_picker":
+            return True
         if action == "portraits":
             return bool(self._save.characters)
         if action == "graph":
@@ -345,13 +333,6 @@ class PlayScreen(Screen[None]):
             # The endings gallery has no useful content until at least one
             # ending has been reached.
             return len(self._save.endings_reached) > 0
-        if action == "regenerate_node":
-            # Regenerate is allowed only on a non-root leaf — that is, a node
-            # that has a parent and whose own choices have not yet been picked
-            # (so no descendant nodes will be orphaned by the rewrite).
-            if node.parent_id is None:
-                return False
-            return not any(c.child_node_id for c in node.choices)
         if action == "tts_toggle":
             return self._tts_player is not None and self._tts_player.is_configured
         if action == "tts_restart":
@@ -531,6 +512,39 @@ class PlayScreen(Screen[None]):
         self._save.current_node_id = node.parent_id
         save_game(self._save)
         self._render_current()
+
+    def action_regen_picker(self) -> None:
+        from storygen.screens._regen_picker import RegenPickerModal
+
+        node = self._save.nodes.get(self._save.current_node_id)
+        if node is None:
+            return
+        can_retry = (
+            node.image_prompt is not None
+            and node.image_status in ("failed", "done", "not_planned")
+        )
+        can_edit = can_retry
+        can_beat = (
+            node.parent_id is not None
+            and not any(c.child_node_id for c in node.choices)
+        )
+
+        def _on_pick(action: str | None) -> None:
+            if action == "retry_image":
+                self.run_worker(self.action_retry_image(), name="regen-retry")
+            elif action == "edit_regen_image":
+                self.run_worker(self.action_edit_regen_image(), name="regen-edit")
+            elif action == "regenerate_node":
+                self.run_worker(self.action_regenerate_node(), name="regen-beat")
+
+        self.app.push_screen(  # pyright: ignore[reportUnknownMemberType]
+            RegenPickerModal(
+                can_retry_image=can_retry,
+                can_edit_regen=can_edit,
+                can_regen_beat=can_beat,
+            ),
+            _on_pick,
+        )
 
     async def action_retry_image(self) -> None:
         if self._pipeline is None:

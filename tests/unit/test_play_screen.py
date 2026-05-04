@@ -616,10 +616,8 @@ async def test_check_action_hides_unavailable_choices_and_back() -> None:
         assert screen.check_action("pick", (9,)) is False
         # No parent → go_back hidden
         assert screen.check_action("go_back", ()) is False
-        # No image_prompt yet → retry_image hidden
-        assert screen.check_action("retry_image", ()) is False
-        # Root has no parent → regenerate hidden (would have nothing to re-roll from)
-        assert screen.check_action("regenerate_node", ()) is False
+        # regen_picker is always available (modal handles per-option checks)
+        assert screen.check_action("regen_picker", ()) is True
 
 
 @pytest.mark.asyncio
@@ -668,13 +666,10 @@ async def test_regenerate_check_action_for_leaf_with_parent() -> None:
         )
         screen._save.nodes["child"] = child  # pyright: ignore[reportPrivateUsage]
         screen._save.current_node_id = "child"  # pyright: ignore[reportPrivateUsage]
-        # Leaf with parent → regenerate enabled.
-        assert screen.check_action("regenerate_node", ()) is True
+        # regen_picker is always enabled (modal handles per-option checks).
+        assert screen.check_action("regen_picker", ()) is True
         # Two nodes now exist → graph action is enabled.
         assert screen.check_action("graph", ()) is True
-        # Now mark one choice as visited → no longer a leaf.
-        child.choices[0].child_node_id = "grandchild"
-        assert screen.check_action("regenerate_node", ()) is False
 
 
 # ----- EndingsScreen integration tests below -----
