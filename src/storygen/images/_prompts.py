@@ -56,10 +56,14 @@ def build_portrait_prompt(
     Returns:
         The full user-facing portrait prompt.
     """
-    if transparent:
+    if transparent and not _is_v2_model(model):
         background_rule = (
             "Transparent PNG background, subject only, no background, no scenery, "
             "no shadow on the ground"
+        )
+    elif transparent and _is_v2_model(model):
+        background_rule = (
+            "Solid 50% grey (#808080) background, subject only, no scenery, no shadow on the ground"
         )
     else:
         background_rule = "plain neutral background"

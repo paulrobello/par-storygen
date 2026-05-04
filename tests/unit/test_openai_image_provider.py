@@ -39,9 +39,9 @@ async def test_generate_portrait_transparent() -> None:
     # Framing guidance must be injected so the body isn't cropped
     assert "full-length" in prompt.lower() or "full-body" in prompt.lower()
     assert "front-facing" in prompt.lower()
-    # Transparency sentence appears; gpt-image-2 does not support
-    # background="transparent" so the API flag falls back to "opaque".
-    assert "Transparent PNG" in prompt
+    # gpt-image-2 does not support background="transparent" — prompt asks
+    # for solid grey instead of transparent to avoid checkered artifacts.
+    assert "Solid 50% grey" in prompt
     assert "feet" in prompt.lower()  # explicit guard against bottom crops
     # Reference image must be neutral: no props that would persist into scenes.
     assert "no props" in prompt.lower()
