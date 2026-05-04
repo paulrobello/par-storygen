@@ -10,6 +10,7 @@ from textual.screen import Screen
 from textual.widgets import Button, Footer, Header
 
 from storygen.storage.app_state import last_story_id
+from storygen.storage.save import load_game
 
 
 class MenuScreen(Screen[None]):
@@ -57,15 +58,18 @@ class MenuScreen(Screen[None]):
         from storygen.app import StoryGenApp
 
         app = self.app  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
-        if isinstance(app, StoryGenApp):
-            self.run_worker(self._do_resume, name="resume-from-menu")  # pyright: ignore[reportUnknownMemberType]
-
-    async def _do_resume(self) -> None:
-        from storygen.app import StoryGenApp
-
-        app = self.app  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
-        if isinstance(app, StoryGenApp):
-            await app._auto_resume()  # pyright: ignore[reportPrivateUsage]
+        if not isinstance(app, StoryGenApp):
+            return
+        game_id = last_story_id()
+        if game_id is None:
+            self.notify("No previous story to resume.", severity="warning", timeout=5)  # pyright: ignore[reportUnknownMemberType]
+            return
+        try:
+            save = load_game(game_id)
+        except FileNotFoundError:
+            self.notify("Last story no longer exists.", severity="warning", timeout=5)  # pyright: ignore[reportUnknownMemberType]
+            return
+        self.run_worker(app._start_game(save), name="resume-from-menu")  # pyright: ignore[reportPrivateUsage]
 
     def action_new_story(self) -> None:
         from storygen.app import StoryGenApp
