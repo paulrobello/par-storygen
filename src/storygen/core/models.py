@@ -11,6 +11,7 @@ source modules now re-export from this package for backward compatibility.
 from __future__ import annotations
 
 from datetime import datetime
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -115,6 +116,38 @@ class CharacterOutfit(BaseModel):
     created_at: datetime
 
 
+class RelationshipType(StrEnum):
+    ALLY = "ally"
+    RIVAL = "rival"
+    NEUTRAL = "neutral"
+    ROMANTIC = "romantic"
+    MENTOR = "mentor"
+    STUDENT = "student"
+    FAMILY = "family"
+    STRANGER = "stranger"
+
+
+class Relationship(BaseModel):
+    """A pairwise relationship between two characters."""
+
+    char_a_id: CharacterId
+    char_b_id: CharacterId
+    type: RelationshipType
+    strength: int = Field(ge=1, le=5)
+    context: str = ""
+    updated_at_node_id: NodeId
+
+    @model_validator(mode="after")
+    def _normalize_order(self) -> Relationship:
+        if self.char_a_id > self.char_b_id:
+            self.char_a_id, self.char_b_id = self.char_b_id, self.char_a_id
+            if self.type == RelationshipType.MENTOR:
+                self.type = RelationshipType.STUDENT
+            elif self.type == RelationshipType.STUDENT:
+                self.type = RelationshipType.MENTOR
+        return self
+
+
 class Character(BaseModel):
     """A character who appears in the story."""
 
@@ -156,6 +189,7 @@ class StoryBeat(BaseModel):
     is_major: bool
     is_ending: bool
     new_characters: list[Character] = Field(default_factory=list[Character])
+    relationship_updates: list[Relationship] = Field(default_factory=list[Relationship])
 
     @model_validator(mode="after")
     def _ending_has_no_choices(self) -> StoryBeat:
@@ -237,6 +271,8 @@ __all__ = [
     "Pacing",
     "ReaderLevel",
     "Recap",
+    "Relationship",
+    "RelationshipType",
     "StoredChoice",
     "StoryBeat",
     "StoryNode",

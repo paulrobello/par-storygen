@@ -14,6 +14,8 @@ from storygen.llm.models import (
     Choice,
     IllustrationPlan,
     ImageProviderConfig,
+    Relationship,
+    RelationshipType,
     StoredChoice,
     StoryBeat,
     StoryNode,
@@ -240,3 +242,123 @@ def test_library_character_source_roundtrip() -> None:
     restored = LibraryCharacter.model_validate_json(dumped)
     assert restored.source == "created"
     assert restored == char
+
+
+# -- Relationship model tests ---------------------------------------------------
+
+
+def test_relationship_normalizes_char_order() -> None:
+    """char_a_id is always lexicographically less than char_b_id."""
+    r = Relationship(
+        char_a_id="zzz",
+        char_b_id="aaa",
+        type=RelationshipType.ALLY,
+        strength=3,
+        context="test",
+        updated_at_node_id="n1",
+    )
+    assert r.char_a_id == "aaa"
+    assert r.char_b_id == "zzz"
+
+
+def test_relationship_mentor_swaps_to_student_on_normalize() -> None:
+    """When lex-swap reverses MENTOR, it becomes STUDENT."""
+    r = Relationship(
+        char_a_id="zzz",
+        char_b_id="aaa",
+        type=RelationshipType.MENTOR,
+        strength=4,
+        context="aaa mentors zzz",
+        updated_at_node_id="n1",
+    )
+    assert r.char_a_id == "aaa"
+    assert r.char_b_id == "zzz"
+    assert r.type == RelationshipType.STUDENT
+
+
+def test_relationship_student_swaps_to_mentor_on_normalize() -> None:
+    r = Relationship(
+        char_a_id="zzz",
+        char_b_id="aaa",
+        type=RelationshipType.STUDENT,
+        strength=4,
+        context="",
+        updated_at_node_id="n1",
+    )
+    assert r.type == RelationshipType.MENTOR
+
+
+def test_relationship_non_directional_type_unchanged_on_swap() -> None:
+    """ALLY, RIVAL, NEUTRAL, ROMANTIC, FAMILY, STRANGER don't change on swap."""
+    for rt in (
+        RelationshipType.ALLY,
+        RelationshipType.RIVAL,
+        RelationshipType.NEUTRAL,
+        RelationshipType.ROMANTIC,
+        RelationshipType.FAMILY,
+        RelationshipType.STRANGER,
+    ):
+        r = Relationship(
+            char_a_id="zzz",
+            char_b_id="aaa",
+            type=rt,
+            strength=2,
+            context="",
+            updated_at_node_id="n1",
+        )
+        assert r.type == rt
+
+
+def test_relationship_strength_clamped_1_to_5() -> None:
+    Relationship(
+        char_a_id="a",
+        char_b_id="b",
+        type=RelationshipType.ALLY,
+        strength=1,
+        context="",
+        updated_at_node_id="n1",
+    )
+    Relationship(
+        char_a_id="a",
+        char_b_id="b",
+        type=RelationshipType.ALLY,
+        strength=5,
+        context="",
+        updated_at_node_id="n1",
+    )
+    with pytest.raises(ValidationError):
+        Relationship(
+            char_a_id="a",
+            char_b_id="b",
+            type=RelationshipType.ALLY,
+            strength=0,
+            context="",
+            updated_at_node_id="n1",
+        )
+    with pytest.raises(ValidationError):
+        Relationship(
+            char_a_id="a",
+            char_b_id="b",
+            type=RelationshipType.ALLY,
+            strength=6,
+            context="",
+            updated_at_node_id="n1",
+        )
+
+
+def test_relationship_round_trip() -> None:
+    r = Relationship(
+        char_a_id="a",
+        char_b_id="b",
+        type=RelationshipType.RIVAL,
+        strength=3,
+        context="sworn enemies",
+        updated_at_node_id="n1",
+    )
+    restored = Relationship.model_validate_json(r.model_dump_json())
+    assert restored == r
+
+
+def test_story_beat_has_relationship_updates_default_empty() -> None:
+    beat = StoryBeat(narration="x", choices=[], is_major=True, is_ending=True)
+    assert beat.relationship_updates == []
