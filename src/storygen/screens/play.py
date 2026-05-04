@@ -157,6 +157,8 @@ class PlayScreen(Screen[None]):
         # True while an edit-regen worker is in flight — prevents
         # on_screen_resume from clobbering show_generating().
         self._edit_regen_active: bool = False
+        # True while a retry-image worker is in flight — same guard.
+        self._image_regen_active: bool = False
         # Last node id we kicked off prefetch FROM. _maybe_start_prefetch
         # short-circuits when current_node_id matches this — the comparison
         # IS the reset, so picks/jumps that change current_node_id naturally
@@ -457,6 +459,7 @@ class PlayScreen(Screen[None]):
         from storygen.llm.models import StoryNode
 
         if isinstance(node, StoryNode) and node.id == self._save.current_node_id:
+            self._image_regen_active = False
             self._image_displayed_at = time.monotonic()
             self._render_image_for(node.image_status, node.image_path)
             if app_state.auto_open_art_enabled() and node.image_path:
@@ -473,6 +476,7 @@ class PlayScreen(Screen[None]):
         from storygen.llm.models import StoryNode
 
         if isinstance(node, StoryNode) and node.id == self._save.current_node_id:
+            self._image_regen_active = False
             self._image.show_failed()
 
     async def _on_new_characters(self, characters: object) -> None:
@@ -516,6 +520,15 @@ class PlayScreen(Screen[None]):
 
         def _on_pick(action: str | None) -> None:
             if action == "retry_image":
+                self._image_regen_active = True
+                node = self._save.nodes.get(self._save.current_node_id)
+                if node and node.image_prompt:
+                    self._save.nodes[node.id] = node.model_copy(
+                        update={"image_status": "generating", "image_path": None}
+                    )
+                    save_game(self._save)
+                self._image.show_generating()
+                self.notify("Regenerating scene image…", timeout=60)  # pyright: ignore[reportUnknownMemberType]
                 self.run_worker(self.action_retry_image(), name="regen-retry")
             elif action == "edit_regen_image":
                 self.run_worker(self.action_edit_regen_image(), name="regen-edit")
@@ -563,12 +576,6 @@ class PlayScreen(Screen[None]):
         node = self._save.nodes[self._save.current_node_id]
         if not node.image_prompt:
             return
-        self._save.nodes[node.id] = node.model_copy(
-            update={"image_status": "generating", "image_path": None}
-        )
-        save_game(self._save)
-        self._image.show_generating()
-        self.notify("Regenerating scene image…", timeout=60)  # pyright: ignore[reportUnknownMemberType]
         cb = PipelineCallbacks(
             on_image_committed=self._on_image_committed,
             on_image_failed=self._on_image_failed,
@@ -847,7 +854,7 @@ class PlayScreen(Screen[None]):
         Skipped while edit-regen is active to avoid overwriting the
         generating throbber with the old on-disk image.
         """
-        if self._edit_regen_active:
+        if self._edit_regen_active or self._image_regen_active:
             return
         self._render_current()
         self._maybe_auto_start_select()
