@@ -10,6 +10,7 @@ from textual.screen import Screen
 from textual.widgets import Button, Footer, Header
 
 from storygen.storage.app_state import last_story_id
+from storygen.storage.paths import game_dir
 from storygen.storage.save import load_game
 
 
@@ -51,8 +52,22 @@ class MenuScreen(Screen[None]):
         yield Footer()
 
     def on_mount(self) -> None:
-        if last_story_id() is None:
-            self.query_one("#btn-resume", Button).disabled = True
+        self._refresh_resume_button()
+
+    def on_screen_resume(self) -> None:
+        self._refresh_resume_button()
+
+    def _resume_available(self) -> bool:
+        gid = last_story_id()
+        return gid is not None and game_dir(gid).exists()
+
+    def _refresh_resume_button(self) -> None:
+        self.query_one("#btn-resume", Button).disabled = not self._resume_available()  # pyright: ignore[reportUnknownMemberType]
+
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        if action == "resume_story":
+            return self._resume_available()
+        return True
 
     def action_resume_story(self) -> None:
         from storygen.app import StoryGenApp
@@ -64,9 +79,14 @@ class MenuScreen(Screen[None]):
         if game_id is None:
             self.notify("No previous story to resume.", severity="warning", timeout=5)  # pyright: ignore[reportUnknownMemberType]
             return
+        if not game_dir(game_id).exists():
+            self._refresh_resume_button()
+            self.notify("Last story was deleted.", severity="warning", timeout=5)  # pyright: ignore[reportUnknownMemberType]
+            return
         try:
             save = load_game(game_id)
         except FileNotFoundError:
+            self._refresh_resume_button()
             self.notify("Last story no longer exists.", severity="warning", timeout=5)  # pyright: ignore[reportUnknownMemberType]
             return
         self.run_worker(app._start_game(save), name="resume-from-menu")  # pyright: ignore[reportPrivateUsage]
