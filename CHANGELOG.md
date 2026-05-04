@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Export book auto-read stops cleanly on last page** — When audio ends on the final page, auto-read now resets the button to "Auto-Read" instead of leaving it stuck on "Stop".
 - **Export book hides audio controls when story has no audio** — Auto-Read button is disabled and audio player HTML is omitted when the exported story has no TTS audio, avoiding empty UI elements.
 - **Blank screen on escape from play** — Pressing Escape to return to the main menu from the play screen showed a blank screen. Fixed by switching to the menu screen instead of popping the play screen off the stack.
+- **Concurrent portrait regeneration race** — Clicking Regenerate on multiple characters in quick succession fired parallel API requests with no throttling, risking rate-limit hits and data races. Both the portraits screen and library browser now track in-flight regenerations in a busy set; all Regenerate buttons are disabled while any regeneration is running.
 
 ## [0.3.1] - 2026-05-01
 

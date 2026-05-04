@@ -7,7 +7,7 @@ import logging
 import os
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import ClassVar, cast
+from typing import ClassVar
 from uuid import uuid4
 
 from PIL import Image
@@ -203,6 +203,9 @@ class PortraitsScreen(Screen[None]):
         # Track which characters currently have an outfit-create worker in
         # flight so the per-row Add button stays disabled until it lands.
         self._outfit_create_busy: set[str] = set()
+        # Track characters with in-flight portrait regenerations so all regen
+        # buttons are disabled while any worker is running.
+        self._regen_busy: set[str] = set()
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         if action == "open_full_res":
@@ -253,7 +256,7 @@ class PortraitsScreen(Screen[None]):
             first_line_personality = char.personality.split(".", 1)[0]
             meta.mount(Static(first_line_personality))
             regen_button = Button("Regenerate", id=f"regen-{char.id}")
-            regen_button.disabled = art_disabled
+            regen_button.disabled = art_disabled or bool(self._regen_busy)
             meta.mount(regen_button)
             edit_regen_button = Button("Edit regen", id=f"edit-regen-{char.id}")
             edit_regen_button.disabled = art_disabled or char.portrait_path is None
@@ -481,7 +484,7 @@ class PortraitsScreen(Screen[None]):
                 timeout=5,
             )
             return
-        original_label = button.label
+        self._regen_busy.add(char.id)
         button.disabled = True
         button.label = "Working…"
         try:
@@ -521,9 +524,10 @@ class PortraitsScreen(Screen[None]):
         except Exception:
             _logger.debug("Portrait regeneration failed", exc_info=True)
             self.notify("Portrait regeneration failed.", severity="error", timeout=5)
-            if button.is_attached:
-                button.disabled = False
-                button.label = cast(str, original_label)
+        finally:
+            self._regen_busy.discard(char.id)
+            if not self._regen_busy:
+                self._rebuild()
 
     # ---- Edit-regen flow -------------------------------------------------
 

@@ -255,6 +255,9 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
         self._character_agent_factory = character_agent_factory
         self._image_provider = image_provider
         self._focused_idx: int = 0
+        # Track in-flight portrait regenerations so all regen buttons are
+        # disabled while any worker is running.
+        self._regen_busy: set[str] = set()
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -560,7 +563,7 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
         full_res_btn.disabled = missing
         photo_buttons.mount(full_res_btn)
         regen_btn = Button("Regenerate", id=f"regen-{entry.id}")
-        regen_btn.disabled = self._image_provider is None
+        regen_btn.disabled = self._image_provider is None or bool(self._regen_busy)
         photo_buttons.mount(regen_btn)
         ref_label = "Change Ref" if entry.reference_image_path else "Ref Image"
         ref_btn = Button(ref_label, id=f"ref-{entry.id}")
@@ -651,7 +654,7 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
                 timeout=5,
             )
             return
-        original_label = button.label
+        self._regen_busy.add(library_id)
         button.disabled = True
         button.label = "Working…"
         self.notify(f"Regenerating portrait for '{entry.name}'...", timeout=5)
@@ -671,15 +674,16 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
         except Exception:
             _logger.debug("Portrait regeneration failed", exc_info=True)
             self.notify("Portrait regeneration failed.", severity="error", timeout=5)
-            if button.is_attached:
-                button.disabled = False
-                button.label = cast(str, original_label)
-            return
-        save_library_character(entry, portrait_bytes)
-        if app_state.auto_open_art_enabled():
-            open_in_system_viewer(library_portrait_path(entry.id))
-        self._rebuild()
-        self.notify(f"Regenerated portrait for '{entry.name}'.", timeout=5)
+        else:
+            save_library_character(entry, portrait_bytes)
+            if app_state.auto_open_art_enabled():
+                open_in_system_viewer(library_portrait_path(entry.id))
+            self._rebuild()
+            self.notify(f"Regenerated portrait for '{entry.name}'.", timeout=5)
+        finally:
+            self._regen_busy.discard(library_id)
+            if not self._regen_busy:
+                self._rebuild()
 
     def _open_ref_image_modal(self, library_id: str) -> None:
         """Open the reference image picker for a library character."""
