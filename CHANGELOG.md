@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-04
+
 ### Changed
 
 - **Consolidate info actions into modal picker** — Portraits, Graph, Endings, and Relationships bindings removed from the play footer. Press `i` to open an Info picker modal (same pattern as Regen) with per-option guards (disabled when unavailable). Frees 4 footer slots for a cleaner UI.
@@ -15,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Voice preview in settings** — A "Preview" button next to the TTS voice selector generates and plays a short audio sample using the selected voice, so users can audition voices before starting a story.
 - **Recap read-aloud hotkey** — Press `t` in the recap modal to read the recap text aloud via TTS.
 - **Auto-read recaps** — New TTS setting "Auto-read recaps aloud when shown" automatically speaks recap text when the recap modal appears (matching the existing auto-read behavior for story beats).
 - **Web export audio speed control** — The exported HTML book's audio player now has a speed button that cycles through 0.75x, 1x, 1.25x, 1.5x, and 2x playback rates.
@@ -32,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Export allowed during generation** — The Export Book button was enabled while images or TTS audio were generating. Now disabled during any active image or audio generation.
+- **TTS voice preview stale cache** — Previewing a voice then changing the voice and previewing again would play the old voice's cached audio. `TTSPlayer.configure()` now invalidates the temp audio cache so a new voice forces fresh generation.
 - **Reference image modal OK button never enables** — Image validation was coupled with thumbnail rendering; if the thumbnail failed the OK button stayed disabled. Validation and preview are now separate — OK enables as soon as the image file loads successfully.
 - **Reference image Browse button invisible** — Path Input defaulted to `width: 100%`, pushing the Browse button off-screen. Added `width: 1fr` to path inputs in both reference image and create character modals so the Browse button is always visible.
 - **Browse button does nothing (tkinter picker fails silently)** — Replaced the tkinter native file dialog (which silently catches all exceptions) with a Textual-native `ImageFilePickerModal` using `DirectoryTree` filtered to image files.

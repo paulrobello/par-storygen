@@ -341,7 +341,13 @@ class PlayScreen(Screen[None]):
             return self._pipeline is not None
         if action == "export_book":
             node = self._save.nodes.get(self._save.current_node_id)
-            return node is not None and node.is_ending
+            if node is None or not node.is_ending:
+                return False
+            if self._loading or self._edit_regen_active or self._image_regen_active:
+                return False
+            return not (
+                self._tts_player is not None and self._tts_player.state == TTSState.GENERATING
+            )
         if action == "recap":
             return True
         if action == "menu":
