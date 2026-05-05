@@ -46,7 +46,7 @@ Configured via environment variables (see `.env.example`) or in-app Settings. **
 
 **Text** (all OpenAI-compatible): OpenAI (`OPENAI_API_KEY`, default `gpt-4o-mini`), OpenRouter (`OPENROUTER_API_KEY` + `STORYGEN_TEXT_PROVIDER=openrouter`), Ollama (local, no key). Config via `STORYGEN_TEXT_MODEL` and optional `STORYGEN_TEXT_BASE_URL`.
 
-**Image**: OpenAI (`gpt-image-2`, ref-portrait aware), Gemini (ref-aware), Z.AI (text-to-image only), Ollama (local, no refs). Config via `STORYGEN_IMAGE_MODEL`, `STORYGEN_IMAGE_BASE_URL`, `STORYGEN_IMAGE_API_KEY`. Settings supports a fallback provider.
+**Image**: OpenAI (`gpt-image-2`, ref-portrait aware), Gemini (ref-aware), Z.AI (text-to-image only), Ollama (local, no refs). Config via `STORYGEN_IMAGE_MODEL`, `STORYGEN_IMAGE_BASE_URL`, `STORYGEN_IMAGE_API_KEY`. Settings supports a fallback provider. Prompt builders in `images/_prompts.py` use structured 5-part format for gpt-image-2, classic paragraph format for others.
 
 ## Architecture
 
@@ -56,9 +56,11 @@ storage  →  llm + images  →  widgets  →  screens  →  app
 
 Lower layers never import higher ones. `app.py` wires concrete providers/agents/pipelines into screens. See `docs/ARCHITECTURE.md` for full implementation details.
 
-Key concepts: **3-stage beat pipeline** (cache → beat gen → concurrent illustration + portraits), **choice schema split** (`Choice` for LLM vs `StoredChoice` for storage), **tree graph** (not DAG, frozen nodes), **branch prefetch** (background-generates pending choices), **cross-game character library** (export/import with optional backstory adaptation), **TTS player** (4-state machine wrapping `par_tts`, per-node audio caching), **export book** (HTML with 3D page-turn rendering via `export/book.py`).
+Key concepts: **3-stage beat pipeline** (cache → beat gen → concurrent illustration + portraits), **choice schema split** (`Choice` for LLM vs `StoredChoice` for storage), **tree graph** (not DAG, frozen nodes), **branch prefetch** (background-generates pending choices), **cross-game character library** (export/import with optional backstory adaptation via `adapt_backstory_system_prompt`), **TTS player** (4-state machine wrapping `par_tts`, per-node audio caching), **export book** (HTML with 3D page-turn rendering via `export/book.py`), **relationship tracking** (pairwise character relationships extracted inline during beat generation).
 
 **Screen flow:** `intro` (splash, auto-dismiss) → `menu` → `wizard` (8 steps) → `play` (main loop). From `play`: `portraits` (modal), `graph` (modal with `replay` sub-modal), `endings` (modal), `load`, `settings`. All screens reachable from `play` re-render on `on_screen_resume`.
+
+**TTS providers:** OpenAI, ElevenLabs, Deepgram, Gemini, Kokoro (local). Configured via `TTSPrefs` in settings. Audio stored as MP3 at `$XDG_DATA_HOME/storygen/games/<game-id>/audio/<node-id>-<provider>-<voice-id>.mp3`.
 
 **Important:** `_textual_patches.py` monkey-patches `Header._on_mount` to catch a Textual startup race. It's imported for side effects from `app.py` and **must be imported before any Header is constructed**.
 
@@ -92,6 +94,9 @@ Key concepts: **3-stage beat pipeline** (cache → beat gen → concurrent illus
 - Long-running LLM/image work: `@work(exit_on_error=False)`, `notify(...)` for progress (60–120s), errors with `severity="error", timeout=10-15`.
 - Footer binding labels: short, verb-first. `check_action` returns False to hide irrelevant bindings.
 - Prefer `Sequence[Choice]` over `list[Choice]` for covariance with `StoredChoice`.
+- **Concurrent operation guards:** Use a `_regen_busy: set[str]` to track in-flight regenerations; disable all regen buttons while any is running (see `portraits.py`, `library_browser.py`).
+- **`on_screen_resume` race:** When a modal dismisses, `on_screen_resume` fires and can clobber UI state before a worker starts. Guard with a flag (e.g. `_image_regen_active`, `_edit_regen_active`) checked in `on_screen_resume` to skip re-rendering.
+- **Save migrations** are cumulative in `storage/save.py`. Current schema version is 4 (v1→v2: `recap_text`, v2→v3: `relationships`, v3→v4: `backstory_summary` auto-population).
 
 ## graphify
 
