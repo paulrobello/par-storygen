@@ -10,12 +10,12 @@ from pathlib import Path
 from typing import ClassVar
 from uuid import uuid4
 
+from par_textual_image import TerminalImage
 from PIL import Image
 from rich.console import RenderableType
-from rich_pixels import Pixels
 from textual import work
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.containers import Grid, Horizontal, Vertical, VerticalScroll
 from textual.events import Click
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
@@ -48,27 +48,55 @@ from storygen.storage.library import (
 from storygen.storage.save import GameSave, save_game
 from storygen.util import open_in_system_viewer
 from storygen.widgets._header_util import format_cost_subtitle
-from storygen.widgets._image_util import render_image_thumbnail
+from storygen.widgets._image_util import pixels_from_image
 
 _logger = logging.getLogger(__name__)
 
 
-class _OutfitThumb(Static):
-    """Clickable mini-thumbnail for a single outfit; emits an action modal.
+def _resize_contain(im: Image.Image, width: int, height: int) -> Image.Image:
+    """Resize image to fit inside *width* x *height* without cropping."""
+    thumb = im.convert("RGBA")
+    thumb.thumbnail((width, height), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    left = (width - thumb.width) // 2
+    top = (height - thumb.height) // 2
+    canvas.alpha_composite(thumb, (left, top))
+    return canvas
 
-    The screen finds the click target via the widget's ``char_id`` /
-    ``outfit_id`` attributes — see :meth:`PortraitsScreen.on_click`.
+
+class _ClickablePortrait(Static):
+    """Static portrait thumbnail that opens in the system viewer on click."""
+
+    def __init__(
+        self,
+        content: RenderableType,
+        *,
+        image_path: Path,
+        **kwargs: object,
+    ) -> None:
+        super().__init__(content, **kwargs)  # type: ignore[arg-type]
+        self._image_path = image_path
+
+    def on_click(self) -> None:
+        open_in_system_viewer(self._image_path)
+
+
+class _OutfitThumbHB(Static):
+    """Clickable halfblock outfit thumbnail — plain Static, no Grid wrapper.
+
+    The screen finds the click target via ``char_id`` / ``outfit_id`` — see
+    :meth:`PortraitsScreen.on_click`.
     """
 
     DEFAULT_CSS = """
-    _OutfitThumb {
+    _OutfitThumbHB {
         border: round $primary 50%;
         margin-right: 1;
     }
-    _OutfitThumb:hover {
+    _OutfitThumbHB:hover {
         border: round $accent;
     }
-    _OutfitThumb.-current {
+    _OutfitThumbHB.-current {
         border: round $accent;
     }
     """
@@ -87,6 +115,97 @@ class _OutfitThumb(Static):
         self.outfit_id = outfit_id
         if is_current:
             self.add_class("-current")
+
+
+class _OutfitThumb(Grid):
+    """Clickable outfit thumbnail using TerminalImage for full-color protocols.
+
+    The screen finds the click target via ``char_id`` / ``outfit_id`` — see
+    :meth:`PortraitsScreen.on_click`.
+    """
+
+    DEFAULT_CSS = """
+    _OutfitThumb {
+        grid-size: 1;
+        overflow: hidden;
+        border: round $primary 50%;
+        margin-right: 1;
+    }
+    _OutfitThumb > TerminalImage {
+        width: 100%;
+        height: 100%;
+    }
+    _OutfitThumb:hover {
+        border: round $accent;
+    }
+    _OutfitThumb.-current {
+        border: round $accent;
+    }
+    """
+
+    def __init__(
+        self,
+        image_path: Path,
+        *,
+        char_id: str,
+        outfit_id: str,
+        is_current: bool,
+        **kwargs: object,
+    ) -> None:
+        super().__init__(**kwargs)  # type: ignore[arg-type]
+        self._image_path = image_path
+        self.char_id = char_id
+        self.outfit_id = outfit_id
+        if is_current:
+            self.add_class("-current")
+
+    def compose(self) -> ComposeResult:
+        yield TerminalImage()
+
+    def on_mount(self) -> None:
+        try:
+            term = self.query_one(TerminalImage)
+            mode = app_state.read_graphics_mode()
+            if mode != "auto":
+                term.force_protocol(mode)  # type: ignore[arg-type]
+            term.image = self._image_path
+        except Exception:
+            pass
+
+
+class _PortraitThumb(Grid):
+    """Clickable portrait thumbnail using TerminalImage for full-color protocols."""
+
+    DEFAULT_CSS = """
+    _PortraitThumb {
+        grid-size: 1;
+        overflow: hidden;
+    }
+    _PortraitThumb > TerminalImage {
+        width: 100%;
+        height: 100%;
+    }
+    """
+
+    def __init__(self, image_path: Path, **kwargs: object) -> None:
+        super().__init__(**kwargs)  # type: ignore[arg-type]
+        self._image_path = image_path
+
+    def compose(self) -> ComposeResult:
+        yield TerminalImage()
+
+    def on_mount(self) -> None:
+        try:
+            term = self.query_one(TerminalImage)
+            mode = app_state.read_graphics_mode()
+            if mode != "auto":
+                term.force_protocol(mode)  # type: ignore[arg-type]
+            term.image = self._image_path
+        except Exception:
+            pass
+
+    def on_click(self) -> None:
+        open_in_system_viewer(self._image_path)
 
 
 def _atomic_write_png(dest: Path, png_bytes: bytes) -> None:
@@ -283,7 +402,7 @@ class PortraitsScreen(Screen[None]):
                 )
             )
 
-    def _render_thumb(self, char: Character) -> Static:
+    def _render_thumb(self, char: Character) -> Static | _PortraitThumb:
         if not char.portrait_path:
             thumb = Static("", classes="portrait-thumb")
             thumb.display = False
@@ -294,19 +413,28 @@ class PortraitsScreen(Screen[None]):
             thumb = Static("", classes="portrait-thumb")
             thumb.display = False
             return thumb
-        return render_image_thumbnail(
-            abs_path,
-            size=(96, 48),
-            css_class="portrait-thumb",
-            placeholder="(no portrait)",
-            on_click=open_in_system_viewer,
-        )
+        if not abs_path.exists():
+            return Static("(no portrait)", classes="portrait-thumb", markup=False)
+        if app_state.read_graphics_mode() == "halfblock":
+            # Container: 28x14 cells, border: round -> content 26x12 cells
+            # Halfblock: 26 px wide, 12 cells * 2 px = 24 px tall
+            try:
+                with Image.open(abs_path) as im:
+                    im = _resize_contain(im, 26, 24)
+                    return _ClickablePortrait(
+                        pixels_from_image(im),
+                        image_path=abs_path,
+                        classes="portrait-thumb",
+                    )
+            except Exception:
+                return Static("(no portrait)", classes="portrait-thumb", markup=False)
+        return _PortraitThumb(abs_path, classes="portrait-thumb")
 
     def _render_outfit_thumb(
         self,
         char: Character,
         outfit: CharacterOutfit,
-    ) -> Static:
+    ) -> Static | _OutfitThumbHB | _OutfitThumb:
         """Render a single outfit's mini-thumbnail (or placeholder)."""
         is_current = outfit.id == char.current_outfit_id
         try:
@@ -314,25 +442,29 @@ class PortraitsScreen(Screen[None]):
         except ValueError:
             return Static("[no image]", classes="outfit-thumb-mini", markup=False)
         if not abs_path.exists():
-            placeholder = Static(
-                "[no image]",
-                classes="outfit-thumb-mini",
-                markup=False,
-            )
-            return placeholder
-        try:
-            with Image.open(abs_path) as im:
-                im = im.convert("RGBA")
-                im.thumbnail((44, 22))
-                return _OutfitThumb(
-                    Pixels.from_image(im),
-                    char_id=char.id,
-                    outfit_id=outfit.id,
-                    is_current=is_current,
-                    classes="outfit-thumb-mini",
-                )
-        except Exception:
-            return Static("[unavailable]", classes="outfit-thumb-mini", markup=False)
+            return Static("[no image]", classes="outfit-thumb-mini", markup=False)
+        if app_state.read_graphics_mode() == "halfblock":
+            # Container: 22x12 cells, _OutfitThumbHB border: round -> content 20x10 cells
+            # Halfblock: 20 px wide, 10 cells * 2 px = 20 px tall
+            try:
+                with Image.open(abs_path) as im:
+                    im = _resize_contain(im, 20, 20)
+                    return _OutfitThumbHB(
+                        pixels_from_image(im),
+                        char_id=char.id,
+                        outfit_id=outfit.id,
+                        is_current=is_current,
+                        classes="outfit-thumb-mini",
+                    )
+            except Exception:
+                return Static("[unavailable]", classes="outfit-thumb-mini", markup=False)
+        return _OutfitThumb(
+            abs_path,
+            char_id=char.id,
+            outfit_id=outfit.id,
+            is_current=is_current,
+            classes="outfit-thumb-mini",
+        )
 
     def _render_outfits_row(
         self,
@@ -420,15 +552,17 @@ class PortraitsScreen(Screen[None]):
     def on_click(self, event: Click) -> None:
         """Outfit-thumb click → action modal.
 
-        Attached at the screen level so a single dispatcher handles every
-        row. The main portrait thumbnail (rendered by
-        :func:`render_image_thumbnail` with ``on_click``) handles its own
-        click locally and stops here naturally — the screen-level handler
-        ignores anything that isn't an :class:`_OutfitThumb`.
+        Walks up the DOM tree from the click target to find an outfit thumb.
+        Halfblock portrait thumbnails (via ``render_image_thumbnail``) and
+        TerminalImage portrait thumbnails (via ``_PortraitThumb``) handle
+        their own click internally.
         """
         widget = event.widget
-        if isinstance(widget, _OutfitThumb):
-            self._open_outfit_action_modal(widget.char_id, widget.outfit_id)
+        while widget is not None:
+            if isinstance(widget, (_OutfitThumb, _OutfitThumbHB)):
+                self._open_outfit_action_modal(widget.char_id, widget.outfit_id)
+                return
+            widget = getattr(widget, "parent", None)
 
     def _export_to_library(self, char: Character) -> None:
         """Copy ``char`` (with its current portrait) into the cross-game library.

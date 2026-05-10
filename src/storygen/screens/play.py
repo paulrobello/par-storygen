@@ -146,6 +146,7 @@ class PlayScreen(Screen[None]):
         self._image_provider = image_provider
         self._tts_player = tts_player
         self._image = ImagePanel()
+        self._image.set_protocol(app_state.read_graphics_mode())
         self._story = StoryPanel()
         self._choices = ChoiceList()
         self._throbber = Throbber()

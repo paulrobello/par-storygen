@@ -22,7 +22,6 @@ from collections.abc import Callable
 from typing import ClassVar
 
 from PIL import Image, UnidentifiedImageError
-from rich_pixels import Pixels
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
@@ -32,6 +31,7 @@ from storygen.llm.models import NodeId, StoryNode
 from storygen.storage import paths
 from storygen.storage.save import GameSave
 from storygen.storage.tree import path_from_root
+from storygen.widgets._image_util import pixels_from_image
 
 
 class _ReplayImage(Static):
@@ -57,7 +57,7 @@ class _ReplayImage(Static):
                 im = im.convert("RGBA")
                 im.thumbnail((96, 48))
                 self.display = True
-                self.update(Pixels.from_image(im))
+                self.update(pixels_from_image(im))
         except (OSError, ValueError, UnidentifiedImageError):
             self.update("")
             self.display = False

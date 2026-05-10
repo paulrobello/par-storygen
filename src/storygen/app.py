@@ -194,6 +194,16 @@ class StoryGenApp(App[None]):
         else:
             self.push_screen(IntroScreen())  # pyright: ignore[reportUnknownMemberType]
 
+    def on_unmount(self) -> None:
+        """Clear all terminal graphics so images don't linger after exit."""
+        from par_textual_image import TerminalImage
+
+        try:
+            for term in self.query(TerminalImage):
+                term.image = None
+        except Exception:
+            pass
+
     def on_text_provider_changed(self, event: TextProviderChanged) -> None:
         """Re-read config and rebuild provider clients so new stories pick them up.
 

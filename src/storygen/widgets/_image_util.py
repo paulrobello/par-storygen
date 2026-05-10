@@ -10,10 +10,42 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+from par_textual_image.protocols import CellSize
+from par_textual_image.protocols.halfblock import HalfBlockRenderer
 from PIL import Image, UnidentifiedImageError
 from rich.console import RenderableType
-from rich_pixels import Pixels
+from rich.console import RenderResult as RichRenderResult
+from rich.segment import Segment
 from textual.widgets import Static
+
+
+class _HalfBlockRenderable:
+    """Rich renderable wrapping halfblock Segments for Static.update()."""
+
+    def __init__(self, segments: list[Segment]) -> None:
+        self._segments = segments
+
+    def __rich_console__(self, console: object, options: object) -> RichRenderResult:
+        yield from self._segments
+
+
+_HALFBLOCK_RENDERER = HalfBlockRenderer()
+
+
+def pixels_from_image(im: Image.Image) -> _HalfBlockRenderable:
+    """Render a PIL Image as half-block characters (replaces Pixels.from_image).
+
+    Uses par-textual-image's HalfBlockRenderer internally. Each cell holds one
+    horizontal pixel; two vertical pixels map to the upper/lower half of ▀.
+    """
+    cell_w = im.width
+    cell_h = max(1, im.height // 2)
+    segments = [
+        s
+        for s in _HALFBLOCK_RENDERER.render(im, cell_w, cell_h, CellSize(1, 2))
+        if isinstance(s, Segment)
+    ]
+    return _HalfBlockRenderable(segments)
 
 
 class _ClickableThumbnail(Static):
@@ -64,9 +96,9 @@ def render_image_thumbnail(
         with Image.open(path) as im:
             im = im.convert("RGBA")
             im.thumbnail(size)
-            pixels = Pixels.from_image(im)
+            rendered = pixels_from_image(im)
     except (OSError, ValueError, UnidentifiedImageError):
         return Static(placeholder, classes=css_class, markup=False)
     if on_click is not None:
-        return _ClickableThumbnail(pixels, path=path, on_click_cb=on_click, classes=css_class)
-    return Static(pixels, classes=css_class)
+        return _ClickableThumbnail(rendered, path=path, on_click_cb=on_click, classes=css_class)
+    return Static(rendered, classes=css_class)

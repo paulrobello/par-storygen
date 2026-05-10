@@ -7,10 +7,10 @@ from pathlib import Path
 from PIL import Image
 from rich.console import Group, RenderableType
 from rich.text import Text
-from rich_pixels import Pixels
 from textual.widgets import Static
 
 from storygen.llm.models import Character
+from storygen.widgets._image_util import pixels_from_image
 
 
 def format_character_entry(c: Character) -> str:
@@ -48,7 +48,7 @@ class CharacterSheet(Static):
             parts.append(Group(*entry))
         self.update(Group(*parts))
 
-    def _load_portrait(self, c: Character) -> Pixels | None:
+    def _load_portrait(self, c: Character) -> RenderableType | None:
         if self._game_dir is None or not c.portrait_path:
             return None
         abs_path = self._game_dir / c.portrait_path
@@ -58,6 +58,6 @@ class CharacterSheet(Static):
             with Image.open(abs_path) as im:
                 im = im.convert("RGBA")
                 im.thumbnail((48, 24))
-                return Pixels.from_image(im)
+                return pixels_from_image(im)
         except Exception:
             return None

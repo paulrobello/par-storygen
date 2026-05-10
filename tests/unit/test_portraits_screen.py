@@ -9,6 +9,7 @@ from typing import cast
 from uuid import uuid4
 
 import pytest
+from PIL import Image
 from textual.app import App, ComposeResult
 
 from storygen.images.base import ReferencePortrait
@@ -35,7 +36,8 @@ from storygen.screens._outfit_modals import OutfitCreateRequest
 from storygen.screens._ref_image_modals import ReferenceImageResult
 from storygen.screens.portraits import (
     PortraitsScreen,
-    _OutfitThumb,  # pyright: ignore[reportPrivateUsage]
+    _OutfitThumbHB,  # pyright: ignore[reportPrivateUsage]
+    _resize_contain,  # pyright: ignore[reportPrivateUsage]
 )
 from storygen.storage import paths
 from storygen.storage.library import list_library_characters
@@ -130,6 +132,26 @@ class _Harness(App[None]):
 
     def compose(self) -> ComposeResult:
         yield from []
+
+
+def _rgba_at(im: Image.Image, x: int, y: int) -> tuple[int, int, int, int]:
+    return cast(tuple[int, int, int, int], im.getpixel((x, y)))
+
+
+def test_portrait_halfblock_resize_preserves_vertical_extremes() -> None:
+    im = Image.new("RGBA", (10, 30), (0, 0, 0, 0))
+    for y in range(3):
+        for x in range(10):
+            im.putpixel((x, y), (255, 0, 0, 255))
+            im.putpixel((x, 29 - y), (0, 0, 255, 255))
+
+    resized = _resize_contain(im, 20, 20)
+
+    assert resized.size == (20, 20)
+    assert any((pixel := _rgba_at(resized, x, 0))[3] > 0 and pixel[0] > pixel[2] for x in range(20))
+    assert any(
+        (pixel := _rgba_at(resized, x, 19))[3] > 0 and pixel[2] > pixel[0] for x in range(20)
+    )
 
 
 @pytest.mark.asyncio
@@ -469,6 +491,7 @@ async def test_outfits_row_renders_one_thumb_per_outfit(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
     o1 = _make_outfit(name="casual")
     o2 = _make_outfit(name="armored")
     save = _save_with_outfits(o1, o2)
@@ -478,7 +501,7 @@ async def test_outfits_row_renders_one_thumb_per_outfit(
     app = _Harness(save, provider)
     async with app.run_test() as pilot:
         await pilot.pause()
-        thumbs = list(app.screen.query(_OutfitThumb))
+        thumbs = list(app.screen.query(_OutfitThumbHB))
         assert len(thumbs) == 2
         outfit_ids = {t.outfit_id for t in thumbs}
         assert outfit_ids == {o1.id, o2.id}

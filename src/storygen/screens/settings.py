@@ -348,6 +348,12 @@ class SettingsScreen(Screen[None]):
         self._llm_cache_switch = Switch(value=False, id="llm-cache-switch")
         self._auto_select_switch = Switch(value=False, id="auto-select-switch")
         self._auto_open_art_switch = Switch(value=False, id="auto-open-art-switch")
+        self._graphics_mode_select: Select[str] = Select(
+            list(app_state.GRAPHICS_MODE_CHOICES),
+            value="halfblock",
+            allow_blank=False,
+            id="graphics-mode-select",
+        )
         self._auto_recap_switch = Switch(value=False, id="auto-recap-switch")
         self._recap_interval_input = Input(
             value="3",
@@ -465,6 +471,8 @@ class SettingsScreen(Screen[None]):
                     "Auto-open full-res images in system viewer when generated",
                     classes="switch-label",
                 )
+            yield Label("Graphics protocol")
+            yield self._graphics_mode_select
 
             yield Static("Branch prefetch", classes="section")
             with Horizontal(classes="switch-row"):
@@ -802,6 +810,7 @@ class SettingsScreen(Screen[None]):
             self._llm_cache_switch.value = app_state.llm_cache_enabled()
             self._auto_select_switch.value = app_state.auto_select_enabled()
             self._auto_open_art_switch.value = app_state.auto_open_art_enabled()
+            self._graphics_mode_select.value = app_state.read_graphics_mode()
             self._auto_recap_switch.value = app_state.auto_recap_enabled()
             self._recap_interval_input.value = str(app_state.recap_interval())
             self._refresh_image_gating()
@@ -1281,6 +1290,7 @@ class SettingsScreen(Screen[None]):
             auto_open_art_value=self._auto_open_art_switch.value,
             auto_recap_value=self._auto_recap_switch.value,
             recap_interval_value=max(1, int(self._recap_interval_input.value or "3")),
+            graphics_mode_value=str(self._graphics_mode_select.value),
         )
         self.post_message(ImageProviderChanged(image_prefs))
         self.post_message(TextProviderChanged(prefs))
@@ -1349,6 +1359,7 @@ class SettingsScreen(Screen[None]):
             self._llm_cache_switch.value = False
             self._auto_select_switch.value = False
             self._auto_open_art_switch.value = False
+            self._graphics_mode_select.value = app_state.DEFAULT_GRAPHICS_MODE
             self._refresh_image_gating()
             # TTS section.
             self._tts_provider_select.value = app_state.DEFAULT_TTS_PROVIDER

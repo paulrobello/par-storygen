@@ -8,11 +8,12 @@ from typing import ClassVar
 
 from PIL import Image
 from pydantic import BaseModel
-from rich_pixels import Pixels
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Input, Static, TextArea
+
+from storygen.widgets._image_util import pixels_from_image
 
 
 class CreateCharRequest(BaseModel):
@@ -179,7 +180,7 @@ class CreateCharacterModal(Screen[CreateCharRequest | None]):
                 self._loaded_ref_bytes = buf.getvalue()
                 thumb = im.copy()
                 thumb.thumbnail((96, 48))
-                preview.update(Pixels.from_image(thumb))
+                preview.update(pixels_from_image(thumb))
         except Exception:
             self._loaded_ref_bytes = None
             preview.update("(failed to load)")

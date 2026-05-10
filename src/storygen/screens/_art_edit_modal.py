@@ -18,12 +18,14 @@ from typing import ClassVar
 
 from PIL import Image
 from pydantic import BaseModel
-from rich_pixels import Pixels
+from rich.console import RenderableType
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.events import Click
 from textual.screen import Screen
 from textual.widgets import Button, Checkbox, RadioButton, RadioSet, Static, TextArea
+
+from storygen.widgets._image_util import pixels_from_image
 
 
 class ArtEditMode(StrEnum):
@@ -37,13 +39,13 @@ class ArtEditResult(BaseModel):
     use_current_as_ref: bool = True
 
 
-def _render_thumb(image_bytes: bytes) -> Pixels | None:
+def _render_thumb(image_bytes: bytes) -> RenderableType | None:
     """Render a small thumbnail from raw image bytes."""
     try:
         with Image.open(io.BytesIO(image_bytes)) as im:
             im = im.convert("RGBA")
             im.thumbnail((64, 32))
-            return Pixels.from_image(im)
+            return pixels_from_image(im)
     except Exception:
         return None
 

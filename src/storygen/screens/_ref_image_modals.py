@@ -19,11 +19,12 @@ from typing import ClassVar, Literal
 
 from PIL import Image
 from pydantic import BaseModel
-from rich_pixels import Pixels
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, DirectoryTree, Input, RadioButton, RadioSet, Static
+
+from storygen.widgets._image_util import pixels_from_image
 
 _logger = logging.getLogger(__name__)
 
@@ -290,7 +291,7 @@ class ReferenceImageModal(Screen[ReferenceImageResult | None]):
             thumb = Image.open(path)
             thumb = thumb.convert("RGBA")
             thumb.thumbnail((96, 48))
-            pixels = Pixels.from_image(thumb)
+            pixels = pixels_from_image(thumb)
             preview = self.query_one("#ref-image-preview", Static)
             preview.update(pixels)
         except Exception:

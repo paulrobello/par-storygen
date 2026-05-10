@@ -586,6 +586,10 @@ def test_write_all_settings_matches_individual_writers_byte_for_byte(
     app_state.set_auto_open_art_enabled(False)
     app_state.set_auto_recap(False)
     app_state.set_recap_interval(3)
+    # graphics_mode: no individual writer, write directly
+    state_a = app_state.read_app_state()
+    state_a["graphics_mode"] = "kitty"
+    app_state.write_app_state(state_a)
     bytes_a = (path_a / "storygen" / "state.json").read_bytes()
 
     # Path B: single atomic write.
@@ -604,6 +608,7 @@ def test_write_all_settings_matches_individual_writers_byte_for_byte(
         auto_open_art_value=False,
         auto_recap_value=False,
         recap_interval_value=3,
+        graphics_mode_value="kitty",
     )
     bytes_b = (path_b / "storygen" / "state.json").read_bytes()
 

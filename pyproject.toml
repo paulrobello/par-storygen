@@ -52,7 +52,7 @@ dependencies = [
     "pydantic-ai>=1.84.1",
     "openai>=2.32.0",
     "rich>=15.0.0",
-    "rich-pixels>=3.0.1",
+    "par-textual-image",
     "typer>=0.24.1",
     "xdg-base-dirs>=6.0.2",
     "httpx>=0.28.1",
@@ -159,3 +159,6 @@ testpaths = [
 addopts = "-v --strict-markers"
 asyncio_mode = "auto"
 timeout = 10
+
+[tool.uv.sources]
+par-textual-image = { path = "../par-textual-image", editable = true }

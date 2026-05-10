@@ -138,6 +138,18 @@ TTS_API_KEY_ENV: MappingProxyType[str, str | None] = MappingProxyType(
 
 _ALLOWED_TTS_PROVIDERS: frozenset[str] = frozenset(pid for _, pid in TTS_PROVIDER_CHOICES)
 
+DEFAULT_GRAPHICS_MODE: str = "halfblock"
+
+GRAPHICS_MODE_CHOICES: tuple[tuple[str, str], ...] = (
+    ("Auto Detect", "auto"),
+    ("Kitty TGP", "kitty"),
+    ("Sixel", "sixel"),
+    ("iTerm2", "iterm2"),
+    ("Halfblock", "halfblock"),
+)
+
+_ALLOWED_GRAPHICS_MODES: frozenset[str] = frozenset(pid for _, pid in GRAPHICS_MODE_CHOICES)
+
 
 def _clamp_target_beats(value: object) -> int:
     """Coerce ``value`` to an int and clamp into [MIN, MAX].
@@ -368,6 +380,14 @@ def set_prefetch_enabled(value: bool) -> None:
     state = read_app_state()
     state["prefetch_enabled"] = bool(value)
     write_app_state(state)
+
+
+def read_graphics_mode() -> str:
+    """Return the terminal image rendering protocol. Defaults to ``"auto"``."""
+    val = read_app_state().get("graphics_mode")
+    if not isinstance(val, str) or val not in _ALLOWED_GRAPHICS_MODES:
+        return DEFAULT_GRAPHICS_MODE
+    return val
 
 
 def prefetch_images_enabled() -> bool:
@@ -660,6 +680,7 @@ def write_all_settings(
     auto_open_art_value: bool = False,
     auto_recap_value: bool = False,
     recap_interval_value: int = 3,
+    graphics_mode_value: str = DEFAULT_GRAPHICS_MODE,
 ) -> None:
     """Atomic write of all Settings-screen-owned state in a single JSON rewrite.
 
@@ -689,4 +710,6 @@ def write_all_settings(
     state["auto_open_art"] = bool(auto_open_art_value)
     state["auto_recap"] = bool(auto_recap_value)
     state["recap_interval"] = max(1, int(recap_interval_value))
+    mode = str(graphics_mode_value)
+    state["graphics_mode"] = mode if mode in _ALLOWED_GRAPHICS_MODES else DEFAULT_GRAPHICS_MODE
     write_app_state(state)

@@ -1951,12 +1951,12 @@ dependencies = [
     { name = "jinja2" },
     { name = "openai" },
     { name = "par-cli-tts" },
+    { name = "par-textual-image" },
     { name = "pillow" },
     { name = "pydantic" },
     { name = "pydantic-ai" },
     { name = "python-dotenv" },
     { name = "rich" },
-    { name = "rich-pixels" },
     { name = "tenacity" },
     { name = "textual" },
     { name = "textual-pyfiglet" },
@@ -1984,12 +1984,12 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "openai", specifier = ">=2.32.0" },
     { name = "par-cli-tts", specifier = ">=0.5.1" },
+    { name = "par-textual-image", editable = "../par-textual-image" },
     { name = "pillow", specifier = ">=12.2.0" },
     { name = "pydantic", specifier = ">=2.9" },
     { name = "pydantic-ai", specifier = ">=1.84.1" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "rich", specifier = ">=15.0.0" },
-    { name = "rich-pixels", specifier = ">=3.0.1" },
     { name = "tenacity", specifier = ">=9.1.4" },
     { name = "textual", specifier = ">=8.2.3" },
     { name = "textual-pyfiglet", specifier = ">=1.0.0" },
@@ -2009,6 +2009,28 @@ dev = [
     { name = "pytest-timeout", specifier = ">=2.4.0" },
     { name = "ruff", specifier = ">=0.15.11" },
 ]
+
+[[package]]
+name = "par-textual-image"
+version = "0.1.0"
+source = { editable = "../par-textual-image" }
+dependencies = [
+    { name = "pillow" },
+    { name = "rich" },
+    { name = "textual" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pillow", specifier = ">=11.0" },
+    { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.25" },
+    { name = "rich", specifier = ">=14.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11" },
+    { name = "textual", specifier = ">=3.0" },
+]
+provides-extras = ["dev"]
 
 [[package]]
 name = "pathable"
@@ -2883,19 +2905,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c0/8f/0722ca900cc807c13a6a0c696dacf35430f72e0ec571c4275d2371fca3e9/rich-15.0.0.tar.gz", hash = "sha256:edd07a4824c6b40189fb7ac9bc4c52536e9780fbbfbddf6f1e2502c31b068c36", size = 230680, upload-time = "2026-04-12T08:24:00.75Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/82/3b/64d4899d73f91ba49a8c18a8ff3f0ea8f1c1d75481760df8c68ef5235bf5/rich-15.0.0-py3-none-any.whl", hash = "sha256:33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb", size = 310654, upload-time = "2026-04-12T08:24:02.83Z" },
-]
-
-[[package]]
-name = "rich-pixels"
-version = "3.0.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pillow" },
-    { name = "rich" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/31/71/6d5cd4b8d67cd49366eda19aaf37f20094ce562223a91166109202590237/rich_pixels-3.0.1.tar.gz", hash = "sha256:4a81977d45437ce5009cdcaf70af80256c3bdfab870e87ab802c577ba4133235", size = 24631, upload-time = "2024-03-30T09:37:52.834Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/08/72/7264494bc0944db1166b73c88f19d9ddfc584dbbc77c210cd0f52f59c511/rich_pixels-3.0.1-py3-none-any.whl", hash = "sha256:e82c5aa0d00885609675494f16e1ef814c68fa795634f1d6917cae9159b755e1", size = 6004, upload-time = "2024-03-30T09:37:51.169Z" },
 ]
 
 [[package]]
