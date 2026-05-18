@@ -598,7 +598,7 @@ class StoryGenApp(App[None]):
         )
         # Show recap for loaded games (not fresh wizard saves)
         has_progress = len(save.nodes) > 1
-        if has_progress:
+        if has_progress and app_state.resume_recap_enabled():
 
             async def _show_resume_recap() -> None:
                 await asyncio.sleep(0.5)

@@ -97,6 +97,19 @@ def test_beat_system_prompt_contains_style_reminder() -> None:
     assert "fourth-wall voice" in out.lower()
 
 
+def test_beat_system_prompt_discourages_repeated_distinctive_phrases() -> None:
+    """Recurring motifs are OK, but stock wording should not loop beat to beat."""
+    theme = Theme(title="t", setting="s", premise="p", keywords=[])
+    tone = Tone(preset="serious", custom_descriptor=None)
+    out = beat_system_prompt(theme=theme, tone=tone, narration_style="third_person")
+    lower = out.lower()
+    assert "recurring motifs" in lower
+    assert "do not repeat distinctive phrases verbatim" in lower
+    assert "fresh action" in lower
+    assert "dialogue" in lower
+    assert "sensory detail" in lower
+
+
 def test_blurb_prompt_includes_theme_and_characters() -> None:
     theme = Theme(
         title="The Hollow Crown",

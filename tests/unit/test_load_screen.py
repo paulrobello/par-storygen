@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import pytest
 from textual.app import App, ComposeResult
-from textual.widgets import Button
+from textual.widgets import Button, Static
 
 from storygen.images.base import ReferencePortrait
 from storygen.llm.models import (
@@ -21,7 +21,7 @@ from storygen.llm.models import (
     Tone,
 )
 from storygen.screens._confirm_modal import ConfirmModal
-from storygen.screens.load import LoadGameScreen
+from storygen.screens.load import LoadGameScreen, StorySetupDetailsModal
 from storygen.storage import paths
 from storygen.storage.save import GameSave, save_game
 
@@ -214,6 +214,53 @@ async def test_delete_cancel_keeps_save(monkeypatch: pytest.MonkeyPatch, tmp_pat
         for _ in range(5):
             await pilot.pause()
     assert save_dir.exists()
+
+
+@pytest.mark.asyncio
+async def test_details_button_opens_story_setup_modal(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    save = _seed_save("With Details")
+    save.creation_prompts.theme_prompt = "Make a mall adventure"
+    save.creation_prompts.character_prompt = "Use Rosie and Galera"
+    save.art_style = "watercolor"
+    save.target_major_beats = 7
+    save_game(save)
+    system_clipboard_calls: list[str] = []
+
+    def fake_system_clipboard(text: str) -> bool:
+        system_clipboard_calls.append(text)
+        return True
+
+    monkeypatch.setattr(
+        "storygen.screens.load.copy_text_to_system_clipboard",
+        fake_system_clipboard,
+    )
+
+    app = _Harness()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, LoadGameScreen)
+        assert screen.query_one(f"#details-{save.id}", Button).label == "Details"
+        await pilot.click(f"#details-{save.id}")
+        for _ in range(5):
+            await pilot.pause()
+            if isinstance(app.screen, StorySetupDetailsModal):
+                break
+        assert isinstance(app.screen, StorySetupDetailsModal)
+        text = "\n".join(str(static.content) for static in app.screen.query(Static))
+        assert "Make a mall adventure" in text
+        assert "Use Rosie and Galera" in text
+        assert "watercolor" in text
+        assert "7" in text
+        copy_buttons = [btn for btn in app.screen.query(Button) if str(btn.label) == "Copy"]
+        assert len(copy_buttons) == len(app.screen._detail_rows())  # pyright: ignore[reportPrivateUsage]
+        await pilot.click("#copy-detail-0")
+        await pilot.pause()
+        assert app.clipboard == "Make a mall adventure"
+        assert system_clipboard_calls == ["Make a mall adventure"]
 
 
 def _valid_png_bytes() -> bytes:

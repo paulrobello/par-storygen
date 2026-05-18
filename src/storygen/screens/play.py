@@ -23,6 +23,7 @@ from storygen.export.book import export_book
 from storygen.llm.models import NodeId, StoryNode
 from storygen.pipeline import BeatPipeline, PipelineCallbacks
 from storygen.screens._art_edit_modal import ArtEditModal, ArtEditMode, ArtEditResult
+from storygen.screens._confirm_modal import ConfirmModal
 from storygen.screens._recap_modal import RecapModal
 from storygen.screens.endings import EndingsScreen
 from storygen.screens.graph import GraphScreen
@@ -37,6 +38,23 @@ from storygen.widgets.choice_list import ChoiceList
 from storygen.widgets.image_panel import ImagePanel
 from storygen.widgets.story_panel import StoryPanel
 from storygen.widgets.throbber import Throbber
+
+_RECAP_RETRY_DELAYS: tuple[float, ...] = (0.5, 1.5)
+
+
+def _is_transient_recap_error(exc: Exception) -> bool:
+    """Return True for provider errors that are likely worth retrying."""
+    text = str(exc).lower()
+    transient_terms = (
+        "network",
+        "timeout",
+        "timed out",
+        "try again later",
+        "temporarily",
+        "connection",
+        "rate limit",
+    )
+    return any(term in text for term in transient_terms)
 
 
 class PlayScreen(Screen[None]):
@@ -190,6 +208,27 @@ class PlayScreen(Screen[None]):
         if self._auto_selecting or self._loading or self._pipeline is None:
             return
         if not app_state.auto_select_enabled():
+            return
+        node = self._save.nodes.get(self._save.current_node_id)
+        if node is None or node.is_ending or not node.choices:
+            return
+
+        def _after_confirm(confirmed: bool | None) -> None:
+            if confirmed and self.is_attached:
+                self._start_auto_select()
+
+        self.app.push_screen(  # pyright: ignore[reportUnknownMemberType]
+            ConfirmModal(
+                "Auto-select is enabled. Start auto-playing this story now?",
+                confirm_label="Start auto-play",
+                cancel_label="Not now",
+            ),
+            _after_confirm,
+        )
+
+    def _start_auto_select(self) -> None:
+        """Start auto-select immediately without another confirmation prompt."""
+        if self._auto_selecting or self._loading or self._pipeline is None:
             return
         node = self._save.nodes.get(self._save.current_node_id)
         if node is None or node.is_ending or not node.choices:
@@ -717,8 +756,21 @@ class PlayScreen(Screen[None]):
                     parts.append(f"Player chose: {chosen.text}")
 
         prompt = "\n\n".join(parts)
-        result = await agent.run(prompt)
-        return result.output
+        for attempt, delay in enumerate((*_RECAP_RETRY_DELAYS, 0.0), start=1):
+            try:
+                result = await agent.run(prompt)
+                return result.output
+            except Exception as exc:
+                if delay <= 0 or not _is_transient_recap_error(exc):
+                    raise
+                if self.is_attached:
+                    self.notify(
+                        f"Recap hit a transient network error; retrying ({attempt + 1}/3)…",
+                        severity="warning",
+                        timeout=5,
+                    )
+                await asyncio.sleep(delay)
+        raise RuntimeError("recap retry loop exhausted")
 
     async def action_regenerate_node(self) -> None:
         """Discard the current beat and re-roll it from the parent's choice."""

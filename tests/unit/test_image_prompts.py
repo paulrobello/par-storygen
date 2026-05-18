@@ -80,6 +80,43 @@ def test_scene_prompt_v2_format() -> None:
     assert "Art style: watercolor illustration." in out
 
 
+def test_scene_prompt_includes_character_facing_object_guidance() -> None:
+    out = build_scene_prompt("Olivia reads from a tablet", art_style="comic book")
+    assert "Spatial orientation:" in out
+    assert "orient the visible surface toward that character" in out
+    assert "not toward the viewer" in out
+    assert "gaze and hands" in out
+
+
+def test_scene_prompt_v2_includes_character_facing_object_guidance() -> None:
+    out = build_scene_prompt(
+        "Olivia reads from a tablet",
+        art_style="comic book",
+        model="gpt-image-2",
+    )
+    assert "Spatial orientation:" in out
+    assert "orient the visible surface toward that character" in out
+
+
+def test_scene_prompt_prevents_screens_on_device_backs() -> None:
+    out = build_scene_prompt("Marcus holds a tablet", art_style="comic book")
+    assert "only the front/display side contains screen content" in out
+    assert "plain physical back/case" in out
+    assert "no glowing UI" in out
+    assert "Do not put a readable display on the back side" in out
+
+
+def test_scene_prompt_defaults_idle_held_devices_to_non_display_side() -> None:
+    out = build_scene_prompt(
+        "Olivia holds a phone while looking across the crowd",
+        art_style="comic book",
+    )
+    assert "holding or carrying a device" in out
+    assert "not actively using it or deliberately showing its screen" in out
+    assert "default to the blank back/case" in out
+    assert "screen turned or tilted away" in out
+
+
 def test_cover_prompt_includes_title() -> None:
     out = build_cover_prompt(
         theme_title="The Lost Kingdom",

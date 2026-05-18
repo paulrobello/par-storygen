@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Switch `par-textual-image` to PyPI** — Dependency changed from local editable path to the published PyPI package (`par-textual-image>=0.1.0`). Removed `[tool.uv.sources]` path override.
+
 ## [0.4.0] - 2026-05-04
 
 ### Changed

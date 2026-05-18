@@ -19,6 +19,21 @@ _CHARACTER_IMAGE_CONFIG = ImageProviderConfig(
 )
 
 
+class RecordingThemeAgent:
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+
+    async def run(self, prompt: str) -> object:
+        self.prompts.append(prompt)
+        theme = Theme(
+            title="Proposed",
+            setting="A misted valley.",
+            premise="Something stirs.",
+            keywords=["mist", "valley"],
+        )
+        return _Result(theme)
+
+
 class FakeThemeAgent:
     async def run(self, prompt: str) -> object:
         theme = Theme(
@@ -106,6 +121,35 @@ async def test_wizard_flow_proposes_theme(monkeypatch: pytest.MonkeyPatch, tmp_p
 
 
 @pytest.mark.asyncio
+async def test_wizard_flow_theme_prompt_includes_existing_titles_to_avoid(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    game_dir = tmp_path / "storygen" / "games" / "existing"
+    game_dir.mkdir(parents=True)
+    (game_dir / "game.json").write_text(
+        '{"theme":{"title":"The Dragon Bakery"},"updated_at":"2025-01-01T00:00:00Z"}',
+        encoding="utf-8",
+    )
+    agent = RecordingThemeAgent()
+    flow = WizardFlow(
+        text_config=_TEXT_CONFIG,
+        image_config=_IMAGE_CONFIG,
+        theme_agent=agent,
+        character_agent_factory=lambda theme: FakeCharacterAgent(),
+        blurb_agent_factory=_fake_blurb_factory,
+        image_provider=FakeImageProvider(),
+    )
+
+    await flow.propose_theme("Make a cozy fantasy story")
+
+    assert "Make a cozy fantasy story" in agent.prompts[0]
+    assert "Existing story titles to avoid" in agent.prompts[0]
+    assert "The Dragon Bakery" in agent.prompts[0]
+    assert "Do not reuse or closely imitate" in agent.prompts[0]
+
+
+@pytest.mark.asyncio
 async def test_wizard_flow_generates_characters(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -150,10 +194,42 @@ async def test_wizard_flow_builds_initial_save(
     # Root narration is the back-cover blurb, not empty.
     assert save.nodes[save.root_node_id].narration
     assert "gripping tale" in save.nodes[save.root_node_id].narration
+    assert save.creation_prompts.theme_prompt == ""
+    assert save.creation_prompts.character_prompt == ""
     # Portraits must exist on disk.
     for c in save.characters:
         assert c.portrait_path is not None
         assert c.portrait_path.endswith("-v1.png")
+
+
+@pytest.mark.asyncio
+async def test_build_initial_save_records_creation_prompts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from storygen.llm.models import Tone
+
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    flow = WizardFlow(
+        text_config=_TEXT_CONFIG,
+        image_config=_IMAGE_CONFIG,
+        theme_agent=FakeThemeAgent(),
+        character_agent_factory=lambda theme: FakeCharacterAgent(),
+        blurb_agent_factory=_fake_blurb_factory,
+        image_provider=FakeImageProvider(),
+    )
+    theme = await flow.propose_theme("A dragon bakery")
+    chars = await flow.generate_characters(theme, user_prompt="two bakers and a fox")
+    save = await flow.build_initial_save(
+        theme=theme,
+        tone=Tone(preset="serious", custom_descriptor=None),
+        narration_style="third_person",
+        characters=chars,
+        theme_prompt="A dragon bakery",
+        character_prompt="two bakers and a fox",
+    )
+
+    assert save.creation_prompts.theme_prompt == "A dragon bakery"
+    assert save.creation_prompts.character_prompt == "two bakers and a fox"
 
 
 @pytest.mark.asyncio

@@ -1931,6 +1931,42 @@ class _RawDumpingSummaryAgent:
         return Summary(text="story so far")
 
 
+class _FailingSummaryAgent:
+    async def run(self, path_summary_prompt: str, raw_sink: Any = None) -> Summary:
+        del path_summary_prompt, raw_sink
+        raise RuntimeError("Network error, please try again later")
+
+
+@pytest.mark.asyncio
+async def test_pipeline_summary_failure_does_not_abort_committed_beat(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    save = _bootstrap_save(tmp_path, monkeypatch)
+    beat = StoryBeat(
+        narration="A major beat lands.",
+        choices=[Choice(id="x", text="x")],
+        is_major=True,
+        is_ending=False,
+    )
+    plan = IllustrationPlan(
+        should_illustrate=False, image_prompt="", featured_character_ids=[], reasoning="quiet"
+    )
+    pipeline = BeatPipeline(
+        beat_agent=FakeBeatAgent(beat),
+        illustration_agent=FakeIllustrationAgent(plan),
+        summary_agent=_FailingSummaryAgent(),
+        image_provider=FakeImageProvider(),
+        callbacks=PipelineCallbacks(),
+    )
+
+    node = await pipeline.advance(save, from_node_id="root", choice_id="c1")
+
+    assert node.narration == "A major beat lands."
+    assert node.summary_to_here is None
+    assert save.current_node_id == node.id
+    assert save.nodes["root"].choices[0].child_node_id == node.id
+
+
 @pytest.mark.asyncio
 async def test_pipeline_dumps_llm_cache_when_enabled(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path

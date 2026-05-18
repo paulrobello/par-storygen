@@ -116,6 +116,7 @@ DEFAULT_TTS_VOICE: str = ""
 DEFAULT_TTS_AUTO_READ: bool = False
 DEFAULT_TTS_AUTO_READ_RECAP: bool = False
 DEFAULT_AUTO_RECAP: bool = False
+DEFAULT_RESUME_RECAP: bool = True
 DEFAULT_RECAP_INTERVAL: int = 3
 
 TTS_PROVIDER_CHOICES: tuple[tuple[str, str], ...] = (
@@ -475,6 +476,18 @@ def set_auto_recap(enabled: bool) -> None:
     write_app_state(state)
 
 
+def resume_recap_enabled() -> bool:
+    """Return whether to show a recap when resuming a story with progress."""
+    return bool(read_app_state().get("resume_recap", DEFAULT_RESUME_RECAP))
+
+
+def set_resume_recap(enabled: bool) -> None:
+    """Set resume-recap enabled flag."""
+    state = read_app_state()
+    state["resume_recap"] = bool(enabled)
+    write_app_state(state)
+
+
 def recap_interval() -> int:
     """Return auto-recap interval in major beats (default: 3)."""
     raw = read_app_state().get("recap_interval", DEFAULT_RECAP_INTERVAL)
@@ -679,6 +692,7 @@ def write_all_settings(
     auto_select_value: bool = False,
     auto_open_art_value: bool = False,
     auto_recap_value: bool = False,
+    resume_recap_value: bool = DEFAULT_RESUME_RECAP,
     recap_interval_value: int = 3,
     graphics_mode_value: str = DEFAULT_GRAPHICS_MODE,
 ) -> None:
@@ -709,6 +723,7 @@ def write_all_settings(
     state["auto_select"] = bool(auto_select_value)
     state["auto_open_art"] = bool(auto_open_art_value)
     state["auto_recap"] = bool(auto_recap_value)
+    state["resume_recap"] = bool(resume_recap_value)
     state["recap_interval"] = max(1, int(recap_interval_value))
     mode = str(graphics_mode_value)
     state["graphics_mode"] = mode if mode in _ALLOWED_GRAPHICS_MODES else DEFAULT_GRAPHICS_MODE

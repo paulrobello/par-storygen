@@ -12,6 +12,7 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.content import Content
 
+from storygen.core.models import Recap
 from storygen.llm.models import (
     ImageProviderConfig,
     StoredChoice,
@@ -21,6 +22,7 @@ from storygen.llm.models import (
     Tone,
 )
 from storygen.pipeline import PipelineCallbacks
+from storygen.screens._confirm_modal import ConfirmModal
 from storygen.screens.endings import EndingsScreen
 from storygen.screens.play import PlayScreen
 from storygen.screens.relationships import RelationshipsScreen
@@ -202,6 +204,50 @@ class _Harness(App[None]):
 
     def compose(self) -> ComposeResult:
         yield from []
+
+
+class _RecapResult:
+    def __init__(self, output: Recap) -> None:
+        self.output = output
+
+
+class _FlakyRecapAgent:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def run(self, prompt: str) -> _RecapResult:
+        del prompt
+        self.calls += 1
+        if self.calls == 1:
+            raise RuntimeError("Network error, please try again later")
+        return _RecapResult(Recap(text="Previously, the story continued."))
+
+
+@pytest.mark.asyncio
+async def test_generate_recap_retries_transient_network_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    agent = _FlakyRecapAgent()
+
+    def _fake_text_model(_config: object) -> object:
+        return object()
+
+    def _fake_recap_agent(_model: object) -> _FlakyRecapAgent:
+        return agent
+
+    monkeypatch.setattr("storygen.llm.provider_factory.build_text_model", _fake_text_model)
+    monkeypatch.setattr("storygen.llm.agents.build_recap_agent", _fake_recap_agent)
+
+    async def _no_sleep(_delay: float) -> None:
+        return None
+
+    monkeypatch.setattr("storygen.screens.play.asyncio.sleep", _no_sleep)
+    screen = PlayScreen(_minimal_save(), pipeline=None, image_provider=None)  # type: ignore[arg-type]
+
+    recap = await screen._generate_recap()  # pyright: ignore[reportPrivateUsage]
+
+    assert recap.text == "Previously, the story continued."
+    assert agent.calls == 2
 
 
 class _TTSHarness(App[None]):
@@ -577,6 +623,28 @@ async def test_speak_current_node_refreshes_stale_tts_audio_path_after_success(
 
     assert node.tts_audio_path == relative_cache
     assert relative_cache in paths.game_save_file(str(save.id)).read_text(encoding="utf-8")
+
+
+@pytest.mark.asyncio
+async def test_auto_select_setting_prompts_before_autoplay_starts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(app_state, "auto_select_enabled", lambda: True)
+    monkeypatch.setattr(app_state, "art_enabled", lambda: False)
+    pipeline = _AdvancingPipeline()
+    app = _PlayHarnessWithDeps(_minimal_save(), pipeline)
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, ConfirmModal)
+        assert pipeline.advance_calls == []
+        await pilot.click("#confirm-yes")
+        for _ in range(10):
+            await pilot.pause()
+            if pipeline.advance_calls:
+                break
+
+    assert pipeline.advance_calls == [("root", "c1")]
 
 
 @pytest.mark.asyncio

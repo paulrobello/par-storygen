@@ -382,14 +382,24 @@ class BeatPipeline:
                     parts.append("BEATS SINCE LAST SUMMARY:\n" + beat_texts)
             parts.append("CURRENT BEAT:\n" + beat.narration)
             summary_input = "\n\n".join(parts)
-            summary = await self._summary.run(
-                summary_input,
-                raw_sink=self._maybe_build_raw_sink(str(save.id), new_node_id, "summary"),
-            )
-            updated = save.nodes[new_node_id].model_copy(update={"summary_to_here": summary.text})
-            save.nodes[new_node_id] = updated
-            save.updated_at = datetime.now(UTC)
-            save_game(save)
+            try:
+                summary = await self._summary.run(
+                    summary_input,
+                    raw_sink=self._maybe_build_raw_sink(str(save.id), new_node_id, "summary"),
+                )
+            except Exception:
+                logging.getLogger(__name__).warning(
+                    "Summary generation failed for node %s; continuing without recap anchor",
+                    new_node_id,
+                    exc_info=True,
+                )
+            else:
+                updated = save.nodes[new_node_id].model_copy(
+                    update={"summary_to_here": summary.text}
+                )
+                save.nodes[new_node_id] = updated
+                save.updated_at = datetime.now(UTC)
+                save_game(save)
 
         return save.nodes[new_node_id]
 

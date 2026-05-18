@@ -7,7 +7,30 @@ from unittest.mock import patch
 
 import pytest
 
-from storygen.util import open_in_system_viewer
+from storygen.util import copy_text_to_system_clipboard, open_in_system_viewer
+
+
+def test_copy_text_to_system_clipboard_uses_pbcopy_on_macos(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    with (
+        patch("storygen.util.platform.system", return_value="Darwin"),
+        patch("storygen.util.subprocess.run") as mock_run,
+    ):
+        assert copy_text_to_system_clipboard("hello") is True
+    mock_run.assert_called_once_with(["pbcopy"], input="hello", text=True, check=True)
+
+
+def test_copy_text_to_system_clipboard_swallows_oserror(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    with (
+        patch("storygen.util.platform.system", return_value="Darwin"),
+        patch("storygen.util.subprocess.run", side_effect=OSError("no pbcopy")),
+    ):
+        assert copy_text_to_system_clipboard("hello") is False
 
 
 def test_open_in_system_viewer_noop_for_missing_path(tmp_path: Path) -> None:

@@ -36,6 +36,19 @@ def test_corrupt_state_returns_empty(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     assert app_state.last_story_id() is None
 
 
+def test_resume_recap_defaults_enabled(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    assert app_state.resume_recap_enabled() is True
+
+
+def test_set_resume_recap_round_trips(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    app_state.set_resume_recap(False)
+    assert app_state.resume_recap_enabled() is False
+    app_state.set_resume_recap(True)
+    assert app_state.resume_recap_enabled() is True
+
+
 def test_wizard_defaults_empty_state_returns_constants(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -585,6 +598,7 @@ def test_write_all_settings_matches_individual_writers_byte_for_byte(
     app_state.set_auto_select_enabled(False)
     app_state.set_auto_open_art_enabled(False)
     app_state.set_auto_recap(False)
+    app_state.set_resume_recap(False)
     app_state.set_recap_interval(3)
     # graphics_mode: no individual writer, write directly
     state_a = app_state.read_app_state()
@@ -607,12 +621,30 @@ def test_write_all_settings_matches_individual_writers_byte_for_byte(
         auto_select_value=False,
         auto_open_art_value=False,
         auto_recap_value=False,
+        resume_recap_value=False,
         recap_interval_value=3,
         graphics_mode_value="kitty",
     )
     bytes_b = (path_b / "storygen" / "state.json").read_bytes()
 
     assert bytes_a == bytes_b
+
+
+def test_write_all_settings_persists_resume_recap_flag(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    app_state.write_all_settings(
+        image_prefs=app_state.ImageProviderPrefs(),
+        text_prefs=app_state.ProviderPrefs(),
+        wizard_defaults=app_state.WizardDefaults(),
+        art_enabled_value=True,
+        prefetch_enabled_value=False,
+        prefetch_images_enabled_value=False,
+        image_streaming_enabled_value=False,
+        resume_recap_value=False,
+    )
+    assert app_state.resume_recap_enabled() is False
 
 
 def test_prefetch_enabled_defaults_to_false(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -19,7 +20,13 @@ from storygen.llm.models import (
     Tone,
 )
 from storygen.storage import paths
-from storygen.storage.save import GameSave, load_game, prune_subtree, save_game
+from storygen.storage.save import (
+    GameSave,
+    list_existing_story_titles,
+    load_game,
+    prune_subtree,
+    save_game,
+)
 
 
 def _make_save() -> GameSave:
@@ -69,12 +76,78 @@ def _make_save() -> GameSave:
     )
 
 
+def test_list_existing_story_titles_reads_newest_valid_saves(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    old_save = _make_save()
+    old_save.theme.title = "Ancient Mall Quest"
+    old_save.updated_at = datetime(2024, 1, 1, tzinfo=UTC)
+    save_game(old_save)
+    new_save = _make_save()
+    new_save.theme.title = "Dragon Bakery"
+    new_save.updated_at = datetime(2025, 1, 1, tzinfo=UTC)
+    save_game(new_save)
+    orphan = paths.games_root() / "orphan"
+    orphan.mkdir(parents=True)
+    (orphan / "game.json").write_text("not json", encoding="utf-8")
+
+    assert list_existing_story_titles() == ["Dragon Bakery", "Ancient Mall Quest"]
+
+
 def test_save_and_load_round_trip(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     save = _make_save()
     save_game(save)
     restored = load_game(str(save.id))
     assert restored == save
+
+
+def test_load_backfills_creation_prompts_from_wizard_debug_cache(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    save = _make_save()
+    save_game(save)
+    llm_dir = paths.game_dir(str(save.id)) / "llm"
+    llm_dir.mkdir(parents=True)
+    (llm_dir / "wizard-theme.json").write_text(
+        '[{"kind":"request","parts":[{"part_kind":"system-prompt","content":"sys"},'
+        '{"part_kind":"user-prompt","content":"Theme from debug"}]}]',
+        encoding="utf-8",
+    )
+    (llm_dir / "wizard-characters.json").write_text(
+        '[{"kind":"request","parts":[{"part_kind":"user-prompt","content":"Generate cast\\n\\n'
+        "User-specified character requirements:\\nA fox and a moon baker\\n\\n"
+        'The following characters are already part of the cast:"}]}]',
+        encoding="utf-8",
+    )
+
+    restored = load_game(str(save.id))
+
+    assert restored.creation_prompts.theme_prompt == "Theme from debug"
+    assert restored.creation_prompts.character_prompt == "A fox and a moon baker"
+    persisted = json.loads(paths.game_save_file(str(save.id)).read_text(encoding="utf-8"))
+    assert persisted["creation_prompts"]["theme_prompt"] == "Theme from debug"
+
+
+def test_load_backfills_full_character_debug_prompt_when_no_requirements_block(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    save = _make_save()
+    save_game(save)
+    llm_dir = paths.game_dir(str(save.id)) / "llm"
+    llm_dir.mkdir(parents=True)
+    (llm_dir / "wizard-characters.json").write_text(
+        '[{"kind":"request","parts":[{"part_kind":"user-prompt",'
+        '"content":"Generate cast for theme: T"}]}]',
+        encoding="utf-8",
+    )
+
+    restored = load_game(str(save.id))
+
+    assert restored.creation_prompts.character_prompt == "Generate cast for theme: T"
 
 
 def test_save_writes_to_expected_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

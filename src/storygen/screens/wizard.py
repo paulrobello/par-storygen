@@ -58,7 +58,15 @@ from storygen.screens.library_browser import CharacterCatalogScreen, LibraryPick
 from storygen.storage import app_state, paths
 from storygen.storage.library import LibraryCharacter, library_portrait_path, load_library_character
 from storygen.storage.llm_cache import dump_llm_exchange
-from storygen.storage.save import GameSave, NarrationStyle, Pacing, ReaderLevel, save_game
+from storygen.storage.save import (
+    GameSave,
+    NarrationStyle,
+    Pacing,
+    ReaderLevel,
+    StoryCreationPrompts,
+    list_existing_story_titles,
+    save_game,
+)
 
 
 def _load_lib_char_if_exists(library_id: str) -> LibraryCharacter | None:
@@ -208,6 +216,16 @@ class WizardFlow:
     async def propose_theme(self, user_prompt: str) -> Theme:
         """Run the theme agent and return a Theme."""
         prompt = user_prompt.strip() or "Propose a theme."
+        existing_titles = list_existing_story_titles()
+        if existing_titles:
+            titles = "\n".join(f"- {title}" for title in existing_titles)
+            prompt = (
+                f"{prompt}\n\n"
+                "Existing story titles to avoid:\n"
+                f"{titles}\n\n"
+                "Do not reuse or closely imitate any existing title. Pick a distinct title "
+                "and premise that will not be confused with these saved stories."
+            )
         result = await self._theme_agent.run(prompt)
         self._record_result_usage(result)
         self._dump_llm("theme", result)
@@ -302,6 +320,8 @@ class WizardFlow:
         reader_level: str = app_state.DEFAULT_READER_LEVEL,
         pacing: str = app_state.DEFAULT_PACING,
         on_progress: Callable[[str], None] | None = None,
+        theme_prompt: str = "",
+        character_prompt: str = "",
         library_import_ids: dict[str, str] | None = None,
         pending_ref_writes: dict[str, tuple[bytes, bytes | None]] | None = None,
     ) -> GameSave:
@@ -315,6 +335,8 @@ class WizardFlow:
             art_style: Visual style guidance applied to portrait + scene prompts.
             on_progress: Optional callback fired before each portrait generation,
                 useful for surfacing per-character progress in the UI.
+            theme_prompt: Original user prompt entered on the theme step.
+            character_prompt: Original user prompt entered on the characters step.
             library_import_ids: Optional mapping ``{character_id: library_id}``
                 flagging characters imported from the cross-game library. For
                 those characters the portrait is COPIED from the library
@@ -466,6 +488,10 @@ class WizardFlow:
             text_config=self._text_config,
             image_config=self._image_config,
             character_image_config=self._character_image_config,
+            creation_prompts=StoryCreationPrompts(
+                theme_prompt=theme_prompt,
+                character_prompt=character_prompt,
+            ),
             characters=enriched,
             nodes={"root": root},
             root_node_id="root",
@@ -1288,6 +1314,8 @@ class WizardScreen(Screen[None]):
                     reader_level=self._reader_level,
                     pacing=self._pacing,
                     on_progress=self._notify_progress,
+                    theme_prompt=self._theme_area.text,
+                    character_prompt=self._user_character_prompt,
                     library_import_ids=dict(self._imported_from_library_ids),
                     pending_ref_writes=pending_ref_writes or None,
                 )

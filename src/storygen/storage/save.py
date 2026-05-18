@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 from datetime import datetime
-from typing import Any
+from pathlib import Path
+from typing import Any, cast
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -33,11 +35,64 @@ __all__ = [
     "GameSave",
     "NarrationStyle",
     "ReaderLevel",
+    "StoryCreationPrompts",
     "delete_game",
+    "list_existing_story_titles",
     "load_game",
     "prune_subtree",
     "save_game",
 ]
+
+
+class StoryCreationPrompts(BaseModel):
+    """User-entered wizard prompts used when creating a story."""
+
+    theme_prompt: str = ""
+    character_prompt: str = ""
+
+
+def _first_user_prompt_from_debug(path: Path) -> str:
+    """Extract the first user-prompt content from a pydantic-ai debug cache file."""
+    try:
+        raw: object = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+    if not isinstance(raw, list):
+        return ""
+    messages = cast(list[object], raw)
+    for message_obj in messages:
+        if not isinstance(message_obj, dict):
+            continue
+        message = cast(dict[str, object], message_obj)
+        parts_obj = message.get("parts")
+        if not isinstance(parts_obj, list):
+            continue
+        parts = cast(list[object], parts_obj)
+        for part_obj in parts:
+            if not isinstance(part_obj, dict):
+                continue
+            part = cast(dict[str, object], part_obj)
+            if part.get("part_kind") != "user-prompt":
+                continue
+            content = part.get("content")
+            if isinstance(content, str):
+                return content.strip()
+    return ""
+
+
+_CHARACTER_REQUIREMENTS_RE = re.compile(
+    r"User-specified character requirements:\s*(?P<requirements>.*?)(?:\n\n[A-Z][^\n]*:|\Z)",
+    re.DOTALL,
+)
+
+
+def _user_character_requirements_from_debug_prompt(prompt: str) -> str:
+    """Extract character requirements, falling back to the cached user prompt."""
+    cleaned = prompt.strip()
+    match = _CHARACTER_REQUIREMENTS_RE.search(cleaned)
+    if match is None:
+        return cleaned
+    return match.group("requirements").strip()
 
 
 class GameSave(BaseModel):
@@ -63,6 +118,7 @@ class GameSave(BaseModel):
     root_node_id: NodeId
     current_node_id: NodeId
     endings_reached: list[NodeId]
+    creation_prompts: StoryCreationPrompts = Field(default_factory=StoryCreationPrompts)
     total_image_cost_usd: float = 0.0
     text_total_input_tokens: int = 0
     text_total_output_tokens: int = 0
@@ -107,6 +163,38 @@ def _migrate(data: dict[str, Any], *, from_version: int) -> dict[str, Any]:
         for char in data.get("characters", []):
             char.setdefault("backstory_summary", None)
     return data
+
+
+def list_existing_story_titles(*, limit: int = 50) -> list[str]:
+    """Return existing save titles newest-first without loading full saves."""
+    root = paths.games_root()
+    if not root.exists():
+        return []
+    rows: list[tuple[str, str]] = []
+    for directory in root.iterdir():
+        if not directory.is_dir():
+            continue
+        game_file = directory / "game.json"
+        if not game_file.exists():
+            continue
+        try:
+            raw: object = json.loads(game_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(raw, dict):
+            continue
+        data = cast(dict[str, object], raw)
+        theme_obj = data.get("theme")
+        if not isinstance(theme_obj, dict):
+            continue
+        theme = cast(dict[str, object], theme_obj)
+        title = theme.get("title")
+        if not isinstance(title, str) or not title.strip():
+            continue
+        updated_at = data.get("updated_at")
+        rows.append((updated_at if isinstance(updated_at, str) else "", title.strip()))
+    rows.sort(key=lambda row: row[0], reverse=True)
+    return [title for _updated, title in rows[: max(0, limit)]]
 
 
 def delete_game(game_id: str) -> None:
@@ -189,6 +277,30 @@ def prune_subtree(save: GameSave, *, node_id: NodeId) -> int:
     return len(doomed)
 
 
+def _backfill_creation_prompts_from_debug_cache(save: GameSave) -> bool:
+    """Populate missing creation prompts from wizard LLM debug sidecars.
+
+    Returns True if ``save`` was mutated. Debug cache files are optional and
+    best-effort; missing/corrupt files simply leave fields blank.
+    """
+    prompts = save.creation_prompts
+    updates: dict[str, str] = {}
+    llm_dir = paths.game_dir(str(save.id)) / "llm"
+    if not prompts.theme_prompt:
+        theme_prompt = _first_user_prompt_from_debug(llm_dir / "wizard-theme.json")
+        if theme_prompt:
+            updates["theme_prompt"] = theme_prompt
+    if not prompts.character_prompt:
+        character_debug_prompt = _first_user_prompt_from_debug(llm_dir / "wizard-characters.json")
+        character_prompt = _user_character_requirements_from_debug_prompt(character_debug_prompt)
+        if character_prompt:
+            updates["character_prompt"] = character_prompt
+    if not updates:
+        return False
+    save.creation_prompts = prompts.model_copy(update=updates)
+    return True
+
+
 def load_game(game_id: str) -> GameSave:
     """Load `game.json` for the given game id.
 
@@ -202,4 +314,7 @@ def load_game(game_id: str) -> GameSave:
     data: dict[str, Any] = json.loads(raw_text)
     version = int(data.get("version", 1))
     data = _migrate(data, from_version=version)
-    return GameSave.model_validate(data)
+    save = GameSave.model_validate(data)
+    if _backfill_creation_prompts_from_debug_cache(save):
+        save_game(save)
+    return save

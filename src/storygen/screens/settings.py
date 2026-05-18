@@ -25,6 +25,7 @@ from textual.widgets import (
 from storygen.config import AppConfig
 from storygen.images.provider_factory import resolve_image_base_url
 from storygen.llm.provider_factory import Provider, api_key_env_var, resolve_base_url
+from storygen.screens._confirm_modal import ConfirmModal
 from storygen.screens.wizard import (
     READER_LEVEL_OPTIONS,
     STYLE_OPTIONS,
@@ -142,7 +143,7 @@ class SettingsScreen(Screen[None]):
     """
 
     BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
-        ("escape", "app.pop_screen", "Back"),
+        ("escape", "back", "Back"),
     ]
 
     # Sentinel value used for the "(none)" entry in the fallback Select.
@@ -355,6 +356,7 @@ class SettingsScreen(Screen[None]):
             id="graphics-mode-select",
         )
         self._auto_recap_switch = Switch(value=False, id="auto-recap-switch")
+        self._resume_recap_switch = Switch(value=True, id="resume-recap-switch")
         self._recap_interval_input = Input(
             value="3",
             id="recap-interval-input",
@@ -384,6 +386,7 @@ class SettingsScreen(Screen[None]):
         self._tts_api_key_status = Static("", id="tts-api-key-status")
         self._tts_auto_read_switch = Switch(value=False, id="tts-auto-read-switch")
         self._tts_auto_read_recap_switch = Switch(value=False, id="tts-auto-read-recap-switch")
+        self._saved_snapshot: tuple[object, ...] | None = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -509,6 +512,12 @@ class SettingsScreen(Screen[None]):
                     "Auto-show recap every N major beats",
                     classes="switch-label",
                 )
+            with Horizontal(classes="switch-row"):
+                yield self._resume_recap_switch
+                yield Static(
+                    "Show recap when resuming a story",
+                    classes="switch-label",
+                )
             with Horizontal(classes="setting-row"):
                 yield Label("Interval (major beats):")
                 yield self._recap_interval_input
@@ -533,7 +542,7 @@ class SettingsScreen(Screen[None]):
             with Horizontal(classes="switch-row"):
                 yield self._tts_auto_read_recap_switch
                 yield Static(
-                    "Auto-read recaps aloud when shown",
+                    "Generate/play audio for recaps when shown",
                     classes="switch-label",
                 )
 
@@ -547,6 +556,7 @@ class SettingsScreen(Screen[None]):
         self._suppress_image_provider_handler = True
         self._suppress_tts_handler = True
         self._populate_from_state()
+        self._saved_snapshot = self._settings_snapshot()
         self.call_after_refresh(self._clear_suppress_flag)
         # Auto-fetch TTS voices in the background so the saved voice is pre-selected.
         self.run_worker(self._auto_fetch_tts_voices(), exclusive=False, name="tts-voice-prefetch")
@@ -788,6 +798,7 @@ class SettingsScreen(Screen[None]):
             self._auto_select_switch.prevent(Switch.Changed),
             self._auto_open_art_switch.prevent(Switch.Changed),
             self._auto_recap_switch.prevent(Switch.Changed),
+            self._resume_recap_switch.prevent(Switch.Changed),
             self._recap_interval_input.prevent(Input.Changed),
         ):
             self._theme_area.text = defaults.theme
@@ -812,6 +823,7 @@ class SettingsScreen(Screen[None]):
             self._auto_open_art_switch.value = app_state.auto_open_art_enabled()
             self._graphics_mode_select.value = app_state.read_graphics_mode()
             self._auto_recap_switch.value = app_state.auto_recap_enabled()
+            self._resume_recap_switch.value = app_state.resume_recap_enabled()
             self._recap_interval_input.value = str(app_state.recap_interval())
             self._refresh_image_gating()
 
@@ -1122,6 +1134,75 @@ class SettingsScreen(Screen[None]):
         elif bid == "btn-reset":
             self._reset_widgets()
 
+    def _settings_snapshot(self) -> tuple[object, ...]:
+        """Return the current Settings-owned widget values for dirty checks."""
+        tts_voice = self._tts_voice_select.value
+        return (
+            self._provider_select.value,
+            self._model_input.value,
+            self._base_url_input.value,
+            self._text_api_key_input.value,
+            self._image_provider_select.value,
+            self._image_model_input.value,
+            self._image_base_url_input.value,
+            self._image_api_key_input.value,
+            self._fallback_select.value,
+            self._fallback_model_input.value,
+            self._character_image_provider_select.value,
+            self._character_image_model_input.value,
+            self._character_image_base_url_input.value,
+            self._char_image_api_key_input.value,
+            self._theme_area.text,
+            self._tone_select.value,
+            self._tone_descriptor.value,
+            self._style_select.value,
+            self._art_style_input.value,
+            self._length_input.value,
+            self._reader_level_select.value,
+            self._pacing_select.value,
+            self._char_area.text,
+            self._art_switch.value,
+            self._streaming_switch.value,
+            self._prefetch_switch.value,
+            self._prefetch_images_switch.value,
+            self._llm_cache_switch.value,
+            self._auto_select_switch.value,
+            self._auto_open_art_switch.value,
+            self._graphics_mode_select.value,
+            self._auto_recap_switch.value,
+            self._resume_recap_switch.value,
+            self._recap_interval_input.value,
+            self._tts_provider_select.value,
+            self._tts_api_key_input.value,
+            tts_voice if isinstance(tts_voice, str) else "",
+            self._tts_auto_read_switch.value,
+            self._tts_auto_read_recap_switch.value,
+        )
+
+    def _has_unsaved_changes(self) -> bool:
+        return (
+            self._saved_snapshot is not None and self._settings_snapshot() != self._saved_snapshot
+        )
+
+    def action_back(self) -> None:
+        """Leave Settings, confirming first if widget values differ from saved state."""
+        if not self._has_unsaved_changes():
+            self.app.pop_screen()  # pyright: ignore[reportUnknownMemberType]
+            return
+
+        def _after_confirm(confirmed: bool | None) -> None:
+            if confirmed:
+                self.app.pop_screen()  # pyright: ignore[reportUnknownMemberType]
+
+        self.app.push_screen(  # pyright: ignore[reportUnknownMemberType]
+            ConfirmModal(
+                "Exit Settings without saving changes?",
+                confirm_label="Exit",
+                cancel_label="Stay",
+            ),
+            _after_confirm,
+        )
+
     # ------------------------------------------------------------------
     # Save / reset
     # ------------------------------------------------------------------
@@ -1289,9 +1370,11 @@ class SettingsScreen(Screen[None]):
             auto_select_value=self._auto_select_switch.value,
             auto_open_art_value=self._auto_open_art_switch.value,
             auto_recap_value=self._auto_recap_switch.value,
+            resume_recap_value=self._resume_recap_switch.value,
             recap_interval_value=max(1, int(self._recap_interval_input.value or "3")),
             graphics_mode_value=str(self._graphics_mode_select.value),
         )
+        self._saved_snapshot = self._settings_snapshot()
         self.post_message(ImageProviderChanged(image_prefs))
         self.post_message(TextProviderChanged(prefs))
         self.post_message(TTSPrefsChanged(tts_prefs))
@@ -1312,6 +1395,9 @@ class SettingsScreen(Screen[None]):
             self._character_image_provider_select.prevent(Select.Changed),
             self._fallback_select.prevent(Select.Changed),
             self._tts_provider_select.prevent(Select.Changed),
+            self._auto_recap_switch.prevent(Switch.Changed),
+            self._resume_recap_switch.prevent(Switch.Changed),
+            self._recap_interval_input.prevent(Input.Changed),
             self._tts_auto_read_switch.prevent(Switch.Changed),
             self._tts_auto_read_recap_switch.prevent(Switch.Changed),
         ):
@@ -1359,6 +1445,9 @@ class SettingsScreen(Screen[None]):
             self._llm_cache_switch.value = False
             self._auto_select_switch.value = False
             self._auto_open_art_switch.value = False
+            self._auto_recap_switch.value = app_state.DEFAULT_AUTO_RECAP
+            self._resume_recap_switch.value = app_state.DEFAULT_RESUME_RECAP
+            self._recap_interval_input.value = str(app_state.DEFAULT_RECAP_INTERVAL)
             self._graphics_mode_select.value = app_state.DEFAULT_GRAPHICS_MODE
             self._refresh_image_gating()
             # TTS section.

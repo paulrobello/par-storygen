@@ -20,7 +20,7 @@ from storygen.images.pricing import image_cost
 from storygen.screens._confirm_modal import ConfirmModal
 from storygen.storage import app_state, paths
 from storygen.storage.save import GameSave, delete_game, load_game, save_game
-from storygen.util import open_in_system_viewer
+from storygen.util import copy_text_to_system_clipboard, open_in_system_viewer
 from storygen.widgets._image_util import render_image_thumbnail
 
 _logger = logging.getLogger(__name__)
@@ -36,6 +36,108 @@ class _CoverImageProvider(Protocol):
         reference_portraits: list[ReferencePortrait],
         art_style: str = "children's story book",
     ) -> bytes: ...
+
+
+class StorySetupDetailsModal(Screen[None]):
+    """Modal showing wizard settings and user prompts used to create a save."""
+
+    DEFAULT_CSS = """
+    StorySetupDetailsModal {
+        align: center middle;
+    }
+    StorySetupDetailsModal #setup-details-box {
+        width: 90;
+        height: 80%;
+        border: round $primary;
+        padding: 1 2;
+        background: $surface;
+    }
+    StorySetupDetailsModal #setup-details-scroll {
+        height: 1fr;
+    }
+    StorySetupDetailsModal .setup-details-title {
+        text-style: bold;
+        margin-bottom: 1;
+    }
+    StorySetupDetailsModal .setup-details-section-row {
+        height: auto;
+        margin-top: 1;
+    }
+    StorySetupDetailsModal .setup-details-section {
+        width: 1fr;
+        text-style: bold;
+        color: $accent;
+    }
+    StorySetupDetailsModal .setup-details-copy {
+        min-width: 8;
+        margin-left: 1;
+    }
+    StorySetupDetailsModal #setup-details-close {
+        margin-top: 1;
+    }
+    """
+
+    BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
+        ("escape", "close", "Close"),
+    ]
+
+    def __init__(self, save: GameSave) -> None:
+        super().__init__()
+        self._save = save
+        self._copy_values: dict[str, str] = {}
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="setup-details-box"):
+            yield Static(self._save.theme.title, classes="setup-details-title", markup=False)
+            with VerticalScroll(id="setup-details-scroll"):
+                for index, (label, value) in enumerate(self._detail_rows()):
+                    copy_id = f"copy-detail-{index}"
+                    self._copy_values[copy_id] = value
+                    with Horizontal(classes="setup-details-section-row"):
+                        yield Static(label, classes="setup-details-section", markup=False)
+                        yield Button("Copy", id=copy_id, classes="setup-details-copy")
+                    yield Static(value or "(blank)", markup=False)
+            yield Button("Close", id="setup-details-close", variant="primary")
+
+    def _detail_rows(self) -> list[tuple[str, str]]:
+        save = self._save
+        prompts = save.creation_prompts
+        characters = "\n".join(
+            f"- {c.name}: {c.personality or c.backstory or c.physical_description}"
+            for c in save.characters
+        )
+        return [
+            ("Theme prompt", prompts.theme_prompt),
+            ("Character prompt", prompts.character_prompt),
+            ("Theme", f"{save.theme.title}\n{save.theme.setting}\n{save.theme.premise}"),
+            ("Tone", f"{save.tone.preset} {save.tone.custom_descriptor or ''}".strip()),
+            ("Narration style", save.narration_style),
+            ("Art style", save.art_style),
+            ("Story length", f"{save.target_major_beats} major beats"),
+            ("Reader level", save.reader_level),
+            ("Pacing", save.pacing),
+            ("Text provider", f"{save.text_config.provider} / {save.text_config.model}"),
+            ("Scene image provider", f"{save.image_config.provider} / {save.image_config.model}"),
+            (
+                "Character image provider",
+                f"{save.character_image_config.provider} / {save.character_image_config.model}",
+            ),
+            ("Characters", characters),
+        ]
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        button_id = event.button.id or ""
+        if button_id == "setup-details-close":
+            self.dismiss(None)
+            return
+        if button_id.startswith("copy-detail-"):
+            text = self._copy_values.get(button_id, "")
+            self.app.copy_to_clipboard(text)  # pyright: ignore[reportUnknownMemberType]
+            copy_text_to_system_clipboard(text)
+            self.notify("Copied section to clipboard.", timeout=2)
+
+    def action_close(self) -> None:
+        self.dismiss(None)
 
 
 class LoadGameScreen(Screen[None]):
@@ -178,6 +280,7 @@ class LoadGameScreen(Screen[None]):
         buttons = Horizontal(classes="load-buttons")
         meta.mount(buttons)
         buttons.mount(Button("Load", id=f"load-{save.id}", variant="primary"))
+        buttons.mount(Button("Details", id=f"details-{save.id}"))
         regen_btn = Button("Regen Cover", id=f"regen-{save.id}")
         regen_btn.disabled = (
             self._image_provider_factory is None or str(save.id) in self._cover_busy
@@ -216,6 +319,9 @@ class LoadGameScreen(Screen[None]):
         if button_id.startswith("load-"):
             self._start_load(button_id[len("load-") :])
             return
+        if button_id.startswith("details-"):
+            self._show_details(button_id[len("details-") :])
+            return
         if button_id.startswith("regen-"):
             game_id = button_id[len("regen-") :]
             title: str | None = None
@@ -225,6 +331,16 @@ class LoadGameScreen(Screen[None]):
             return
         if button_id.startswith("delete-"):
             self._start_delete(button_id[len("delete-") :])
+
+    def _show_details(self, game_id: str) -> None:
+        try:
+            save = load_game(game_id)
+        except Exception:
+            _logger.debug("Could not load game for details", exc_info=True)
+            self.notify("Save no longer exists.", severity="error", timeout=5)
+            self._refresh()
+            return
+        self.app.push_screen(StorySetupDetailsModal(save))  # pyright: ignore[reportUnknownMemberType]
 
     def action_focus_next_row(self) -> None:
         if not self._saves_order:

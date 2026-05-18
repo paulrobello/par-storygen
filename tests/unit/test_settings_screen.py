@@ -10,6 +10,7 @@ from textual.widgets import Button, Input, Select, Static, Switch
 
 from storygen.config import AppConfig
 from storygen.llm.models import ImageProviderConfig, TextProviderConfig
+from storygen.screens._confirm_modal import ConfirmModal
 from storygen.screens.settings import (
     ImageProviderChanged,
     SettingsScreen,
@@ -1046,3 +1047,77 @@ async def test_reset_clears_llm_cache_flag(monkeypatch: pytest.MonkeyPatch, tmp_
 
     # Reset is widget-only — disk value persists until Save.
     assert app_state.llm_cache_enabled() is True
+
+
+@pytest.mark.asyncio
+async def test_recap_options_default_resume_on_audio_off(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    app = _Harness()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, SettingsScreen)
+        resume_recap_sw = screen.query_one("#resume-recap-switch", Switch)
+        recap_audio_sw = screen.query_one("#tts-auto-read-recap-switch", Switch)
+        assert resume_recap_sw.value is True
+        assert recap_audio_sw.value is False
+
+
+@pytest.mark.asyncio
+async def test_save_persists_resume_recap_flag(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    app = _Harness()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, SettingsScreen)
+        screen.query_one("#resume-recap-switch", Switch).value = False
+        await pilot.pause()
+        screen.query_one("#btn-save", Button).press()
+        await pilot.pause()
+
+    assert app_state.resume_recap_enabled() is False
+
+
+@pytest.mark.asyncio
+async def test_reset_restores_resume_recap_default_without_persisting(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    app_state.set_resume_recap(False)
+    app = _Harness()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, SettingsScreen)
+        resume_recap_sw = screen.query_one("#resume-recap-switch", Switch)
+        assert resume_recap_sw.value is False
+        screen.query_one("#btn-reset", Button).press()
+        await pilot.pause()
+        assert resume_recap_sw.value is True
+
+    assert app_state.resume_recap_enabled() is False
+
+
+@pytest.mark.asyncio
+async def test_escape_with_unsaved_settings_prompts_before_exit(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    app = _Harness()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, SettingsScreen)
+        screen.query_one("#llm-cache-switch", Switch).value = True
+        await pilot.pause()
+        await pilot.press("escape")
+        for _ in range(5):
+            await pilot.pause()
+            if isinstance(app.screen, ConfirmModal):
+                break
+        assert isinstance(app.screen, ConfirmModal)

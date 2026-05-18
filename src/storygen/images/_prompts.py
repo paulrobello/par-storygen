@@ -22,6 +22,21 @@ from __future__ import annotations
 
 from storygen.images.base import ReferencePortrait
 
+_SCENE_SPATIAL_ORIENTATION_GUIDANCE = (
+    "Spatial orientation: When a character is reading, writing, using, or looking at "
+    "an object such as a book, paper, map, tablet, phone, sign, or screen, orient the "
+    "visible surface toward that character, not toward the viewer/camera, unless the "
+    "scene explicitly says it is being shown to the viewer. Align text, images, and "
+    "screens with the character's gaze and hands so the object would be readable or "
+    "usable from the character's position. If a character is merely holding or carrying a device "
+    "and is not actively using it or deliberately showing its screen, default to the blank back/case "
+    "facing the viewer, with the screen turned or tilted away. Device surfaces: For tablets, phones, "
+    "laptops, and e-readers, only the front/display side contains screen content. "
+    "If the viewer sees the back or outer case of the device, render it as a plain "
+    "physical back/case with no glowing UI, maps, text, or screen image. Do not put "
+    "a readable display on the back side of a device."
+)
+
 
 def _is_v2_model(model: str | None) -> bool:
     """Return True if the model is gpt-image-2 (or a snapshot thereof).
@@ -146,9 +161,15 @@ def build_scene_prompt(
         The styled scene prompt.
     """
     if _is_v2_model(model):
-        result = f"Art style: {art_style} illustration.\n\n{prompt}"
+        result = (
+            f"Art style: {art_style} illustration.\n\n"
+            f"{prompt}\n\n"
+            f"{_SCENE_SPATIAL_ORIENTATION_GUIDANCE}"
+        )
     else:
-        result = f"{prompt}\n\nRendered in {art_style} style."
+        result = (
+            f"{prompt}\n\n{_SCENE_SPATIAL_ORIENTATION_GUIDANCE}\n\nRendered in {art_style} style."
+        )
 
     if reference_portraits:
         result += build_scene_ref_guidance(reference_portraits)
