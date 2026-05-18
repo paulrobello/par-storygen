@@ -23,7 +23,7 @@ def main(
     ctx: typer.Context,
     version: Annotated[
         bool,
-        typer.Option(
+        typer.Option(  # type: ignore[reportUnknownMemberType]
             "--version",
             callback=_version_callback,
             is_eager=True,
@@ -41,7 +41,7 @@ def main(
 def run(
     resume: Annotated[
         bool,
-        typer.Option(
+        typer.Option(  # type: ignore[reportUnknownMemberType]
             "--resume",
             "-r",
             help="Skip the menu and resume the most recently played story.",
