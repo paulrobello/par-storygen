@@ -1,4 +1,4 @@
-.PHONY: build setup test lint fmt typecheck checkall Checkall precommit run resume clean package
+.PHONY: build setup test lint fmt typecheck checkall Checkall precommit run resume clean package deploy
 
 build:
 	uv sync
@@ -37,3 +37,6 @@ precommit:
 
 package:
 	uv build
+
+deploy:
+	gh workflow run release.yml
