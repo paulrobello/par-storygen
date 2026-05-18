@@ -4,6 +4,6 @@
 - Update CHANGELOG.md, docs/ and README.md
 - Run `make precommit`
 - Commit and push
-- Run `make deploy` to trigger cicd workflow
+- Run `make deploy` to trigger cicd workflow and monitor it for failures
 
 $ARGUMENTS
