@@ -126,7 +126,7 @@ jobs:
         if: success()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-        uses: Ilshidur/action-discord@v0.4.0
+        uses: Ilshidur/action-discord@0.4.0
         with:
           args: 'The project {{ EVENT_PAYLOAD.repository.full_name }} ${{ env.VERSION }} has been published to TestPyPI.'
         continue-on-error: true
@@ -186,7 +186,7 @@ jobs:
         if: success()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-        uses: Ilshidur/action-discord@v0.4.0
+        uses: Ilshidur/action-discord@0.4.0
         with:
           args: 'A new release v${{ env.VERSION }} has been created for {{ EVENT_PAYLOAD.repository.full_name }}.'
 
@@ -240,7 +240,7 @@ jobs:
         if: success()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-        uses: Ilshidur/action-discord@v0.4.0
+        uses: Ilshidur/action-discord@0.4.0
         with:
           args: 'The project {{ EVENT_PAYLOAD.repository.full_name }} ${{ env.VERSION }} has been published to PyPI.'
         continue-on-error: true
