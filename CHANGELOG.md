@@ -7,9 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-18
+
+### Fixed
+
+- **Improved terminal image rendering** — Portrait and scene image display in the terminal now handles sizing, fallback, and reference image handling more robustly across `portraits`, `image_panel`, `image_util`, `replay`, and `character_sheet` screens. New `app_state` fields control image display preferences.
+
 ### Changed
 
 - **Switch `par-textual-image` to PyPI** — Dependency changed from local editable path to the published PyPI package (`par-textual-image>=0.1.0`). Removed `[tool.uv.sources]` path override.
+
+### Internal
+
+- Updated GitHub Actions to latest major versions for CI workflow.
+- Added `deploy` make target and `cut-release` command for streamlined releases.
 
 ## [0.4.0] - 2026-05-04
 
