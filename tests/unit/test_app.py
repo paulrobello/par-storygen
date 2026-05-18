@@ -42,6 +42,7 @@ async def test_text_provider_changed_rebuilds_clients(
 ) -> None:
     """The on_text_provider_changed handler reloads config and rebuilds clients."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
     # Work from the tmp dir so the repo's .env doesn't silently re-inject
     # STORYGEN_TEXT_* vars into os.environ via python-dotenv.
     monkeypatch.chdir(str(xdg_tmp))  # type: ignore[no-untyped-call]  # pyright: ignore[reportUnknownArgumentType]
