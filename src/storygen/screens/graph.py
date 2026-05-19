@@ -10,10 +10,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import ClassVar
 
+from rich.segment import Segment
 from rich.style import Style
-from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
+from textual.strip import Strip
 from textual.screen import Screen
 from textual.widgets import Footer, Header, Static, Tree
 from textual.widgets.tree import TreeNode
@@ -70,7 +71,13 @@ def _format_label(node: StoryNode, *, is_current: bool, is_on_path: bool = False
 
 
 class _StoryTree(Tree[dict[str, object]]):
-    """Tree subclass that highlights the root-to-current path with accent color."""
+    """Tree subclass that highlights the root-to-current path with accent color.
+
+    Overrides ``_render_line`` so that every segment (guides + label) for a
+    path node gets recolored cyan.  ``render_label`` alone can't reach the
+    guide characters because Textual builds them from CSS component styles
+    inside ``_render_line``.
+    """
 
     def __init__(
         self,
@@ -85,18 +92,21 @@ class _StoryTree(Tree[dict[str, object]]):
     def update_path(self, path_ids: frozenset[str]) -> None:
         self._path_ids = path_ids
 
-    def render_label(
-        self,
-        node: TreeNode[dict[str, object]],
-        base_style: Style,
-        style: Style,
-    ) -> Text:
+    def _render_line(self, y: int, x1: int, x2: int, base_style: Style) -> Strip:
+        strip = super()._render_line(y, x1, x2, base_style)
+        tree_lines = self._tree_lines
+        if y >= len(tree_lines):
+            return strip
+        node = tree_lines[y].path[-1]
         data = node.data or {}
         nid = data.get("node_id")
         if isinstance(nid, str) and nid in self._path_ids:
             cyan = Style(color="cyan")
-            return super().render_label(node, base_style + cyan, style + cyan)
-        return super().render_label(node, base_style, style)
+            strip = Strip(
+                Segment(seg.text, (seg.style or Style()) + cyan, seg.control)
+                for seg in strip._segments  # pyright: ignore[reportPrivateUsage]
+            )
+        return strip
 
 
 class GraphScreen(Screen[None]):
