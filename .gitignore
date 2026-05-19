@@ -76,3 +76,10 @@ TODO.md
 ideas.md
 /.claude/worktrees/
 graphify-out/
+
+# Web frontend
+web/node_modules/
+web/.next/
+web/out/
+web/.env.local
+web/.env*.local

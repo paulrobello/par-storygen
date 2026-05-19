@@ -1,4 +1,21 @@
-.PHONY: build setup test lint fmt typecheck checkall Checkall precommit run resume clean package deploy
+.PHONY: build setup test lint fmt typecheck checkall Checkall precommit run resume clean package deploy api-dev web-install web-dev web-build
+
+# ── Web (Next.js) ──
+web-install:         ## Install Next.js frontend dependencies
+	cd web && npm install
+
+web-dev:             ## Start Next.js dev server on :8100
+	cd web && npx next dev --port 8100
+
+web-build:           ## Build Next.js for production
+	cd web && npm run build
+
+# ── API (FastAPI) ──
+api-dev:             ## Start FastAPI dev server on :8101
+	uv run uvicorn storygen_api.main:app --reload --port 8101
+
+api-prod:            ## Start FastAPI production server on :8101
+	uv run uvicorn storygen_api.main:app --port 8101 --workers 1
 
 build:
 	uv sync

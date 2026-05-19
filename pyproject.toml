@@ -80,6 +80,7 @@ Discussions = "https://github.com/paulrobello/par-storygen/discussions"
 
 [project.scripts]
 storygen = "storygen.main:app"
+storygen-api = "storygen_api.main:cli"
 
 [build-system]
 requires = [
@@ -100,6 +101,15 @@ dev = [
     "hatchling>=1.29.0",
 ]
 
+[project.optional-dependencies]
+api = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "websockets>=12.0",
+    "python-multipart>=0.0.9",
+]
+
+
 [tool.hatch.version]
 path = "src/storygen/__init__.py"
 
@@ -109,11 +119,14 @@ allow-direct-references = true
 [tool.hatch.build.targets.wheel]
 packages = [
     "src/storygen",
+    "src/storygen_api",
 ]
 
 [tool.hatch.build.targets.sdist]
 include = [
     "src/storygen",
+    "src/storygen_api",
+    "web",
     "LICENSE",
     "README.md",
     "pyproject.toml",
@@ -149,6 +162,9 @@ typeCheckingMode = "strict"
 include = [
     "src",
     "tests",
+]
+exclude = [
+    "web",
 ]
 reportMissingTypeStubs = false
 
