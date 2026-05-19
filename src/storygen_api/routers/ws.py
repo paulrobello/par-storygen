@@ -45,10 +45,12 @@ async def websocket_endpoint(
                 choice_id = data.get("choice_id", "")
                 from_node_id = data.get("from_node_id", "")
                 if not choice_id or not from_node_id:
-                    await ws.send_json({
-                        "type": "error",
-                        "error": "advance requires choice_id and from_node_id",
-                    })
+                    await ws.send_json(
+                        {
+                            "type": "error",
+                            "error": "advance requires choice_id and from_node_id",
+                        }
+                    )
                     continue
 
                 # Reload save for latest state
@@ -74,15 +76,19 @@ async def websocket_endpoint(
                     )
                     mgr.update_save(game_id, save)
                 except Exception as exc:
-                    await ws.send_json({
-                        "type": "error",
-                        "error": str(exc),
-                    })
+                    await ws.send_json(
+                        {
+                            "type": "error",
+                            "error": str(exc),
+                        }
+                    )
             else:
-                await ws.send_json({
-                    "type": "error",
-                    "error": f"Unknown message type: {msg_type}",
-                })
+                await ws.send_json(
+                    {
+                        "type": "error",
+                        "error": f"Unknown message type: {msg_type}",
+                    }
+                )
     except WebSocketDisconnect:
         pass
     finally:

@@ -34,13 +34,11 @@ def _build_flow(config: AppConfig) -> WizardFlow:
         character_agent_factory=lambda theme: agent_mod.build_character_agent(  # pyright: ignore[reportArgumentType]
             text_model, theme=theme
         ),
-        blurb_agent_factory=lambda theme, characters, narration_style: (
-            agent_mod.build_blurb_agent(  # pyright: ignore[reportArgumentType]
-                text_model,
-                theme=theme,
-                characters=characters,
-                narration_style=narration_style,
-            )
+        blurb_agent_factory=lambda theme, characters, narration_style: agent_mod.build_blurb_agent(  # pyright: ignore[reportArgumentType]
+            text_model,
+            theme=theme,
+            characters=characters,
+            narration_style=narration_style,
         ),
         adapt_agent_factory=lambda theme: agent_mod.build_adapt_backstory_agent(  # pyright: ignore[reportArgumentType]
             text_model, theme=theme
@@ -76,9 +74,7 @@ async def wizard_characters(
         user_prompt=body.prompt,
         imported_characters=imported or None,
     )
-    return WizardCharactersResponse(
-        characters=[c.model_dump() for c in characters]
-    )
+    return WizardCharactersResponse(characters=[c.model_dump() for c in characters])
 
 
 @router.post("/confirm", response_model=WizardConfirmResponse)

@@ -10,6 +10,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import ClassVar
 
+from rich.style import Style
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 from textual.screen import Screen
@@ -20,6 +22,7 @@ from storygen.llm.models import NodeId, StoryNode
 from storygen.screens._confirm_modal import ConfirmModal
 from storygen.screens.replay import ReplayScreen
 from storygen.storage.save import GameSave, prune_subtree
+from storygen.storage.tree import path_from_root
 
 # Maximum length (in characters) of the narration excerpt rendered for each
 # tree node. Anything longer is ellipsized so the tree stays scannable.
@@ -54,11 +57,46 @@ def _suffixes(node: StoryNode) -> str:
     return " ".join(tags)
 
 
-def _format_label(node: StoryNode, *, is_current: bool) -> str:
-    marker = "→" if is_current else "·"
+def _format_label(node: StoryNode, *, is_current: bool, is_on_path: bool = False) -> str:
+    if is_current:
+        marker = "→"
+    elif is_on_path:
+        marker = "▸"
+    else:
+        marker = "·"
     body = _excerpt(node.narration)
     suffix = _suffixes(node)
     return f"{marker} {body} {suffix}".rstrip()
+
+
+class _StoryTree(Tree[dict[str, object]]):
+    """Tree subclass that highlights the root-to-current path with accent color."""
+
+    def __init__(
+        self,
+        path_ids: frozenset[str],
+        label: str,
+        data: dict[str, object],
+        **kwargs: object,
+    ) -> None:
+        super().__init__(label, data=data, **kwargs)  # type: ignore[no-untyped-def]
+        self._path_ids = path_ids
+
+    def update_path(self, path_ids: frozenset[str]) -> None:
+        self._path_ids = path_ids
+
+    def render_label(
+        self,
+        node: TreeNode[dict[str, object]],
+        base_style: Style,
+        style: Style,
+    ) -> Text:
+        data = node.data or {}
+        nid = data.get("node_id")
+        if isinstance(nid, str) and nid in self._path_ids:
+            cyan = Style(color="cyan")
+            return super().render_label(node, base_style + cyan, style + cyan)
+        return super().render_label(node, base_style, style)
 
 
 class GraphScreen(Screen[None]):
@@ -81,6 +119,7 @@ class GraphScreen(Screen[None]):
     _LEGEND = (
         "[b]Legend[/b]   "
         "[$accent]→[/] current   "
+        "[$accent]▸[/] path   "
         "[$text-muted]·[/] beat   "
         "[$text-muted]○[/] unexplored choice   "
         "★ ending   "
@@ -106,10 +145,19 @@ class GraphScreen(Screen[None]):
         # Map from node_id -> TreeNode so we can scroll/highlight the current
         # node after the tree is built.
         self._node_widgets: dict[NodeId, TreeNode[dict[str, object]]] = {}
+        # Compute the root-to-current path for highlighting.
+        self._path_ids: frozenset[str] = frozenset(
+            n.id for n in path_from_root(save, save.current_node_id)
+        )
         root = save.nodes[save.root_node_id]
         root_data: dict[str, object] = {"node_id": root.id}
-        self._tree: Tree[dict[str, object]] = Tree(
-            _format_label(root, is_current=save.current_node_id == root.id),
+        self._tree: _StoryTree = _StoryTree(
+            self._path_ids,
+            _format_label(
+                root,
+                is_current=save.current_node_id == root.id,
+                is_on_path=root.id in self._path_ids,
+            ),
             data=root_data,
             id="graph-tree",
         )
@@ -179,6 +227,7 @@ class GraphScreen(Screen[None]):
             label = _format_label(
                 child_node,
                 is_current=self._save.current_node_id == child_node.id,
+                is_on_path=child_node.id in self._path_ids,
             )
             child_data: dict[str, object] = {"node_id": child_node.id}
             child_widget = parent_widget.add(
@@ -302,6 +351,11 @@ class GraphScreen(Screen[None]):
             self.notify(f"Prune failed: {exc}", severity="error", timeout=5)
             return
         self._apply_header()
+        # Recompute path — prune may have moved current_node_id.
+        self._path_ids = frozenset(
+            n.id for n in path_from_root(self._save, self._save.current_node_id)
+        )
+        self._tree.update_path(self._path_ids)
         # Rebuild the tree from scratch.
         self._tree.clear()
         self._node_widgets.clear()

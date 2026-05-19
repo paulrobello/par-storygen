@@ -63,10 +63,12 @@ async def generate_tts(game_id: str, node_id: str) -> JSONResponse:
         save.nodes[node_id] = node.model_copy(update={"tts_audio_path": rel_path})
         save_game(save)
 
-    return JSONResponse({
-        "audio_url": f"/api/tts/{game_id}/{node_id}/audio",
-        "status": "ready",
-    })
+    return JSONResponse(
+        {
+            "audio_url": f"/api/tts/{game_id}/{node_id}/audio",
+            "status": "ready",
+        }
+    )
 
 
 @router.get("/{game_id}/{node_id}/audio")
@@ -85,7 +87,9 @@ async def get_tts_audio(game_id: str, node_id: str) -> FileResponse:
 async def tts_status(game_id: str, node_id: str) -> JSONResponse:
     """Check if TTS audio exists for a node."""
     audio_files = paths.node_audio_glob(game_id, node_id)
-    return JSONResponse({
-        "has_audio": len(audio_files) > 0,
-        "audio_url": f"/api/tts/{game_id}/{node_id}/audio" if audio_files else None,
-    })
+    return JSONResponse(
+        {
+            "has_audio": len(audio_files) > 0,
+            "audio_url": f"/api/tts/{game_id}/{node_id}/audio" if audio_files else None,
+        }
+    )

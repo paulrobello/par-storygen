@@ -48,44 +48,57 @@ class WebSocketManager:
         """Create PipelineCallbacks that broadcast events to WebSocket clients."""
 
         async def on_narration_delta(delta: str) -> None:
-            await self._broadcast(game_id, {
-                "type": "narration_delta",
-                "delta": delta,
-                "ts": datetime.now(UTC).isoformat(),
-            })
+            await self._broadcast(
+                game_id,
+                {
+                    "type": "narration_delta",
+                    "delta": delta,
+                    "ts": datetime.now(UTC).isoformat(),
+                },
+            )
 
         async def on_beat_committed(node: StoryNode) -> None:
-            await self._broadcast(game_id, {
-                "type": "beat_committed",
-                "node_id": node.id,
-                "is_ending": node.is_ending,
-                "ts": datetime.now(UTC).isoformat(),
-            })
+            await self._broadcast(
+                game_id,
+                {
+                    "type": "beat_committed",
+                    "node_id": node.id,
+                    "is_ending": node.is_ending,
+                    "ts": datetime.now(UTC).isoformat(),
+                },
+            )
 
         async def on_image_committed(node: StoryNode) -> None:
-            await self._broadcast(game_id, {
-                "type": "image_status",
-                "node_id": node.id,
-                "status": node.image_status,
-                "ts": datetime.now(UTC).isoformat(),
-            })
+            await self._broadcast(
+                game_id,
+                {
+                    "type": "image_status",
+                    "node_id": node.id,
+                    "status": node.image_status,
+                    "ts": datetime.now(UTC).isoformat(),
+                },
+            )
 
         async def on_image_failed(node: StoryNode) -> None:
-            await self._broadcast(game_id, {
-                "type": "image_failed",
-                "node_id": node.id,
-                "status": node.image_status,
-                "ts": datetime.now(UTC).isoformat(),
-            })
+            await self._broadcast(
+                game_id,
+                {
+                    "type": "image_failed",
+                    "node_id": node.id,
+                    "status": node.image_status,
+                    "ts": datetime.now(UTC).isoformat(),
+                },
+            )
 
         async def on_new_characters(characters: list[Character]) -> None:
-            await self._broadcast(game_id, {
-                "type": "new_characters",
-                "characters": [
-                    {"id": c.id, "name": c.name} for c in characters
-                ],
-                "ts": datetime.now(UTC).isoformat(),
-            })
+            await self._broadcast(
+                game_id,
+                {
+                    "type": "new_characters",
+                    "characters": [{"id": c.id, "name": c.name} for c in characters],
+                    "ts": datetime.now(UTC).isoformat(),
+                },
+            )
 
         return PipelineCallbacks(
             on_narration_delta=on_narration_delta,

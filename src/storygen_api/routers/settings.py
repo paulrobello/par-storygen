@@ -89,7 +89,9 @@ async def update_settings(body: SettingsUpdateRequest) -> SettingsResponse:
             model=_str_or_default(ip, "model", image_prefs.model),
             base_url=_str_or_default(ip, "base_url", image_prefs.base_url),
             api_key=_str_or_default(ip, "api_key", image_prefs.api_key),
-            fallback_provider=_str_or_default(ip, "fallback_provider", image_prefs.fallback_provider),
+            fallback_provider=_str_or_default(
+                ip, "fallback_provider", image_prefs.fallback_provider
+            ),
             fallback_model=_str_or_default(ip, "fallback_model", image_prefs.fallback_model),
         )
 
@@ -117,7 +119,9 @@ async def update_settings(body: SettingsUpdateRequest) -> SettingsResponse:
             narration_style=_str_or_default(wd, "narration_style", wizard_defaults.narration_style),
             art_style=_str_or_default(wd, "art_style", wizard_defaults.art_style),
             target_major_beats=target_beats,
-            reader_level=str(reader_level) if isinstance(reader_level, str) else wizard_defaults.reader_level,  # pyright: ignore[reportArgumentType]
+            reader_level=str(reader_level)
+            if isinstance(reader_level, str)
+            else wizard_defaults.reader_level,  # pyright: ignore[reportArgumentType]
             pacing=_str_or_default(wd, "pacing", wizard_defaults.pacing),
             characters=_str_or_default(wd, "characters", wizard_defaults.characters),
             save_to_catalog=bool(wd.get("save_to_catalog", wizard_defaults.save_to_catalog)),
@@ -128,17 +132,39 @@ async def update_settings(body: SettingsUpdateRequest) -> SettingsResponse:
         text_prefs=text_prefs,
         wizard_defaults=wizard_defaults,
         character_image_prefs=char_image_prefs,
-        art_enabled_value=body.art_enabled if body.art_enabled is not None else app_state.art_enabled(),
-        prefetch_enabled_value=body.prefetch_enabled if body.prefetch_enabled is not None else app_state.prefetch_enabled(),
-        prefetch_images_enabled_value=body.prefetch_images_enabled if body.prefetch_images_enabled is not None else app_state.prefetch_images_enabled(),
-        image_streaming_enabled_value=body.image_streaming_enabled if body.image_streaming_enabled is not None else app_state.image_streaming_enabled(),
-        llm_cache_enabled_value=body.llm_cache_enabled if body.llm_cache_enabled is not None else app_state.llm_cache_enabled(),
-        auto_select_value=body.auto_select_enabled if body.auto_select_enabled is not None else app_state.auto_select_enabled(),
-        auto_open_art_value=body.auto_open_art_enabled if body.auto_open_art_enabled is not None else app_state.auto_open_art_enabled(),
-        auto_recap_value=body.auto_recap_enabled if body.auto_recap_enabled is not None else app_state.auto_recap_enabled(),
-        resume_recap_value=body.resume_recap_enabled if body.resume_recap_enabled is not None else app_state.resume_recap_enabled(),
-        recap_interval_value=body.recap_interval if body.recap_interval is not None else app_state.recap_interval(),
-        graphics_mode_value=body.graphics_mode if body.graphics_mode is not None else app_state.read_graphics_mode(),
+        art_enabled_value=body.art_enabled
+        if body.art_enabled is not None
+        else app_state.art_enabled(),
+        prefetch_enabled_value=body.prefetch_enabled
+        if body.prefetch_enabled is not None
+        else app_state.prefetch_enabled(),
+        prefetch_images_enabled_value=body.prefetch_images_enabled
+        if body.prefetch_images_enabled is not None
+        else app_state.prefetch_images_enabled(),
+        image_streaming_enabled_value=body.image_streaming_enabled
+        if body.image_streaming_enabled is not None
+        else app_state.image_streaming_enabled(),
+        llm_cache_enabled_value=body.llm_cache_enabled
+        if body.llm_cache_enabled is not None
+        else app_state.llm_cache_enabled(),
+        auto_select_value=body.auto_select_enabled
+        if body.auto_select_enabled is not None
+        else app_state.auto_select_enabled(),
+        auto_open_art_value=body.auto_open_art_enabled
+        if body.auto_open_art_enabled is not None
+        else app_state.auto_open_art_enabled(),
+        auto_recap_value=body.auto_recap_enabled
+        if body.auto_recap_enabled is not None
+        else app_state.auto_recap_enabled(),
+        resume_recap_value=body.resume_recap_enabled
+        if body.resume_recap_enabled is not None
+        else app_state.resume_recap_enabled(),
+        recap_interval_value=body.recap_interval
+        if body.recap_interval is not None
+        else app_state.recap_interval(),
+        graphics_mode_value=body.graphics_mode
+        if body.graphics_mode is not None
+        else app_state.read_graphics_mode(),
     )
 
     return await get_settings()

@@ -16,7 +16,12 @@ from storygen_api.deps import (
     get_app_config,
     get_session_manager,
 )
-from storygen_api.schemas import OutfitActionRequest, OutfitRequest, PortraitEditRequest, SceneEditRequest
+from storygen_api.schemas import (
+    OutfitActionRequest,
+    OutfitRequest,
+    PortraitEditRequest,
+    SceneEditRequest,
+)
 from storygen_api.session import PipelineSessionManager
 from storygen_api.ws import ws_manager
 
@@ -349,9 +354,7 @@ async def add_outfit(
         created_at=datetime.now(UTC),
     )
 
-    save.characters[char_idx] = char.model_copy(
-        update={"outfits": [*char.outfits, outfit]}
-    )
+    save.characters[char_idx] = char.model_copy(update={"outfits": [*char.outfits, outfit]})
     save_game(save)
     return {"status": "done", "outfit_id": outfit_id}
 

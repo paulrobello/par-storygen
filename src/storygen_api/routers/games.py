@@ -48,8 +48,7 @@ def _node_to_detail(node: StoryNode) -> NodeDetail:
         image_prompt=node.image_prompt,
         summary_to_here=node.summary_to_here,
         choices=[
-            ChoiceOption(id=c.id, text=c.text, child_node_id=c.child_node_id)
-            for c in node.choices
+            ChoiceOption(id=c.id, text=c.text, child_node_id=c.child_node_id) for c in node.choices
         ],
         created_at=node.created_at,
     )
@@ -196,9 +195,7 @@ async def advance_game(
 
     # Reload save to pick up the latest mutations
     save = load_game(game_id)
-    new_char_ids = [
-        c for c in save.characters if c.introduced_at_node_id == node.id
-    ]
+    new_char_ids = [c for c in save.characters if c.introduced_at_node_id == node.id]
 
     return AdvanceResponse(
         node=_node_to_detail(node),

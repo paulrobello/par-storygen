@@ -97,6 +97,7 @@ class PruneRequest(BaseModel):
 
 class RegenerateNodeRequest(BaseModel):
     """Re-roll the current node by pruning it and re-advancing from the parent."""
+
     pass
 
 

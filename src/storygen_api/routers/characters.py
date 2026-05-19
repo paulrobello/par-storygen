@@ -98,9 +98,7 @@ def _image_to_png_bytes(image_bytes: bytes) -> bytes:
 async def list_characters() -> CharacterLibraryResponse:
     """List all library characters."""
     chars = list_library_characters()
-    return CharacterLibraryResponse(
-        characters=[_lib_to_entry(c) for c in chars]
-    )
+    return CharacterLibraryResponse(characters=[_lib_to_entry(c) for c in chars])
 
 
 @router.get("/{library_id}", response_model=CharacterLibraryEntry)
@@ -444,7 +442,9 @@ async def import_from_story(
             try:
                 from storygen.storage import paths as save_paths
 
-                ref_abs = save_paths.safe_join(save_paths.game_dir(save_id), char.reference_image_path)
+                ref_abs = save_paths.safe_join(
+                    save_paths.game_dir(save_id), char.reference_image_path
+                )
                 if ref_abs.exists():
                     ref_bytes = ref_abs.read_bytes()
             except (ValueError, OSError):
