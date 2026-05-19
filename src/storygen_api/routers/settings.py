@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from storygen.storage import app_state
+from storygen.storage.app_state import TTSPrefs
 from storygen_api.schemas import SettingsResponse, SettingsUpdateRequest
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -15,6 +16,7 @@ async def get_settings() -> SettingsResponse:
     image_prefs = app_state.read_image_provider_prefs()
     char_image_prefs = app_state.read_character_image_provider_prefs()
     wizard_defaults = app_state.read_wizard_defaults()
+    tts = app_state.read_tts_prefs()
     return SettingsResponse(
         art_enabled=app_state.art_enabled(),
         prefetch_enabled=app_state.prefetch_enabled(),
@@ -55,6 +57,12 @@ async def get_settings() -> SettingsResponse:
             "pacing": wizard_defaults.pacing,
             "characters": wizard_defaults.characters,
             "save_to_catalog": wizard_defaults.save_to_catalog,
+        },
+        tts_prefs={
+            "provider": tts.provider,
+            "voice": tts.voice,
+            "auto_read": tts.auto_read,
+            "auto_read_recap": tts.auto_read_recap,
         },
     )
 
@@ -127,11 +135,23 @@ async def update_settings(body: SettingsUpdateRequest) -> SettingsResponse:
             save_to_catalog=bool(wd.get("save_to_catalog", wizard_defaults.save_to_catalog)),
         )
 
+    tts = app_state.read_tts_prefs()
+    if body.tts_prefs is not None:
+        tp = body.tts_prefs
+        tts = TTSPrefs(
+            provider=_str_or_default(tp, "provider", tts.provider),
+            api_key=_str_or_default(tp, "api_key", tts.api_key),
+            voice=_str_or_default(tp, "voice", tts.voice),
+            auto_read=bool(tp.get("auto_read", tts.auto_read)),
+            auto_read_recap=bool(tp.get("auto_read_recap", tts.auto_read_recap)),
+        )
+
     app_state.write_all_settings(
         image_prefs=image_prefs,
         text_prefs=text_prefs,
         wizard_defaults=wizard_defaults,
         character_image_prefs=char_image_prefs,
+        tts_prefs=tts,
         art_enabled_value=body.art_enabled
         if body.art_enabled is not None
         else app_state.art_enabled(),

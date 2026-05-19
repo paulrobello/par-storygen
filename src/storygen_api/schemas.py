@@ -163,6 +163,7 @@ class SettingsResponse(BaseModel):
     image_provider: dict[str, object] = {}
     character_image_provider: dict[str, object] = {}
     wizard_defaults: dict[str, object] = {}
+    tts_prefs: dict[str, object] = {}
 
 
 class SettingsUpdateRequest(BaseModel):
@@ -181,6 +182,7 @@ class SettingsUpdateRequest(BaseModel):
     image_provider: dict[str, object] | None = None
     character_image_provider: dict[str, object] | None = None
     wizard_defaults: dict[str, object] | None = None
+    tts_prefs: dict[str, object] | None = None
 
 
 # ---------------------------------------------------------------------------
