@@ -168,7 +168,7 @@ export default function SettingsPage() {
 
   return (
     <GameLayout>
-      <div className="flex-1 px-4 py-8 max-w-2xl mx-auto w-full">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-8 max-w-2xl mx-auto w-full">
         <h1 className="text-2xl font-bold text-gray-100 mb-6">⚙️ Settings</h1>
 
         {error && (
