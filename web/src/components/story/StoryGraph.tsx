@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useRef, useCallback } from "react";
 import type { StoryNode } from "@/lib/api";
+import { apiPost } from "@/lib/api";
 
 export interface GraphEdge {
   parent_id: string;
@@ -15,6 +16,8 @@ interface StoryGraphProps {
   currentId: string;
   nodes: Record<string, StoryNode>;
   onNodeClick: (id: string) => void;
+  onPrune?: (nodeId: string) => void;
+  gameId?: string;
 }
 
 interface TreeNode {
@@ -120,11 +123,22 @@ function buildTree(
   };
 }
 
-function TreeNodeBox({ node, onClick }: { node: TreeNode; onClick: () => void }) {
+function TreeNodeBox({
+  node,
+  onClick,
+  onPrune,
+  canPrune,
+}: {
+  node: TreeNode;
+  onClick: () => void;
+  onPrune?: (nodeId: string) => void;
+  canPrune: boolean;
+}) {
   const W = NODE_W;
   const H = NODE_H;
   const x = node.x;
   const y = node.y;
+  const [hovered, setHovered] = useState(false);
 
   let fill = "#1e293b";
   let stroke = "#334155";
@@ -147,8 +161,15 @@ function TreeNodeBox({ node, onClick }: { node: TreeNode; onClick: () => void })
     stroke = "#6366f1";
   }
 
+  const showPruneBtn = canPrune && onPrune && !node.isGhost && !node.isRoot && !node.isCurrent && hovered;
+
   return (
-    <g onClick={node.isGhost ? undefined : onClick} className={node.isGhost ? "" : "cursor-pointer"}>
+    <g
+      onClick={node.isGhost ? undefined : onClick}
+      className={node.isGhost ? "" : "cursor-pointer"}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       <rect
         x={x}
         y={y - H / 2}
@@ -178,6 +199,37 @@ function TreeNodeBox({ node, onClick }: { node: TreeNode; onClick: () => void })
       >
         {node.label.length > 20 ? node.label.slice(0, 18) + "…" : node.label}
       </text>
+      {/* Prune button on hover */}
+      {showPruneBtn && (
+        <g
+          onClick={(e) => {
+            e.stopPropagation();
+            onPrune(node.id);
+          }}
+          className="cursor-pointer"
+        >
+          <rect
+            x={x + W - 2}
+            y={y - H / 2 - 2}
+            width={18}
+            height={18}
+            rx={4}
+            fill="#7f1d1d"
+            stroke="#ef4444"
+            strokeWidth={1}
+          />
+          <text
+            x={x + W + 7}
+            y={y - H / 2 + 12}
+            textAnchor="middle"
+            fontSize={11}
+            fill="#fca5a5"
+            className="pointer-events-none select-none"
+          >
+            &times;
+          </text>
+        </g>
+      )}
     </g>
   );
 }
@@ -217,17 +269,27 @@ function TreeEdge({ parent, child }: { parent: TreeNode; child: TreeNode }) {
   );
 }
 
-function renderTree(node: TreeNode, onNodeClick: (id: string) => void): React.ReactNode[] {
+function renderTree(
+  node: TreeNode,
+  onNodeClick: (id: string) => void,
+  onPrune?: (nodeId: string) => void,
+): React.ReactNode[] {
   const elements: React.ReactNode[] = [];
 
   for (const child of node.children) {
     elements.push(<TreeEdge key={`e-${node.id}-${child.id}`} parent={node} child={child} />);
   }
   elements.push(
-    <TreeNodeBox key={`n-${node.id}`} node={node} onClick={() => onNodeClick(node.id)} />,
+    <TreeNodeBox
+      key={`n-${node.id}`}
+      node={node}
+      onClick={() => onNodeClick(node.id)}
+      onPrune={onPrune}
+      canPrune
+    />,
   );
   for (const child of node.children) {
-    elements.push(...renderTree(child, onNodeClick));
+    elements.push(...renderTree(child, onNodeClick, onPrune));
   }
 
   return elements;
@@ -239,6 +301,8 @@ export function StoryGraph({
   currentId,
   nodes,
   onNodeClick,
+  onPrune,
+  gameId,
 }: StoryGraphProps) {
   const { tree } = useMemo(
     () => buildTree(edges, rootId, currentId, nodes),
@@ -248,6 +312,31 @@ export function StoryGraph({
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const dragging = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
+
+  // Prune confirmation state
+  const [pruneTarget, setPruneTarget] = useState<string | null>(null);
+  const [pruning, setPruning] = useState(false);
+
+  const handlePruneRequest = useCallback((nodeId: string) => {
+    setPruneTarget(nodeId);
+  }, []);
+
+  const handlePruneConfirm = useCallback(async () => {
+    if (!pruneTarget || !gameId) return;
+    setPruning(true);
+    try {
+      await apiPost<{ removed_count: number }>(`/api/games/${gameId}/prune`, {
+        node_id: pruneTarget,
+      });
+      setPruneTarget(null);
+      onPrune?.(pruneTarget);
+    } catch {
+      // Silently close on error; parent can show toast
+      setPruneTarget(null);
+    } finally {
+      setPruning(false);
+    }
+  }, [pruneTarget, gameId, onPrune]);
 
   const onPointerDown = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
     dragging.current = true;
@@ -268,17 +357,50 @@ export function StoryGraph({
   }, []);
 
   return (
-    <svg
-      width="100%"
-      height="100%"
-      className="cursor-grab active:cursor-grabbing"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-    >
-      <g transform={`translate(${offset.x}, ${offset.y})`}>
-        {renderTree(tree, onNodeClick)}
-      </g>
-    </svg>
+    <>
+      <svg
+        width="100%"
+        height="100%"
+        className="cursor-grab active:cursor-grabbing"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+      >
+        <g transform={`translate(${offset.x}, ${offset.y})`}>
+          {renderTree(tree, onNodeClick, onPrune ? handlePruneRequest : undefined)}
+        </g>
+      </svg>
+
+      {/* Prune confirmation dialog */}
+      {pruneTarget && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+          <div className="bg-gray-900 border border-gray-700/60 rounded-xl shadow-2xl max-w-sm w-full p-6 text-gray-100">
+            <h3 className="text-lg font-semibold text-gray-100 mb-2">Prune Branch</h3>
+            <p className="text-gray-400 text-sm mb-1">
+              Prune this branch and all its descendants?
+            </p>
+            <p className="text-amber-400/80 text-xs mb-5">
+              This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setPruneTarget(null)}
+                disabled={pruning}
+                className="px-4 py-2 text-sm text-gray-400 hover:text-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePruneConfirm}
+                disabled={pruning}
+                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors disabled:opacity-50"
+              >
+                {pruning ? "Pruning…" : "Prune"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

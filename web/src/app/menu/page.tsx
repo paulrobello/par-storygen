@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, FolderOpen, Settings, Users } from "lucide-react";
+import { BookOpen, FolderOpen, Settings, Sparkles, Users } from "lucide-react";
 
 const menuItems = [
   {
@@ -10,6 +10,13 @@ const menuItems = [
     label: "📖  New Story",
     description: "Create a new adventure",
     accent: "text-cyan-400 border-cyan-400/30 hover:border-cyan-400/60 hover:bg-cyan-400/5",
+  },
+  {
+    href: "/presets",
+    icon: Sparkles,
+    label: "⚡  Quick Start",
+    description: "Pick a preset & play",
+    accent: "text-purple-400 border-purple-400/30 hover:border-purple-400/60 hover:bg-purple-400/5",
   },
   {
     href: "/load",

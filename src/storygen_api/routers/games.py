@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from typing import cast
 
 from storygen.config import AppConfig
@@ -146,6 +147,11 @@ async def get_game(game_id: str) -> GameDetail:
         nodes=node_details,
         endings_reached=save.endings_reached,
         art_style=save.art_style,
+        total_image_cost_usd=save.total_image_cost_usd,
+        text_total_input_tokens=save.text_total_input_tokens,
+        text_total_output_tokens=save.text_total_output_tokens,
+        text_total_requests=save.text_total_requests,
+        relationships=[r.model_dump() for r in save.relationships],
         created_at=save.created_at,
         updated_at=save.updated_at,
     )
@@ -371,3 +377,33 @@ async def export_book_endpoint(
         raise HTTPException(status_code=500, detail=str(exc))
 
     return {"path": str(out), "filename": os.path.basename(out)}
+
+
+@router.get("/{game_id}/export-book/download")
+async def download_book(
+    game_id: str,
+) -> FileResponse:
+    """Download the exported HTML book as a file."""
+    import os
+
+    try:
+        save = load_game(game_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    node = save.nodes.get(save.current_node_id)
+    if node is None:
+        raise HTTPException(status_code=400, detail="No current node")
+
+    try:
+        out = await __import__("asyncio").to_thread(export_book, save, node.id, open_browser=False)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    # out is the directory path; the main file is index.html inside it
+    html_path = out / "index.html"
+    if not html_path.exists():
+        raise HTTPException(status_code=404, detail="Book file not found")
+
+    filename = f"{save.theme.title.replace(' ', '_')}_Book.html"
+    return FileResponse(html_path, media_type="text/html", filename=filename)

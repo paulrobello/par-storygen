@@ -8,21 +8,23 @@ import {
   Image as ImageIcon,
   GitBranch,
   Flag,
-  BookOpen,
   ArrowLeft,
   Volume2,
-  Repeat,
   Pencil,
   Eye,
   Download,
-  Trash2,
+  Film,
+  Users,
+  BookOpen,
+  FastForward,
 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
 import type { StoryNode } from "@/lib/api";
 
 interface GameMenuProps {
   currentNode: StoryNode;
   isStreaming: boolean;
+  autoPlay: boolean;
+  onToggleAutoPlay: () => void;
   onRetryImage: () => void;
   onEditImage: () => void;
   onRegenerateNode: () => void;
@@ -32,11 +34,16 @@ interface GameMenuProps {
   onViewPortraits: () => void;
   onReadAloud: () => void;
   onExportBook: () => void;
+  onViewReplay: () => void;
+  onViewRelationships: () => void;
+  onViewRecap: () => void;
 }
 
 export function GameMenu({
   currentNode,
   isStreaming,
+  autoPlay,
+  onToggleAutoPlay,
   onRetryImage,
   onEditImage,
   onRegenerateNode,
@@ -46,6 +53,9 @@ export function GameMenu({
   onViewPortraits,
   onReadAloud,
   onExportBook,
+  onViewReplay,
+  onViewRelationships,
+  onViewRecap,
 }: GameMenuProps) {
   const [open, setOpen] = useState(false);
 
@@ -53,7 +63,7 @@ export function GameMenu({
   const hasDescendants = (currentNode.choices ?? []).some((c) => !!c.child_node_id);
   const canRegenNode = !!currentNode.parent_id && !!currentNode.chosen_choice_id && !hasDescendants;
   const hasImage = !!currentNode.image_prompt;
-  const isEnding = currentNode.is_ending;
+  const hasRecap = !!currentNode.recap_text;
 
   const items = [
     {
@@ -62,6 +72,13 @@ export function GameMenu({
       action: onGoBack,
       disabled: !canGoBack || isStreaming,
       hint: "Return to previous node",
+    },
+    {
+      label: "Recap",
+      icon: BookOpen,
+      action: onViewRecap,
+      disabled: !hasRecap || isStreaming,
+      hint: "Previously on...",
     },
     {
       label: "Regenerate Node",
@@ -102,6 +119,13 @@ export function GameMenu({
       hint: "View and manage character portraits",
     },
     {
+      label: "Relationships",
+      icon: Users,
+      action: onViewRelationships,
+      disabled: isStreaming,
+      hint: "View character relationships",
+    },
+    {
       label: "Story Graph",
       icon: GitBranch,
       action: onViewGraph,
@@ -121,6 +145,23 @@ export function GameMenu({
       action: onExportBook,
       disabled: isStreaming,
       hint: "Export as HTML book",
+    },
+    {
+      label: "Replay",
+      icon: Film,
+      action: onViewReplay,
+      disabled: isStreaming,
+      hint: "Replay story from the beginning",
+    },
+    { type: "divider" as const },
+    {
+      label: autoPlay ? "Stop Auto-Play" : "Auto-Play",
+      icon: FastForward,
+      action: onToggleAutoPlay,
+      disabled: isStreaming,
+      hint: autoPlay ? "Stop automatic play" : "Auto-pick choices",
+      toggle: true,
+      toggleActive: autoPlay,
     },
   ];
 
@@ -155,6 +196,8 @@ export function GameMenu({
                 disabled: boolean;
                 hint?: string;
                 danger?: boolean;
+                toggle?: boolean;
+                toggleActive?: boolean;
               };
               const Icon = mi.icon;
               return (
@@ -168,13 +211,24 @@ export function GameMenu({
                   className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
                     mi.disabled
                       ? "text-gray-600 cursor-not-allowed"
-                      : mi.danger
-                        ? "text-amber-300 hover:bg-amber-900/20"
-                        : "text-gray-300 hover:bg-gray-800/60"
+                      : mi.toggle && mi.toggleActive
+                        ? "text-cyan-300 bg-cyan-900/20 hover:bg-cyan-900/30"
+                        : mi.danger
+                          ? "text-amber-300 hover:bg-amber-900/20"
+                          : "text-gray-300 hover:bg-gray-800/60"
                   }`}
                   title={mi.hint}
                 >
-                  <Icon size={16} className={mi.danger && !mi.disabled ? "text-amber-400" : ""} />
+                  <Icon
+                    size={16}
+                    className={
+                      mi.toggle && mi.toggleActive && !mi.disabled
+                        ? "text-cyan-400"
+                        : mi.danger && !mi.disabled
+                          ? "text-amber-400"
+                          : ""
+                    }
+                  />
                   <span className="flex-1 text-left">{mi.label}</span>
                   {mi.hint && !mi.disabled && (
                     <span className="text-[10px] text-gray-600">{mi.hint}</span>

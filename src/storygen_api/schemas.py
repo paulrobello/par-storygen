@@ -57,6 +57,11 @@ class GameDetail(BaseModel):
     nodes: dict[NodeId, NodeDetail]
     endings_reached: list[NodeId]
     art_style: str
+    total_image_cost_usd: float = 0.0
+    text_total_input_tokens: int = 0
+    text_total_output_tokens: int = 0
+    text_total_requests: int = 0
+    relationships: list[dict[str, object]] = []
     created_at: datetime
     updated_at: datetime
 
@@ -243,6 +248,15 @@ class CharacterCreateRequest(BaseModel):
 class StoryImportRequest(BaseModel):
     save_id: str
     character_ids: list[str]
+
+
+class OutfitRequest(BaseModel):
+    name: str
+    description: str
+
+
+class OutfitActionRequest(BaseModel):
+    action: str  # "set" or "delete"
 
 
 class SceneEditRequest(BaseModel):

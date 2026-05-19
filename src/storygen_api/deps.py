@@ -5,6 +5,8 @@ from collections.abc import Callable
 from functools import lru_cache
 from typing import cast
 
+from fastapi import Depends
+
 from storygen.config import AppConfig, load_config
 from storygen.images.provider_factory import (
     ImageProviderName,
@@ -20,11 +22,7 @@ from storygen.llm.usage import record_usage_on_save
 from storygen.pipeline import BeatPipeline, PipelineCallbacks
 from storygen.storage import app_state
 from storygen.storage.save import GameSave, save_game
-
-from fastapi import Depends
-
 from storygen_api.session import PipelineSessionManager
-
 
 # ---------------------------------------------------------------------------
 # Adapter classes — mirror app.py's adapters for pydantic-ai agents
@@ -153,6 +151,10 @@ def _build_split_image_provider(
     art_router = _build_routed_image_provider(save.image_config)
     character_router = _build_routed_image_provider(save.character_image_config)
     return SplitImageProvider(character_provider=character_router, art_provider=art_router)
+
+
+# Public alias so routers can import without triggering reportPrivateUsage.
+build_split_image_provider = _build_split_image_provider
 
 
 # ---------------------------------------------------------------------------

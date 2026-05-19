@@ -5,7 +5,8 @@ import { GameLayout } from "@/components/layout/GameLayout";
 import { Button } from "@/components/ui/Button";
 import { Loading } from "@/components/ui/Loading";
 import { useSettingsStore } from "@/stores/settings-store";
-import { Save } from "lucide-react";
+import { Save, Palette } from "lucide-react";
+import Link from "next/link";
 import type { SettingsResponse } from "@/lib/api";
 
 const TEXT_PROVIDERS = [
@@ -19,6 +20,37 @@ const IMAGE_PROVIDERS = [
   { label: "Google Gemini", value: "gemini" },
   { label: "Z.AI GLM-image", value: "zai" },
   { label: "Ollama (local)", value: "ollama" },
+];
+
+const TTS_PROVIDERS = [
+  { label: "OpenAI", value: "openai" },
+  { label: "ElevenLabs", value: "elevenlabs" },
+  { label: "Deepgram", value: "deepgram" },
+  { label: "Gemini", value: "gemini" },
+  { label: "Kokoro (local)", value: "kokoro" },
+];
+
+const TONE_PRESETS = [
+  "silly", "serious", "dark", "whimsical", "mysterious", "romantic", "action", "unexpected",
+];
+
+const NARRATION_STYLES = [
+  { label: "Third Person", value: "third_person" },
+  { label: "First Person", value: "first_person" },
+  { label: "Fourth Wall", value: "fourth_wall" },
+];
+
+const PACING_OPTIONS = [
+  { label: "Slow", value: "slow" },
+  { label: "Moderate", value: "moderate" },
+  { label: "Fast", value: "fast" },
+];
+
+const READER_LEVELS = [
+  { label: "Ages 0-5", value: "ages_0_5" },
+  { label: "Ages 6-10", value: "ages_6_10" },
+  { label: "Ages 11-15", value: "ages_11_15" },
+  { label: "Ages 15+", value: "ages_15_plus" },
 ];
 
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
@@ -191,6 +223,64 @@ export default function SettingsPage() {
               })}
               options={[{ label: "None", value: "none" }, ...IMAGE_PROVIDERS]}
             />
+            <div className="pt-2">
+              <Link href="/style-gallery">
+                <Button variant="ghost" size="sm">
+                  <Palette size={14} className="mr-2" />
+                  Open Style Gallery
+                </Button>
+              </Link>
+            </div>
+          </section>
+
+          {/* Character Portrait Provider */}
+          <section className="bg-gray-900/50 border border-gray-800 rounded-xl p-5 space-y-4">
+            <h2 className="text-lg font-semibold text-gray-200">Character Portrait Provider</h2>
+            <SelectField
+              label="Provider"
+              value={form.character_image_provider.provider}
+              onChange={(v) => update("character_image_provider", { ...form.character_image_provider, provider: v })}
+              options={IMAGE_PROVIDERS}
+            />
+            <InputField
+              label="Model"
+              value={form.character_image_provider.model}
+              onChange={(v) => update("character_image_provider", { ...form.character_image_provider, model: v })}
+              placeholder="gpt-image-2"
+            />
+            <InputField
+              label="Base URL (optional)"
+              value={form.character_image_provider.base_url ?? ""}
+              onChange={(v) => update("character_image_provider", { ...form.character_image_provider, base_url: v || null })}
+              placeholder="https://api.openai.com/v1"
+            />
+          </section>
+
+          {/* TTS */}
+          <section className="bg-gray-900/50 border border-gray-800 rounded-xl p-5 space-y-4">
+            <h2 className="text-lg font-semibold text-gray-200">Text-to-Speech</h2>
+            <SelectField
+              label="Provider"
+              value={form.tts_prefs.provider}
+              onChange={(v) => update("tts_prefs", { ...form.tts_prefs, provider: v })}
+              options={TTS_PROVIDERS}
+            />
+            <InputField
+              label="Voice"
+              value={form.tts_prefs.voice}
+              onChange={(v) => update("tts_prefs", { ...form.tts_prefs, voice: v })}
+              placeholder="alloy"
+            />
+            <Toggle
+              label="Auto-read story beats aloud"
+              checked={form.tts_prefs.auto_read}
+              onChange={(v) => update("tts_prefs", { ...form.tts_prefs, auto_read: v })}
+            />
+            <Toggle
+              label="Auto-read recaps aloud"
+              checked={form.tts_prefs.auto_read_recap}
+              onChange={(v) => update("tts_prefs", { ...form.tts_prefs, auto_read_recap: v })}
+            />
           </section>
 
           {/* Toggles */}
@@ -225,6 +315,91 @@ export default function SettingsPage() {
               label="Resume Recap"
               checked={form.resume_recap_enabled}
               onChange={(v) => update("resume_recap_enabled", v)}
+            />
+            <Toggle
+              label="LLM Cache (debug)"
+              checked={form.llm_cache_enabled}
+              onChange={(v) => update("llm_cache_enabled", v)}
+            />
+            <Toggle
+              label="Auto-Select (random choices)"
+              checked={form.auto_select_enabled}
+              onChange={(v) => update("auto_select_enabled", v)}
+            />
+            <div className="pt-2">
+              <InputField
+                label="Recap Interval (major beats)"
+                value={String(form.recap_interval)}
+                onChange={(v) => {
+                  const n = parseInt(v, 10);
+                  if (!isNaN(n) && n > 0) update("recap_interval", n);
+                }}
+                type="number"
+                placeholder="3"
+              />
+            </div>
+          </section>
+
+          {/* Wizard Defaults */}
+          <section className="bg-gray-900/50 border border-gray-800 rounded-xl p-5 space-y-4">
+            <h2 className="text-lg font-semibold text-gray-200">Wizard Defaults</h2>
+            <InputField
+              label="Default Theme Prompt"
+              value={form.wizard_defaults.theme}
+              onChange={(v) => update("wizard_defaults", { ...form.wizard_defaults, theme: v })}
+              placeholder="A magical adventure in a faraway land..."
+            />
+            <SelectField
+              label="Tone Preset"
+              value={form.wizard_defaults.tone_preset}
+              onChange={(v) => update("wizard_defaults", { ...form.wizard_defaults, tone_preset: v })}
+              options={TONE_PRESETS.map((t) => ({ label: t.charAt(0).toUpperCase() + t.slice(1), value: t }))}
+            />
+            <InputField
+              label="Custom Tone Descriptor"
+              value={form.wizard_defaults.tone_descriptor}
+              onChange={(v) => update("wizard_defaults", { ...form.wizard_defaults, tone_descriptor: v })}
+              placeholder="Optional custom tone..."
+            />
+            <SelectField
+              label="Narration Style"
+              value={form.wizard_defaults.narration_style}
+              onChange={(v) => update("wizard_defaults", { ...form.wizard_defaults, narration_style: v })}
+              options={NARRATION_STYLES}
+            />
+            <InputField
+              label="Art Style"
+              value={form.wizard_defaults.art_style}
+              onChange={(v) => update("wizard_defaults", { ...form.wizard_defaults, art_style: v })}
+              placeholder="children's story book"
+            />
+            <InputField
+              label="Target Major Beats"
+              value={String(form.wizard_defaults.target_major_beats)}
+              onChange={(v) => {
+                const n = parseInt(v, 10);
+                if (!isNaN(n) && n >= 2 && n <= 30) update("wizard_defaults", { ...form.wizard_defaults, target_major_beats: n });
+              }}
+              type="number"
+              placeholder="5"
+            />
+            <SelectField
+              label="Reader Level"
+              value={form.wizard_defaults.reader_level}
+              onChange={(v) => update("wizard_defaults", { ...form.wizard_defaults, reader_level: v as SettingsResponse["wizard_defaults"]["reader_level"] })}
+              options={READER_LEVELS}
+            />
+            <SelectField
+              label="Pacing"
+              value={form.wizard_defaults.pacing}
+              onChange={(v) => update("wizard_defaults", { ...form.wizard_defaults, pacing: v as SettingsResponse["wizard_defaults"]["pacing"] })}
+              options={PACING_OPTIONS}
+            />
+            <InputField
+              label="Character Requirements"
+              value={form.wizard_defaults.characters}
+              onChange={(v) => update("wizard_defaults", { ...form.wizard_defaults, characters: v })}
+              placeholder="2-3 diverse characters..."
             />
           </section>
 

@@ -53,6 +53,7 @@ interface GameState {
   setImageStatus: (status: string) => void;
   setCurrentImageUrl: (url: string | null) => void;
   addCharacters: (chars: Character[]) => void;
+  updateCharacter: (characterId: string, updates: Partial<Pick<Character, "name" | "personality" | "physical_description" | "backstory">>) => void;
   setError: (error: string | null) => void;
   refreshGame: (gameId: string) => Promise<void>;
   reset: () => void;
@@ -176,6 +177,21 @@ export const useGameStore = create<GameState>((set, get) => ({
       return {
         characters: [...state.characters, ...chars.filter((c) => !existing.has(c.id))],
       };
+    }),
+  updateCharacter: (characterId, updates) =>
+    set((state) => {
+      const updatedCharacters = state.characters.map((c) =>
+        c.id === characterId ? { ...c, ...updates } : c
+      );
+      const updatedGame = state.currentGame
+        ? {
+            ...state.currentGame,
+            characters: state.currentGame.characters.map((c) =>
+              c.id === characterId ? { ...c, ...updates } : c
+            ),
+          }
+        : null;
+      return { characters: updatedCharacters, currentGame: updatedGame };
     }),
   setError: (error: string | null) => set({ error }),
 

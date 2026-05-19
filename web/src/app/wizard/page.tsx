@@ -6,9 +6,12 @@ import { Button } from "@/components/ui/Button";
 import { GameLayout } from "@/components/layout/GameLayout";
 import { WizardStepper } from "@/components/wizard/WizardStepper";
 import { Loading } from "@/components/ui/Loading";
-import { apiPost } from "@/lib/api";
-import type { Theme, Character, NarrationStyle, ReaderLevel, Pacing } from "@/lib/api";
-import { ChevronLeft, ChevronRight, Wand2 } from "lucide-react";
+import { Modal } from "@/components/ui/Modal";
+import { apiGet, apiPost } from "@/lib/api";
+import type { Theme, Character, NarrationStyle, ReaderLevel, Pacing, LibraryCharacter, CharacterLibraryResponse } from "@/lib/api";
+import { ChevronLeft, ChevronRight, Wand2, Download, User, Check } from "lucide-react";
+
+const API_BASE = "http://localhost:8101";
 
 const STEPS = [
   "Theme",
@@ -50,6 +53,8 @@ interface WizardState {
   readerLevel: ReaderLevel;
   pacing: Pacing;
   characters: Character[];
+  /** IDs of characters that were imported from the library. */
+  importedCharacterIds: Set<string>;
   characterPrompt: string;
 }
 
@@ -64,6 +69,7 @@ const defaultWizard: WizardState = {
   readerLevel: "ages_11_15",
   pacing: "moderate",
   characters: [],
+  importedCharacterIds: new Set(),
   characterPrompt: "",
 };
 
@@ -75,6 +81,12 @@ export default function WizardPage() {
   const [isGeneratingTheme, setIsGeneratingTheme] = useState(false);
   const [isGeneratingChars, setIsGeneratingChars] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Library import modal state
+  const [showLibraryModal, setShowLibraryModal] = useState(false);
+  const [libraryCharacters, setLibraryCharacters] = useState<LibraryCharacter[]>([]);
+  const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
+  const [selectedLibraryIds, setSelectedLibraryIds] = useState<Set<string>>(new Set());
 
   const update = <K extends keyof WizardState>(key: K, value: WizardState[K]) =>
     setState((s) => ({ ...s, [key]: value }));
@@ -100,17 +112,79 @@ export default function WizardPage() {
     setIsGeneratingChars(true);
     setError(null);
     try {
+      // Separate imported from generated so the LLM can incorporate them
+      const importedChars = state.characters.filter((c) =>
+        state.importedCharacterIds.has(c.id)
+      );
       const result = await apiPost<{ characters: Character[] }>("/api/wizard/characters", {
         theme: state.theme,
         tone: { preset: state.tonePreset, custom_descriptor: state.toneDescriptor || null },
         character_prompt: state.characterPrompt,
+        imported_characters: importedChars.length > 0 ? importedChars : undefined,
       });
-      update("characters", result.characters);
+      // Append newly generated characters (keep imported ones)
+      setState((s) => ({
+        ...s,
+        characters: [
+          ...s.characters.filter((c) => s.importedCharacterIds.has(c.id)),
+          ...result.characters,
+        ],
+      }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate characters");
     } finally {
       setIsGeneratingChars(false);
     }
+  };
+
+  const openLibraryModal = async () => {
+    setShowLibraryModal(true);
+    setSelectedLibraryIds(new Set());
+    setIsLoadingLibrary(true);
+    try {
+      const result = await apiGet<CharacterLibraryResponse>("/api/characters");
+      setLibraryCharacters(result.characters);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load library");
+    } finally {
+      setIsLoadingLibrary(false);
+    }
+  };
+
+  const toggleLibrarySelection = (charId: string) => {
+    setSelectedLibraryIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(charId)) next.delete(charId);
+      else next.add(charId);
+      return next;
+    });
+  };
+
+  const handleImportSelected = () => {
+    const selected = libraryCharacters.filter((c) => selectedLibraryIds.has(c.id));
+    if (selected.length === 0) return;
+
+    const newCharacters: Character[] = selected.map((lib) => ({
+      id: lib.id,
+      name: lib.name,
+      backstory: lib.backstory,
+      backstory_summary: null,
+      personality: lib.personality,
+      physical_description: lib.physical_description,
+      portrait_path: lib.has_portrait ? "library" : null,
+      portrait_prompt: lib.portrait_prompt || null,
+      introduced_at_node_id: "",
+      outfits: [],
+      current_outfit_id: null,
+      reference_image_path: lib.reference_image_path ?? null,
+    }));
+
+    setState((s) => ({
+      ...s,
+      characters: [...s.characters, ...newCharacters],
+      importedCharacterIds: new Set([...s.importedCharacterIds, ...selected.map((c) => c.id)]),
+    }));
+    setShowLibraryModal(false);
   };
 
   const handleSubmit = async () => {
@@ -364,21 +438,151 @@ export default function WizardPage() {
                 className="w-full h-24 bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-gray-200 placeholder-gray-600 focus:outline-none focus:border-cyan-500/50 resize-none"
               />
             </div>
-            <Button onClick={handleGenerateCharacters} disabled={isGeneratingChars || !state.theme}>
-              <Wand2 size={16} className="mr-2" />
-              {isGeneratingChars ? "Generating..." : "Generate Characters"}
-            </Button>
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={handleGenerateCharacters} disabled={isGeneratingChars || !state.theme}>
+                <Wand2 size={16} className="mr-2" />
+                {isGeneratingChars ? "Generating..." : "Generate Characters"}
+              </Button>
+              <Button variant="secondary" onClick={openLibraryModal}>
+                <Download size={16} className="mr-2" />
+                Import from Library
+              </Button>
+            </div>
             {state.characters.length > 0 && (
               <div className="space-y-3">
-                {state.characters.map((char) => (
-                  <div key={char.id} className="bg-gray-900/50 border border-gray-700/50 rounded-lg p-4">
-                    <p className="text-cyan-400 font-semibold">{char.name}</p>
-                    <p className="text-gray-400 text-sm mt-1">{char.personality}</p>
-                    <p className="text-gray-500 text-xs mt-2 line-clamp-2">{char.backstory}</p>
-                  </div>
-                ))}
+                {state.characters.map((char) => {
+                  const isImported = state.importedCharacterIds.has(char.id);
+                  return (
+                    <div
+                      key={char.id}
+                      className={`bg-gray-900/50 border rounded-lg p-4 ${
+                        isImported ? "border-cyan-700/40" : "border-gray-700/50"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {isImported && char.portrait_path && (
+                          <div
+                            className="w-10 h-10 rounded-lg border border-gray-700 flex items-center justify-center flex-shrink-0 overflow-hidden"
+                            style={{ backgroundColor: "#828181" }}
+                          >
+                            <img
+                              src={`${API_BASE}/api/characters/${char.id}/portrait`}
+                              alt={char.name}
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-cyan-400 font-semibold">{char.name}</p>
+                            {isImported && (
+                              <span className="px-1.5 py-0.5 bg-cyan-900/40 text-cyan-400 text-[10px] rounded-full border border-cyan-700/50">
+                                Imported
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-gray-400 text-sm mt-1">{char.personality}</p>
+                          <p className="text-gray-500 text-xs mt-2 line-clamp-2">{char.backstory}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
+
+            {/* Library Import Modal */}
+            <Modal
+              open={showLibraryModal}
+              onClose={() => setShowLibraryModal(false)}
+              title="Import from Library"
+              maxWidth="max-w-3xl"
+            >
+              <div className="space-y-4">
+                {isLoadingLibrary ? (
+                  <Loading text="Loading library..." />
+                ) : libraryCharacters.length === 0 ? (
+                  <p className="text-center py-8 text-gray-500">
+                    No characters in your library yet.
+                  </p>
+                ) : (
+                  <div className="max-h-[50vh] overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-3 pr-1">
+                    {libraryCharacters.map((libChar) => {
+                      const isSelected = selectedLibraryIds.has(libChar.id);
+                      const alreadyImported = state.importedCharacterIds.has(libChar.id);
+                      return (
+                        <button
+                          key={libChar.id}
+                          onClick={() => !alreadyImported && toggleLibrarySelection(libChar.id)}
+                          disabled={alreadyImported}
+                          className={`
+                            relative text-left rounded-xl border p-3 transition-all
+                            ${alreadyImported
+                              ? "border-cyan-700/30 bg-cyan-900/10 opacity-50 cursor-not-allowed"
+                              : isSelected
+                                ? "border-cyan-400 bg-cyan-400/10 cursor-pointer"
+                                : "border-gray-700/50 bg-gray-900/50 hover:border-gray-600 cursor-pointer"
+                            }
+                          `}
+                        >
+                          {/* Selection indicator */}
+                          {isSelected && (
+                            <div className="absolute top-2 right-2 w-5 h-5 bg-cyan-400 rounded-full flex items-center justify-center">
+                              <Check size={12} className="text-gray-900" />
+                            </div>
+                          )}
+                          {alreadyImported && (
+                            <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-cyan-800/50 text-cyan-400 text-[9px] rounded-full">
+                              Added
+                            </div>
+                          )}
+                          {/* Portrait */}
+                          <div
+                            className="w-full aspect-square rounded-lg border border-gray-700 flex items-center justify-center overflow-hidden mb-2"
+                            style={{ backgroundColor: "#828181" }}
+                          >
+                            {libChar.has_portrait ? (
+                              <img
+                                src={`${API_BASE}/api/characters/${libChar.id}/portrait`}
+                                alt={libChar.name}
+                                className="w-full h-full object-contain"
+                              />
+                            ) : (
+                              <User size={24} className="text-gray-500" />
+                            )}
+                          </div>
+                          <p className="text-gray-200 text-sm font-medium truncate">
+                            {libChar.name}
+                          </p>
+                          <p className="text-gray-500 text-xs mt-0.5 line-clamp-2">
+                            {libChar.personality}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex justify-end gap-3 pt-2 border-t border-gray-800">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowLibraryModal(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleImportSelected}
+                    disabled={selectedLibraryIds.size === 0}
+                  >
+                    <Download size={14} className="mr-1.5" />
+                    Import Selected ({selectedLibraryIds.size})
+                  </Button>
+                </div>
+              </div>
+            </Modal>
           </div>
         );
 
@@ -418,11 +622,24 @@ export default function WizardPage() {
                 <div>
                   <span className="text-xs text-gray-500 uppercase">Characters ({state.characters.length})</span>
                   <div className="flex flex-wrap gap-1.5 mt-1">
-                    {state.characters.map((c) => (
-                      <span key={c.id} className="px-2 py-0.5 bg-gray-800 text-gray-300 text-xs rounded-full">
-                        {c.name}
-                      </span>
-                    ))}
+                    {state.characters.map((c) => {
+                      const isImported = state.importedCharacterIds.has(c.id);
+                      return (
+                        <span
+                          key={c.id}
+                          className={`px-2 py-0.5 text-xs rounded-full ${
+                            isImported
+                              ? "bg-cyan-900/40 text-cyan-300 border border-cyan-700/40"
+                              : "bg-gray-800 text-gray-300"
+                          }`}
+                        >
+                          {c.name}
+                          {isImported && (
+                            <span className="ml-1 text-[10px] text-cyan-500">imported</span>
+                          )}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

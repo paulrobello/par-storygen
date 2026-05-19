@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from storygen.storage import paths
 
 from storygen_api.deps import get_app_config, get_session_manager
-from storygen_api.routers import characters, games, images, settings, tts, wizard
+from storygen_api.routers import characters, games, images, presets, settings, tts, wizard
 from storygen_api.routers import ws as ws_router
 
 
@@ -50,6 +50,7 @@ def create_app() -> FastAPI:
     app.include_router(settings.router)
     app.include_router(images.router)
     app.include_router(characters.router)
+    app.include_router(presets.router)
     app.include_router(tts.router)
     app.include_router(ws_router.router, prefix="/api")
 
