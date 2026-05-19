@@ -27,6 +27,7 @@ interface TreeNode {
   x: number;
   y: number;
   isCurrent: boolean;
+  isOnPath: boolean;
   isEnding: boolean;
   isRoot: boolean;
   isGhost: boolean; // unvisited choice — no real node yet
@@ -56,6 +57,22 @@ function buildTree(
       list.push({ id: `__ghost_${e.parent_id}_${e.choice_text}`, choice: e.choice_text, ghost: true });
     }
     childrenOf.set(e.parent_id, list);
+  }
+
+  // Compute root-to-current path for highlighting
+  const parentMap = new Map<string, string>();
+  for (const e of edges) {
+    if (e.child_id && !parentMap.has(e.child_id)) {
+      parentMap.set(e.child_id, e.parent_id);
+    }
+  }
+  const pathIds = new Set<string>();
+  {
+    let cur: string | undefined = currentId;
+    while (cur) {
+      pathIds.add(cur);
+      cur = parentMap.get(cur);
+    }
   }
 
   // Count leaves for column width
@@ -97,6 +114,7 @@ function buildTree(
       x: pos.x * (NODE_W + H_GAP),
       y: pos.y * (NODE_H + V_GAP),
       isCurrent: id === currentId,
+      isOnPath: pathIds.has(id),
       isEnding: node?.is_ending ?? false,
       isRoot: id === rootId,
       isGhost,
@@ -152,6 +170,9 @@ function TreeNodeBox({
     strokeDasharray = "4 3";
   } else if (node.isCurrent) {
     fill = "#0e3a4a";
+    stroke = "#06b6d4";
+  } else if (node.isOnPath) {
+    fill = "#0c2d3a";
     stroke = "#06b6d4";
   } else if (node.isEnding) {
     fill = "#3b1f0b";
@@ -241,7 +262,7 @@ function TreeEdge({ parent, child }: { parent: TreeNode; child: TreeNode }) {
   const y2 = child.y;
   const midX = (x1 + x2) / 2;
 
-  const isActive = child.isCurrent;
+  const isOnPath = child.isOnPath && parent.isOnPath;
   const isGhost = child.isGhost;
 
   return (
@@ -249,8 +270,8 @@ function TreeEdge({ parent, child }: { parent: TreeNode; child: TreeNode }) {
       <path
         d={`M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`}
         fill="none"
-        stroke={isActive ? "#06b6d4" : isGhost ? "#374151" : "#334155"}
-        strokeWidth={isActive ? 2 : 1}
+        stroke={isOnPath ? "#06b6d4" : isGhost ? "#374151" : "#334155"}
+        strokeWidth={isOnPath ? 2 : 1}
         strokeDasharray={isGhost ? "4 3" : undefined}
         opacity={isGhost ? 0.5 : 1}
       />
@@ -260,7 +281,7 @@ function TreeEdge({ parent, child }: { parent: TreeNode; child: TreeNode }) {
         y={(y1 + y2) / 2 - 6}
         textAnchor="middle"
         fontSize={9}
-        fill={isActive ? "#06b6d4" : isGhost ? "#4b5563" : "#64748b"}
+        fill={isOnPath ? "#06b6d4" : isGhost ? "#4b5563" : "#64748b"}
         className="pointer-events-none select-none"
       >
         {child.choiceText.length > 16 ? child.choiceText.slice(0, 14) + "…" : child.choiceText}
