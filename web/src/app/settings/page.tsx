@@ -125,6 +125,7 @@ export default function SettingsPage() {
   const loadSettings = useSettingsStore((s) => s.loadSettings);
   const [form, setForm] = useState<SettingsResponse | null>(null);
   const [saving, setSaving] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     loadSettings();
@@ -139,8 +140,14 @@ export default function SettingsPage() {
   const handleSave = async () => {
     if (!form) return;
     setSaving(true);
-    await updateSettings(form);
+    try {
+      await updateSettings(form);
+      setToastMessage("Settings saved");
+    } catch {
+      setToastMessage("Failed to save settings");
+    }
     setSaving(false);
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
   const update = <K extends keyof SettingsResponse>(key: K, value: SettingsResponse[K]) =>
@@ -417,6 +424,12 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {toastMessage && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-200 z-50 animate-in fade-in duration-150">
+          {toastMessage}
+        </div>
+      )}
     </GameLayout>
   );
 }
