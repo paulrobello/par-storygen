@@ -47,9 +47,9 @@ keywords = [
 ]
 requires-python = ">=3.13"
 dependencies = [
-    "textual>=8.2.6",
+    "textual>=8.2.7",
     "pydantic>=2.9",
-    "pydantic-ai>=1.97.0",
+    "pydantic-ai>=1.99.0",
     "openai>=2.37.0",
     "rich>=15.0.0",
     "par-textual-image>=0.1.0",
@@ -82,6 +82,14 @@ Discussions = "https://github.com/paulrobello/par-storygen/discussions"
 storygen = "storygen.main:app"
 storygen-api = "storygen_api.main:cli"
 
+[project.optional-dependencies]
+api = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "websockets>=12.0",
+    "python-multipart>=0.0.9",
+]
+
 [build-system]
 requires = [
     "hatchling",
@@ -100,15 +108,6 @@ dev = [
     "pre-commit>=4.6.0",
     "hatchling>=1.29.0",
 ]
-
-[project.optional-dependencies]
-api = [
-    "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.30.0",
-    "websockets>=12.0",
-    "python-multipart>=0.0.9",
-]
-
 
 [tool.hatch.version]
 path = "src/storygen/__init__.py"
