@@ -7,9 +7,11 @@ non-navigable leaves so the user can see where the story can still branch.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import sys
+from collections.abc import Callable, Sequence
 from typing import ClassVar
 
+from rich.cells import cell_len
 from rich.segment import Segment
 from rich.style import Style
 from textual.app import ComposeResult
@@ -70,43 +72,133 @@ def _format_label(node: StoryNode, *, is_current: bool, is_on_path: bool = False
     return f"{marker} {body} {suffix}".rstrip()
 
 
-class _StoryTree(Tree[dict[str, object]]):
-    """Tree subclass that highlights the root-to-current path with accent color.
+_CYAN = Style(color="cyan")
 
-    Overrides ``_render_line`` so that every segment (guides + label) for a
-    path node gets recolored cyan.  ``render_label`` alone can't reach the
-    guide characters because Textual builds them from CSS component styles
-    inside ``_render_line``.
+
+def _node_id(node: TreeNode[dict[str, object]]) -> str | None:
+    """Return the StoryNode id for a TreeNode, or None (unexplored leaf / root)."""
+    data = node.data
+    if not isinstance(data, dict):
+        return None
+    nid = data.get("node_id")
+    return nid if isinstance(nid, str) else None
+
+
+def _recolour(strip: Strip, x1: int, span: tuple[int, int]) -> Strip:
+    """Return a new Strip with cyan applied to cells inside ``[span[0], span[1])``.
+
+    Segments fully outside the span are kept as-is; fully-inside segments are
+    recoloured wholesale; segments that straddle the span are split at
+    character boundaries so only the cells inside the span change colour.
+    """
+    cs_start, cs_end = span
+    new_segments: list[Segment] = []
+    pos = 0  # cell position within the (already-cropped) strip
+    for seg in strip._segments:  # pyright: ignore[reportPrivateUsage]
+        text = seg.text
+        seg_cells = cell_len(text)
+        base = seg.style or Style()
+        abs_start = x1 + pos
+        abs_end = abs_start + seg_cells
+
+        if abs_end <= cs_start or abs_start >= cs_end:
+            new_segments.append(seg)
+        elif cs_start <= abs_start and abs_end <= cs_end:
+            new_segments.append(Segment(text, base + _CYAN, seg.control))
+        else:
+            # Partial overlap — split per character (e.g. ├ vs ── ).
+            run_text: list[str] = []
+            run_colored: bool | None = None
+            col = abs_start
+            for ch in text:
+                ch_cells = cell_len(ch)
+                ch_in = col < cs_end and col + ch_cells > cs_start
+                if run_colored is None or ch_in == run_colored:
+                    run_text.append(ch)
+                    run_colored = ch_in
+                else:
+                    style = base + _CYAN if run_colored else base
+                    new_segments.append(Segment("".join(run_text), style, seg.control))
+                    run_text = [ch]
+                    run_colored = ch_in
+                col += ch_cells
+            if run_text:
+                style = base + _CYAN if run_colored else base
+                new_segments.append(Segment("".join(run_text), style, seg.control))
+        pos += seg_cells
+    return Strip(new_segments)
+
+
+class _StoryTree(Tree[dict[str, object]]):
+    """Tree subclass that highlights the root-to-current path with cyan.
+
+    Cyan is applied as follows:
+
+    - Path-node rows: the full branch connector (├── or └──) + expand icon
+      + label. Ancestor guide columns to the left stay uncoloured.
+    - Rows that diverge from the path: only when the divergent ancestor sits
+      *before* the corresponding path node among its siblings (i.e. the row
+      lies physically between two consecutive path-node rows in the display).
+      Only the leading T-junction character of the divergence column is
+      coloured. Rows whose divergence sits *after* the path node, plus
+      descendants of the current node, get nothing.
     """
 
     def __init__(
         self,
-        path_ids: frozenset[str],
+        path_node_ids: tuple[str, ...],
         label: str,
         data: dict[str, object],
         **kwargs: object,
     ) -> None:
         super().__init__(label, data=data, **kwargs)  # type: ignore[no-untyped-def]
-        self._path_ids = path_ids
+        self._path_node_ids = path_node_ids
+        self._path_ids = frozenset(path_node_ids)
 
-    def update_path(self, path_ids: frozenset[str]) -> None:
-        self._path_ids = path_ids
+    def update_path(self, path_node_ids: tuple[str, ...]) -> None:
+        self._path_node_ids = path_node_ids
+        self._path_ids = frozenset(path_node_ids)
+
+    def _color_span(
+        self, path: Sequence[TreeNode[dict[str, object]]]
+    ) -> tuple[int, int] | None:
+        """Return the column span ``[start, end)`` to colour, or None for no colour."""
+        gd = self.guide_depth
+
+        if _node_id(path[-1]) in self._path_ids:
+            # Path-node row: branch + icon + label start at (depth-1)*gd.
+            # Root (depth 0) has no branch; clamp to 0.
+            return (max(0, (len(path) - 2) * gd), sys.maxsize)
+
+        # Find the depth at which this row first leaves the path lineage.
+        for d in range(1, len(path)):
+            if _node_id(path[d]) not in self._path_ids:
+                break
+        else:
+            return None  # Should be unreachable: row isn't on path, must diverge somewhere.
+
+        if d >= len(self._path_node_ids):
+            return None  # Below current node — no colour.
+
+        # Walk siblings in order: if we hit the divergent node before the
+        # path target, this row sits *between* path[d-1] and path[d].
+        target_id = self._path_node_ids[d]
+        row_div_node = path[d]
+        for child in path[d - 1].children:
+            if child is row_div_node:
+                t_col = (d - 1) * gd
+                return (t_col, t_col + 1)
+            if _node_id(child) == target_id:
+                return None
+        return None
 
     def _render_line(self, y: int, x1: int, x2: int, base_style: Style) -> Strip:
         strip = super()._render_line(y, x1, x2, base_style)
         tree_lines = self._tree_lines
         if y >= len(tree_lines):
             return strip
-        node = tree_lines[y].path[-1]
-        data = node.data or {}
-        nid = data.get("node_id")
-        if isinstance(nid, str) and nid in self._path_ids:
-            cyan = Style(color="cyan")
-            strip = Strip(
-                Segment(seg.text, (seg.style or Style()) + cyan, seg.control)
-                for seg in strip._segments  # pyright: ignore[reportPrivateUsage]
-            )
-        return strip
+        span = self._color_span(tree_lines[y].path)
+        return strip if span is None else _recolour(strip, x1, span)
 
 
 class GraphScreen(Screen[None]):
@@ -155,14 +247,17 @@ class GraphScreen(Screen[None]):
         # Map from node_id -> TreeNode so we can scroll/highlight the current
         # node after the tree is built.
         self._node_widgets: dict[NodeId, TreeNode[dict[str, object]]] = {}
-        # Compute the root-to-current path for highlighting.
-        self._path_ids: frozenset[str] = frozenset(
+        # Compute the root-to-current path for highlighting (ordered tuple
+        # so _StoryTree can do sibling-order comparisons; frozenset for fast
+        # membership checks elsewhere in this screen).
+        self._path_node_ids: tuple[str, ...] = tuple(
             n.id for n in path_from_root(save, save.current_node_id)
         )
+        self._path_ids: frozenset[str] = frozenset(self._path_node_ids)
         root = save.nodes[save.root_node_id]
         root_data: dict[str, object] = {"node_id": root.id}
         self._tree: _StoryTree = _StoryTree(
-            self._path_ids,
+            self._path_node_ids,
             _format_label(
                 root,
                 is_current=save.current_node_id == root.id,
@@ -362,10 +457,11 @@ class GraphScreen(Screen[None]):
             return
         self._apply_header()
         # Recompute path — prune may have moved current_node_id.
-        self._path_ids = frozenset(
+        self._path_node_ids = tuple(
             n.id for n in path_from_root(self._save, self._save.current_node_id)
         )
-        self._tree.update_path(self._path_ids)
+        self._path_ids = frozenset(self._path_node_ids)
+        self._tree.update_path(self._path_node_ids)
         # Rebuild the tree from scratch.
         self._tree.clear()
         self._node_widgets.clear()
