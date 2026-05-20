@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Graph path highlighting precision** — In the graph view, cyan path highlighting now follows the direct root-to-current lineage only. Path-node rows show cyan on the branch connector (├── / └──), expand icon, and label; ancestor guide columns stay default. "Between" rows (siblings of a path node that come before it, plus their descendants) get only the single T-junction cell highlighted. Rows past where the path branches off and descendants of the current node are no longer highlighted. The internal `_StoryTree` was refactored to compute a single column span per row and split segments at character boundaries for partial cells.
+
 ## [0.5.0] - 2026-05-18
 
 ### Fixed
