@@ -23,10 +23,11 @@ from storygen.llm.models import (
     Theme,
     Tone,
 )
-from storygen.pipeline import (
-    BeatPipeline,
-    PipelineCallbacks,
-    _pacing_hint_for_depth,  # pyright: ignore[reportPrivateUsage]
+from storygen.pipeline import BeatPipeline, PipelineCallbacks
+
+# ARC-011: pacing_hint_for_depth moved to pipeline_prompts.py.
+from storygen.pipeline_prompts import (
+    pacing_hint_for_depth as _pacing_hint_for_depth,
 )
 from storygen.storage.save import GameSave, save_game
 

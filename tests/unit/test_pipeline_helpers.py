@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from storygen.core.models import one_sentence as _one_sentence
 from storygen.llm.models import (
     ImageProviderConfig,
     StoredChoice,
@@ -13,11 +14,14 @@ from storygen.llm.models import (
     Theme,
     Tone,
 )
-from storygen.pipeline import (
-    _build_beat_prompt,  # pyright: ignore[reportPrivateUsage]
-    _one_sentence,  # pyright: ignore[reportPrivateUsage]
-    _pacing_hint_for_depth,  # pyright: ignore[reportPrivateUsage]
-    _resolve_chosen_text,  # pyright: ignore[reportPrivateUsage]
+from storygen.pipeline_prompts import (
+    build_beat_prompt as _build_beat_prompt,
+)
+from storygen.pipeline_prompts import (
+    pacing_hint_for_depth as _pacing_hint_for_depth,
+)
+from storygen.pipeline_prompts import (
+    resolve_chosen_text as _resolve_chosen_text,
 )
 from storygen.storage.save import GameSave
 
