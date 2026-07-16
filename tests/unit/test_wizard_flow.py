@@ -10,7 +10,8 @@ from storygen.images.base import ReferencePortrait
 from storygen.images.constants import PORTRAIT_QUALITY, PORTRAIT_SIZE, SCENE_QUALITY, SCENE_SIZE
 from storygen.images.pricing import image_cost
 from storygen.llm.models import Character, ImageProviderConfig, TextProviderConfig, Theme
-from storygen.screens.wizard import WizardFlow, WizardStep
+from storygen.runtime.wizard_flow import WizardFlow
+from storygen.screens.wizard import WizardStep
 
 _TEXT_CONFIG = TextProviderConfig(provider="openai", model="gpt-4o-mini")
 _IMAGE_CONFIG = ImageProviderConfig(provider="openai", model="gpt-image-2")

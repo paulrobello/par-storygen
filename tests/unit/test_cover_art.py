@@ -20,7 +20,7 @@ from storygen.llm.models import (
     Theme,
     Tone,
 )
-from storygen.screens.wizard import WizardFlow
+from storygen.runtime.wizard_flow import WizardFlow
 from storygen.storage import app_state, paths
 from storygen.storage.save import GameSave, save_game
 
