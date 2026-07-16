@@ -92,7 +92,7 @@ class _BeatAgentAdapter:
         if self._on_usage is not None:
             # Never let usage tracking crash a beat.
             with contextlib.suppress(Exception):
-                self._on_usage(result.usage())  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                self._on_usage(result.usage)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
         if raw_sink is not None:
             # Debug-only raw cache; must never crash the pipeline.
             with contextlib.suppress(Exception):
@@ -120,7 +120,7 @@ class _SummaryAdapter:
         result = await self._agent.run(path_summary_prompt)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
         if self._on_usage is not None:
             with contextlib.suppress(Exception):
-                self._on_usage(result.usage())  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                self._on_usage(result.usage)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
         if raw_sink is not None:
             with contextlib.suppress(Exception):
                 raw_sink(result.all_messages_json())  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
@@ -148,7 +148,7 @@ class _IllustrationAdapter:
         if self._on_usage is not None:
             # Never let usage tracking crash a beat.
             with contextlib.suppress(Exception):
-                self._on_usage(result.usage())  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                self._on_usage(result.usage)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
         if raw_sink is not None:
             with contextlib.suppress(Exception):
                 raw_sink(result.all_messages_json())  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
@@ -435,7 +435,7 @@ class StoryGenApp(App[None]):
             return
         # Usage capture is best-effort; don't break the backfill on failure.
         with contextlib.suppress(Exception):
-            record_usage_on_save(save, model=save.text_config.model, usage=result.usage())
+            record_usage_on_save(save, model=save.text_config.model, usage=result.usage)
         # Debug-only raw-exchange cache. Keyed to the root node id because
         # the blurb lives on the root. Suppress broadly; never crash load.
         if app_state.llm_cache_enabled():

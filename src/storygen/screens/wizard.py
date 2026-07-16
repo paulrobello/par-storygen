@@ -197,13 +197,13 @@ class WizardFlow:
 
     def _record_result_usage(self, result: object) -> None:
         """Best-effort: pull a RunUsage off ``result`` and tally it."""
-        usage_fn = getattr(result, "usage", None)
-        if usage_fn is None:
-            return
-        try:
-            usage = usage_fn()
-        except Exception:
-            return
+        usage = getattr(result, "usage", None)
+        # pydantic-ai 2.x exposes ``usage`` as a RunUsage attribute; 1.x exposed a callable.
+        if callable(usage):
+            try:
+                usage = usage()
+            except Exception:
+                return
         if usage is None:
             return
         self._usage_totals.record(
