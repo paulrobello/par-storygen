@@ -305,6 +305,7 @@ class WizardScreen(Screen[None]):
         """Open the library browser; on pick, append to in-progress cast."""
         if self.current_step != WizardStep.CHARACTERS:
             return
+        # self.app is typed App[None] (Textual base) but is StoryGenApp at runtime
         self.app.push_screen(  # pyright: ignore[reportUnknownMemberType]
             CharacterCatalogScreen(),
             self._on_library_pick,
@@ -418,6 +419,7 @@ class WizardScreen(Screen[None]):
         """Open the reference image modal; on confirm, append a new character."""
         if self.current_step != WizardStep.CHARACTERS:
             return
+        # self.app is typed App[None] (Textual base) but is StoryGenApp at runtime
         self.app.push_screen(  # pyright: ignore[reportUnknownMemberType]
             ReferenceImageModal("New Character", default_style=self._art_style),
             self._on_ref_image_pick,
@@ -471,6 +473,9 @@ class WizardScreen(Screen[None]):
         else:
             # Style-transfer: generate portrait via image provider.
             try:
+                # WizardFlow.image_provider is Optional[ImageProviderLike]; pyright
+                # can't narrow from the runtime guard above (_flow is initialized
+                # before this branch is reachable).
                 image_provider = self._flow.image_provider  # type: ignore[union-attr]
                 generated = await image_provider.generate_portrait(  # type: ignore[union-attr]
                     "As shown in reference image",
@@ -553,6 +558,8 @@ class WizardScreen(Screen[None]):
         self._step_label.update(f"Step: {self.current_step.name}")
         # Hide every step widget; the active step re-shows what it needs.
         for widget in self._step_widgets():
+            # _step_widgets returns a heterogeneous Iterable[Widget]; pyright can't
+            # narrow every element to the subset that has a `display` attribute.
             widget.display = False  # pyright: ignore[reportAttributeAccessIssue]
 
         if self.current_step == WizardStep.THEME:
@@ -728,6 +735,7 @@ class WizardScreen(Screen[None]):
                 return
             self._apply_preset(preset)
 
+        # self.app is typed App[None] (Textual base) but is StoryGenApp at runtime
         self.app.push_screen(PresetPickerModal(presets), _on_pick)  # pyright: ignore[reportUnknownMemberType]
 
     def _apply_preset(self, preset: StoryPreset) -> None:

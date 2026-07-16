@@ -71,7 +71,7 @@ def create_app() -> FastAPI:
         )
 
     @app.get("/api/health")
-    async def _health() -> dict[str, str]:  # pyright: ignore[reportUnusedFunction]
+    async def _health() -> dict[str, str]:  # pyright: ignore[reportUnusedFunction] - registered as a FastAPI route by the @app.get decorator above; pyright doesn't model the decorator's registration side-effect
         return {"status": "ok"}
 
     return app
@@ -83,6 +83,9 @@ _cli_app = typer.Typer(name="storygen-api", help="par-storygen HTTP API server")
 
 @_cli_app.command()
 def serve(
+    # typer.Option returns a dynamically-typed placeholder that typer resolves at
+    # runtime; pyright sees the placeholder's type as unknown. This is typer's
+    # documented pattern — see https://typer.tiangolo.com/tutorial/options/
     host: str = typer.Option("127.0.0.1", help="Bind host (loopback by default)"),  # type: ignore[reportUnknownMemberType]
     port: int = typer.Option(8000, help="Bind port"),  # type: ignore[reportUnknownMemberType]
     reload: bool = typer.Option(False, help="Enable auto-reload"),  # type: ignore[reportUnknownMemberType]

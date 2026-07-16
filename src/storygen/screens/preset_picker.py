@@ -47,6 +47,7 @@ class PresetPickerScreen(Screen[None]):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "preset-screen-back":
+            # self.app is typed App[None] (Textual base) but is StoryGenApp at runtime
             self.app.pop_screen()  # pyright: ignore[reportUnknownMemberType]
 
     @work(exit_on_error=False)
@@ -56,9 +57,15 @@ class PresetPickerScreen(Screen[None]):
         from storygen.llm.provider_factory import build_text_model
         from storygen.screens.wizard import WizardFlow
 
+        # self.app is typed App[None] (Textual base) but is StoryGenApp at runtime;
+        # reaching into its privates (_config, _image_provider, _start_game) is the
+        # documented escape hatch per CLAUDE.md.
         app = self.app  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
         config = app._config  # type: ignore[attr-defined]  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
 
+        # build_text_model + the agent_mod.build_* family are intentionally
+        # loose-typed (pydantic-ai adapters carry `# type: ignore[no-untyped-def]`,
+        # see CLAUDE.md) — the Unknown cascade here is the downstream cost.
         text_model = build_text_model(config.text_config)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
         flow = WizardFlow(
             text_config=config.text_config,  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
@@ -88,6 +95,7 @@ class PresetPickerScreen(Screen[None]):
             theme = await flow.propose_theme(preset.theme)
 
             tone = Tone(
+                # Tone.preset is a Literal; StoryPreset.tone_preset is a wider str
                 preset=preset.tone_preset,  # pyright: ignore[reportArgumentType]
                 custom_descriptor=preset.tone_descriptor or None,
             )
@@ -112,6 +120,7 @@ class PresetPickerScreen(Screen[None]):
         await app._start_game(save)  # type: ignore[attr-defined]
 
     def action_back(self) -> None:
+        # self.app is typed App[None] (Textual base) but is StoryGenApp at runtime
         self.app.pop_screen()  # pyright: ignore[reportUnknownMemberType]
 
     DEFAULT_CSS = """
