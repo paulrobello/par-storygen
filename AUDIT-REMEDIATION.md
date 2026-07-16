@@ -4,7 +4,40 @@
 > **Audit Date**: 2026-07-16 (see `AUDIT.md`)
 > **Remediation Date**: 2026-07-16
 > **Severity Filter Applied**: `all` (all phases executed)
-> **Base commit**: `a8f8c91` → **Head**: `33a3dd5` (branch `fix/audit-remediation`, 22 commits)
+> **Base commit**: `a8f8c91` → **Head**: `74913f3` (branch `fix/audit-remediation`, 28 commits)
+
+---
+
+## Follow-up Session (2026-07-16)
+
+A second pass closed six items the original report had left partial/deferred.
+All six are now **fully resolved**; only the God-screen *controller extraction*
+(ARC-012/QA-006 — the large backlog refactor) and the external ARC-017 remain.
+
+- **[ARC-011]** `PrefetchCoordinator` extracted into its own module
+  (`src/storygen/pipeline_prefetch.py`); `pipeline.py` 973 → 862 LOC. The
+  branch-prefetch lifecycle (task registry, failure-log dedup, concurrency
+  semaphore) is now a cohesive class wrapping the bound `advance` callable.
+  `BeatPipeline` keeps `start_prefetch`/`await_prefetched`/`cancel_all_prefetches`
+  as thin delegators so the public API is unchanged; recursion stays bounded by
+  `advance`'s `suppress_side_effects` guard. (`413bb28`)
+- **[QA-002]** All four tractable complexity hotspots now use dispatch tables:
+  `wizard._advance_worker`, `play.check_action`, `settings._save_settings`
+  (validator-fold), and `portraits.on_button_pressed` (prefix→handler table).
+  `pipeline.advance` remains as intrinsic complexity per the audit. (`6074625`, `24266ea`)
+- **[ARC-015]** Playwright e2e added (`web/e2e/play.spec.ts` + config) — drives
+  the `/play/[gameId]` route against a fully mocked REST + WebSocket backend
+  and asserts the theme heading, narration, and choice buttons render in real
+  Chromium. Hermetic (no live FastAPI/LLM); wired as a parallel `web-e2e` CI
+  job. (`74913f3`)
+- **[DOC-014]** One-line module docstrings added to all `storygen_api` files
+  that lacked them; `routers/ws.py` now documents the WS event contract.
+- **[DOC-020]** Verified already-satisfied — `BeatPipeline`/`advance`/all four
+  protocols and `StoryGenApp` already carry class/method docstrings.
+- **[DOC-021]** `[project.urls] Documentation` repointed at `docs/ARCHITECTURE.md`.
+
+Gate after follow-up: `make checkall` green (886 passed, ruff 0, pyright 0);
+web vitest 11 passed, `next build` clean, Playwright e2e 1 passed.
 
 ---
 
@@ -90,46 +123,19 @@ No regressions. The orchestrator independently re-ran every gate after each phas
 
 ## Requires Manual Intervention 🔧
 
-These could not be safely completed in an automated pass. They are **long-term backlog** items (the audit's own roadmap defers them), not blockers. The green gate is unaffected.
+After the follow-up session, only two items remain — neither is a blocker, and the green gate is unaffected. (ARC-011, ARC-015, DOC-014, DOC-020, DOC-021, and the QA-002 hotspots moved to Resolved — see the Follow-up Session section above.)
 
-### [ARC-011] `pipeline.py` — `PrefetchCoordinator` extraction (Partial)
-- **Done**: pure prompt helpers extracted to `pipeline_prompts.py` (pipeline.py 1077→973 LOC).
-- **Why deferred**: prefetch lifecycle is tightly coupled to `BeatPipeline`'s instance state (`_prefetch_tasks`/`_prefetch_failure_logged`/`_prefetch_semaphore`) and `advance()`'s cache-hit path — not a clean, obviously-safe move.
-- **Recommended approach**: a dedicated follow-up that either passes the private fields into a coordinator or does a larger responsibility split, with integration-test coverage first.
-- **Estimated effort**: medium.
-
-### [ARC-012 / QA-002 / QA-006] God screens + complexity (Partial)
-- **Done**: dispatch-table refactors for `wizard._advance_worker` (cc 34→low) and `play.check_action` (cc 31→low) — behavior-preserving, all screen tests green.
-- **Why deferred**: `settings._save_settings` is a linear validation pipeline (not a dispatch candidate — needs a validator-list pattern); `portraits.on_button_pressed` couples to widget identity + per-character state in ways that resist mechanical extraction.
-- **Recommended approach**: dedicated follow-up per screen with integration-test coverage before decomposing; consider per-section controller classes.
+### [ARC-012 / QA-006] God-screen controller decomposition (Partial)
+- **Done**: all four QA-002 complexity hotspots now use dispatch tables (`wizard._advance_worker`, `play.check_action`, `settings._save_settings` validator-fold, `portraits.on_button_pressed` prefix table); `pipeline.advance` left as intrinsic complexity per the audit.
+- **Why deferred**: the remaining ask is the larger structural one — extracting per-section controller classes so the four screens (`settings.py` 1475, `wizard.py` 1345, `play.py` 1140, `portraits.py` 1106 LOC) become thin compose-and-delegate shells. That is a dedicated, per-screen refactor with integration-test coverage first, not an automated pass.
+- **Recommended approach**: one follow-up per screen; promote the dispatch tables into small controller classes; screens shrink to composition.
 - **Estimated effort**: large.
-
-### [ARC-015] Playwright e2e (Partial)
-- **Done**: vitest + jsdom layer (config + `useWebSocket` contract, 11 tests).
-- **Why deferred**: an end-to-end Playwright test requires a running `api-dev`/`web-dev` pair and browser download — heavier setup.
-- **Estimated effort**: small-medium.
-
-### [DOC-014] `storygen_api` module docstrings — routers/ws/main (Partial)
-- **Done**: docstrings added to `deps.py`, `session.py`, `schemas.py` (the files the Documentation agent owned).
-- **Why deferred**: the router/ws/main files were owned by the Security agent in the same round; they still lack one-line module docstrings.
-- **Recommended approach**: a quick follow-up sweep adding one-line docstrings to `routers/*.py`, `ws.py`, `main.py`.
-- **Estimated effort**: small.
-
-### [DOC-020] `pipeline.py` headline-symbol docstrings (Partial)
-- **Done**: `StoryGenApp` class docstring.
-- **Why deferred**: `pipeline.run`/`generate_portrait`/`generate_scene` live in `pipeline.py`, which other agents owned during the doc round.
-- **Estimated effort**: small.
-
-### [DOC-021] `pyproject.toml` Documentation URL (Deferred)
-- **Why deferred**: `pyproject.toml` was owned by other agents in-round.
-- **Recommended approach**: repoint `[project.urls] Documentation` at a docs index (or leave as README). Trivial.
-- **Estimated effort**: trivial.
 
 ### [ARC-017] par-mem friction (Skipped — external)
 - Already filed to `~/Repos/PAR-MEM-FEEDBACK.md` by the audit's architecture agent. No project code change.
 
 ### Incidental observation (not an audit item)
-- `web/src/components/story/AudioPlayer.tsx` imports `Volume2`/`VolumeX` from `lucide-react` but never uses them. **Pre-existing** (the ARC-016 sweep only added the `@/lib/config` import; it did not touch these). Flagged per surgical-change discipline; not deleted.
+- `web/src/components/story/AudioPlayer.tsx` imports `Volume2`/`VolumeX` from `lucide-react` but never uses them. **Pre-existing**; flagged per surgical-change discipline, not deleted.
 
 ---
 
@@ -146,14 +152,13 @@ Notable new modules/files:
 - `.github/workflows/ci.yml` — push/PR gate (ARC-006)
 - `web/src/lib/config.ts`, `web/vitest.{config,setup}.ts`, `web/src/{lib/config,hooks/useWebSocket}.test.ts` — web config + tests (ARC-015/016)
 
-Full commit list (`a8f8c91..33a3dd5`): see `git log --oneline a8f8c91..HEAD`.
+Full commit list (`a8f8c91..74913f3`): see `git log --oneline a8f8c91..HEAD`.
 
 ---
 
 ## Next Steps
 
-1. **Review the Partial/Manual items above** and assign the backlog refactors (ARC-011 PrefetchCoordinator, ARC-012 screen decomposition, DOC-014/020/021) — none are blockers.
-2. **Sweep `DOC-014` docstrings** into the `routers/`/`ws.py`/`main.py` files (small, quick).
-3. **Re-run `/audit`** to regenerate `AUDIT.md` against the remediated state — it should now show the Critical/High security + architecture findings cleared and the gate green.
-4. **Decide on the security-config rollout**: the API now requires `STORYGEN_API_TOKEN` (fail-closed) and defaults to `127.0.0.1`. Operators exposing it beyond loopback must set the token and an allowed-origin/SSRF config. Documented in README + ARCHITECTURE.md.
-5. *(Wrap-up, on confirmation)* Update CHANGELOG, then merge `fix/audit-remediation` to `main` (rebased) and delete `AUDIT.md` + this file.
+1. **The only remaining backlog item is ARC-012/QA-006** — full God-screen controller decomposition (per-screen, with integration-test coverage first). It is not a blocker; the gate is green.
+2. **Re-run `/audit`** to regenerate `AUDIT.md` against the remediated state — it should now show the Critical/High security + architecture findings cleared and the gate green.
+3. **Decide on the security-config rollout**: the API now requires `STORYGEN_API_TOKEN` (fail-closed) and defaults to `127.0.0.1`. Operators exposing it beyond loopback must set the token and an allowed-origin/SSRF config. Documented in README + ARCHITECTURE.md.
+4. *(Wrap-up, on confirmation)* Update CHANGELOG, then merge `fix/audit-remediation` to `main` (rebased) and delete `AUDIT.md` + this file.
