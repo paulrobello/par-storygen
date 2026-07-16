@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import pytest
 
-from storygen.images._prompts import build_cover_prompt
+from storygen.images.prompts import build_cover_prompt
 from storygen.llm.models import (
     Character,
     ImageProviderConfig,

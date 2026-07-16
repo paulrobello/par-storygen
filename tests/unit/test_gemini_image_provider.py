@@ -101,7 +101,7 @@ async def test_generate_scene_zero_refs_has_single_string_content() -> None:
     assert "children's story book" in first
     # The no-refs path must delegate to build_scene_prompt verbatim so every
     # provider without a reference-image channel emits byte-identical output.
-    from storygen.images._prompts import build_scene_prompt
+    from storygen.images.prompts import build_scene_prompt
 
     assert first == build_scene_prompt("a wheat field", art_style="children's story book")
 

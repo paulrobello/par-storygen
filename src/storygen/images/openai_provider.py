@@ -22,7 +22,6 @@ from typing import Literal, TypedDict
 from openai import AsyncOpenAI
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from storygen.images._prompts import build_portrait_prompt, build_scene_prompt
 from storygen.images.base import ReferencePortrait
 from storygen.images.constants import (
     OPENAI_PARTIAL_IMAGES,
@@ -32,6 +31,7 @@ from storygen.images.constants import (
     SCENE_SIZE,
 )
 from storygen.images.pricing import openai_image_cost as _openai_image_cost
+from storygen.images.prompts import build_portrait_prompt, build_scene_prompt
 
 # Re-export so existing ``from storygen.images.openai_provider import …``
 # call sites continue to work without modification.

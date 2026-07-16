@@ -13,7 +13,7 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Input, Static, TextArea
 
-from storygen.widgets._image_util import pixels_from_image
+from storygen.widgets.image_util import pixels_from_image
 
 
 class CreateCharRequest(BaseModel):

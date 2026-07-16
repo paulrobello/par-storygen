@@ -24,7 +24,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, DirectoryTree, Input, RadioButton, RadioSet, Static
 
-from storygen.widgets._image_util import pixels_from_image
+from storygen.widgets.image_util import pixels_from_image
 
 _logger = logging.getLogger(__name__)
 

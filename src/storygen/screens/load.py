@@ -13,15 +13,15 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 
-from storygen.images._prompts import build_cover_prompt
 from storygen.images.base import ReferencePortrait
 from storygen.images.constants import SCENE_QUALITY, SCENE_SIZE
 from storygen.images.pricing import image_cost
+from storygen.images.prompts import build_cover_prompt
 from storygen.screens._confirm_modal import ConfirmModal
 from storygen.storage import app_state, paths
 from storygen.storage.save import GameSave, delete_game, load_game, save_game
 from storygen.util import copy_text_to_system_clipboard, open_in_system_viewer
-from storygen.widgets._image_util import render_image_thumbnail
+from storygen.widgets.image_util import render_image_thumbnail
 
 _logger = logging.getLogger(__name__)
 

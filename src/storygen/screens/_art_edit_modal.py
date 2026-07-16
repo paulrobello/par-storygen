@@ -25,7 +25,7 @@ from textual.events import Click
 from textual.screen import Screen
 from textual.widgets import Button, Checkbox, RadioButton, RadioSet, Static, TextArea
 
-from storygen.widgets._image_util import pixels_from_image
+from storygen.widgets.image_util import pixels_from_image
 
 
 class ArtEditMode(StrEnum):

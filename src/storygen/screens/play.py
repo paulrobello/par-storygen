@@ -33,8 +33,8 @@ from storygen.storage import app_state, paths
 from storygen.storage.save import GameSave, save_game
 from storygen.tts.player import TTSPlayer, TTSState
 from storygen.util import open_in_system_viewer
-from storygen.widgets._header_util import format_cost_subtitle
 from storygen.widgets.choice_list import ChoiceList
+from storygen.widgets.header_util import format_cost_subtitle
 from storygen.widgets.image_panel import ImagePanel
 from storygen.widgets.story_panel import StoryPanel
 from storygen.widgets.throbber import Throbber

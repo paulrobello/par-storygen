@@ -28,7 +28,7 @@ from storygen.llm.models import NodeId, StoryNode
 from storygen.storage import paths
 from storygen.storage.save import GameSave
 from storygen.storage.tree import path_from_root
-from storygen.widgets._image_util import render_image_thumbnail
+from storygen.widgets.image_util import render_image_thumbnail
 
 # Maximum length of the narration excerpt rendered per card. Endings tend to
 # be short, but the cap keeps a verbose ending from blowing the card height

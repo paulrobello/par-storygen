@@ -31,7 +31,7 @@ from storygen.llm.models import NodeId, StoryNode
 from storygen.storage import paths
 from storygen.storage.save import GameSave
 from storygen.storage.tree import path_from_root
-from storygen.widgets._image_util import pixels_from_image
+from storygen.widgets.image_util import pixels_from_image
 
 
 class _ReplayImage(Static):

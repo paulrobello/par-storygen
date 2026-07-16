@@ -52,7 +52,7 @@ from storygen.storage.library import (
 )
 from storygen.storage.save import load_game
 from storygen.util import open_in_system_viewer
-from storygen.widgets._image_util import render_image_thumbnail
+from storygen.widgets.image_util import render_image_thumbnail
 
 SortMode = Literal["newest", "name"]
 

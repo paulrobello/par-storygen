@@ -15,7 +15,6 @@ from datetime import UTC, datetime
 from typing import Protocol, cast
 from uuid import UUID, uuid4
 
-from storygen.images._prompts import build_cover_prompt
 from storygen.images.constants import (
     PORTRAIT_QUALITY,
     PORTRAIT_SIZE,
@@ -23,6 +22,7 @@ from storygen.images.constants import (
     SCENE_SIZE,
 )
 from storygen.images.pricing import image_cost
+from storygen.images.prompts import build_cover_prompt
 from storygen.llm.models import (
     Character,
     ImageProviderConfig,

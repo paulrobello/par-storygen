@@ -8,7 +8,7 @@ single authoritative test file.
 
 from __future__ import annotations
 
-from storygen.images._prompts import build_cover_prompt, build_portrait_prompt, build_scene_prompt
+from storygen.images.prompts import build_cover_prompt, build_portrait_prompt, build_scene_prompt
 
 
 def test_portrait_transparent_includes_transparent_png_phrase() -> None:

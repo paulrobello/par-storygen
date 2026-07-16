@@ -10,7 +10,7 @@ from rich.text import Text
 from textual.widgets import Static
 
 from storygen.llm.models import Character
-from storygen.widgets._image_util import pixels_from_image
+from storygen.widgets.image_util import pixels_from_image
 
 
 def format_character_entry(c: Character) -> str:

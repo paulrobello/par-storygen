@@ -12,9 +12,9 @@ from textual.app import App
 # Apply Textual library workarounds before any Header is constructed.
 import storygen._textual_patches  # noqa: F401  # pyright: ignore[reportUnusedImport]
 from storygen.config import AppConfig, load_config
-from storygen.images._prompts import build_cover_prompt
 from storygen.images.base import ImageProvider
 from storygen.images.constants import SCENE_QUALITY, SCENE_SIZE
+from storygen.images.prompts import build_cover_prompt
 from storygen.images.split_provider import SplitImageProvider
 from storygen.llm import agents as agent_mod
 from storygen.llm.provider_factory import build_text_model
