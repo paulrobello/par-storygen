@@ -68,6 +68,12 @@ A configurable LLM (via pydantic-ai) drives theme, characters, narration, and ch
 - **Reader Levels**: Vocabulary and complexity controls for ages 0-5, 6-10, 11-15, or 15+
 - **Settings Persistence**: In-app Settings screen for provider defaults, art toggle, streaming, prefetch, TTS, and auto-play options
 - **Export Book**: Export any story path as a standalone HTML book reader with 3D page turns, audio player, and auto-read
+- **Story Templates / Presets**: Six curated presets plus your own saved presets; "Quick Start" from the main menu or "Load Preset" / "Save as Preset" in the wizard
+- **Narrative Recap**: Press `Shift+R` for an on-demand "Previously on..." summary; optional auto-recap every N major beats and on resume
+- **Relationship Tracking**: Press `f` to view pairwise character relationships (ally, rival, romantic, mentor, …) with strength bars, extracted inline as the story progresses
+- **Image Style Gallery**: Browse and apply art styles from the Settings screen
+- **Graph Prune**: Press `p` in the story graph to delete a node and all its descendants (with confirmation)
+- **Dynamic Pacing**: Choose Slow / Moderate / Fast pacing per story (wizard LENGTH step) to control narration length and choice frequency
 
 ### Technical Excellence
 - **Async Architecture**: Non-blocking pipeline with concurrent illustration and portrait generation
@@ -190,7 +196,7 @@ options:
 * `STORYGEN_IMAGE_BASE_URL` — Override base URL for the scene/cover art provider
 * `STORYGEN_IMAGE_API_KEY` — Override API key for the scene/cover art provider
 * `STORYGEN_CHARACTER_IMAGE_PROVIDER` — Character portrait provider: `openai` (default), `gemini`, `zai`, or `ollama`
-* `STORYGEN_CHARACTER_IMAGE_MODEL` — Character portrait model identifier (default: `gpt-image-1.5` for transparent-background support)
+* `STORYGEN_CHARACTER_IMAGE_MODEL` — Character portrait model identifier (default: `gpt-image-2`)
 * `STORYGEN_CHARACTER_IMAGE_BASE_URL` — Override base URL for the character portrait provider
 * `STORYGEN_CHARACTER_IMAGE_API_KEY` — Override API key for the character portrait provider
 
@@ -250,13 +256,13 @@ There are two ways to select the provider and model:
 
 **Priority order:** real environment variables > `.env` file > Settings-saved prefs > hardcoded default (`openai` / `gpt-4o-mini`).
 
-### OpenAI
+### OpenAI (text)
 Set `OPENAI_API_KEY`. Known-good models: **`gpt-4o-mini`** (default — fast, cheap, reliable structured output), **`gpt-4o`** (higher-quality prose), **`gpt-4.1-mini`** (newer, balanced). Billing runs through api.openai.com.
 
 ### OpenRouter
 Set `OPENROUTER_API_KEY` and `STORYGEN_TEXT_PROVIDER=openrouter`. OpenRouter routes to dozens of frontier models under a single key. Known-good models: **`anthropic/claude-3.5-sonnet`** (excellent structured output), **`meta-llama/llama-3.3-70b-instruct`** (open-weight, very cheap). Full catalog at [openrouter.ai/models](https://openrouter.ai/models). Keep the `<vendor>/<model>` slash form.
 
-### Ollama
+### Ollama (text)
 Set `STORYGEN_TEXT_PROVIDER=ollama` and run `ollama serve` locally (default: `http://localhost:11434`). No API key required. Known-good models: **`llama3.3:70b`** (good narration if you have the VRAM), **`qwen2.5:32b-instruct`** (lighter, faster). The model string must match the Ollama tag exactly. For remote Ollama, set `STORYGEN_TEXT_BASE_URL=http://<host>:11434/v1`.
 
 **Note:** Each save pins its own `text_config`. Changing the provider in Settings only affects new stories — existing saves keep what they were created with.
@@ -268,17 +274,17 @@ par-storygen supports four image-gen providers. Only OpenAI and Gemini support *
 Scene/cover art and character portraits are configured separately:
 
 - **Scene/cover art** uses `STORYGEN_IMAGE_PROVIDER`, `STORYGEN_IMAGE_MODEL`, `STORYGEN_IMAGE_BASE_URL`, and `STORYGEN_IMAGE_API_KEY`. The hardcoded default is OpenAI **`gpt-image-2`**.
-- **Character portraits** use `STORYGEN_CHARACTER_IMAGE_PROVIDER`, `STORYGEN_CHARACTER_IMAGE_MODEL`, `STORYGEN_CHARACTER_IMAGE_BASE_URL`, and `STORYGEN_CHARACTER_IMAGE_API_KEY`. The hardcoded default is OpenAI **`gpt-image-1.5`**, chosen because portrait generation requests transparent backgrounds.
+- **Character portraits** use `STORYGEN_CHARACTER_IMAGE_PROVIDER`, `STORYGEN_CHARACTER_IMAGE_MODEL`, `STORYGEN_CHARACTER_IMAGE_BASE_URL`, and `STORYGEN_CHARACTER_IMAGE_API_KEY`. The hardcoded default is OpenAI **`gpt-image-2`**. Note: `gpt-image-2` does not accept the transparent-background flag, so portraits render on a solid neutral background; choose **`gpt-image-1.5`** or **`gpt-image-1`** if you need transparent PNG portraits.
 
 There are two ways to select image providers and models:
 
 1. **Environment variables** — use the scene/cover `STORYGEN_IMAGE_*` variables and/or the portrait-specific `STORYGEN_CHARACTER_IMAGE_*` variables. See [`.env.example`](./.env.example).
 2. **Settings screen** (persisted across sessions) — edit the "Image provider" block for scene/cover art and the "Character portrait provider" block for portraits.
 
-**Priority order for each image config:** real environment variables > `.env` file > Settings-saved prefs > hardcoded defaults (`openai` / `gpt-image-2` for scene/cover art, `openai` / `gpt-image-1.5` for character portraits).
+**Priority order for each image config:** real environment variables > `.env` file > Settings-saved prefs > hardcoded defaults (`openai` / `gpt-image-2` for scene/cover art, `openai` / `gpt-image-2` for character portraits).
 
-### OpenAI
-Set `OPENAI_API_KEY`. Supports reference images natively via `images.edit` — each scene folds in the featured characters' portraits so faces stay consistent. Known-good models: **`gpt-image-2`** (default for scene/cover art), **`gpt-image-1.5`** (default for transparent-background character portraits), **`gpt-image-1`** (older, cheaper — untested with current `gpt-image-2`-tuned scene prompts). Docs: [platform.openai.com/docs/guides/images](https://platform.openai.com/docs/guides/images).
+### OpenAI (image)
+Set `OPENAI_API_KEY`. Supports reference images natively via `images.edit` — each scene folds in the featured characters' portraits so faces stay consistent. Known-good models: **`gpt-image-2`** (default for both scene/cover art and character portraits), **`gpt-image-1.5`** (transparent-background character portraits — `gpt-image-2` cannot produce transparency), **`gpt-image-1`** (older, cheaper — untested with current `gpt-image-2`-tuned scene prompts). Docs: [platform.openai.com/docs/guides/images](https://platform.openai.com/docs/guides/images).
 
 ### Google Gemini
 Set `GEMINI_API_KEY` and `STORYGEN_IMAGE_PROVIDER=gemini`. Supports up to 14 reference images per call. Known-good models: **`gemini-3.1-flash-image-preview`** (Nano Banana 2, $0.067/1K image tokens), **`gemini-3-pro-image-preview`** (Nano Banana Pro, $0.134/image). Leave `STORYGEN_IMAGE_BASE_URL` blank for Gemini. Docs: [ai.google.dev/gemini-api/docs/image-generation](https://ai.google.dev/gemini-api/docs/image-generation).
@@ -286,7 +292,7 @@ Set `GEMINI_API_KEY` and `STORYGEN_IMAGE_PROVIDER=gemini`. Supports up to 14 ref
 ### Z.AI GLM-image
 Set `ZAI_API_KEY` and `STORYGEN_IMAGE_PROVIDER=zai`. Text-to-image only — no reference-image support. Price: $0.015/image. Known-good model: **`glm-image`**. Docs: [docs.z.ai](https://docs.z.ai).
 
-### Ollama
+### Ollama (image)
 Set `STORYGEN_IMAGE_PROVIDER=ollama` and run `ollama serve` locally. No API key required. macOS-only as of 2026-04, requires server **≥ 0.13.3**. No reference-image support. Known-good models: **`x/z-image-turbo`** (fastest), **`x/flux2-klein:4b`**, **`x/flux2-klein:9b`** (higher quality, more VRAM). For remote Ollama, set `STORYGEN_IMAGE_BASE_URL=http://<host>:11434/v1/`.
 
 ### Fallback provider
@@ -302,7 +308,7 @@ par-storygen keeps a cross-game character library at `$XDG_DATA_HOME/storygen/li
 From a game's **Portraits** screen, press the **Export** button next to any character. The character's name, backstory, personality, physical description, portrait, and the exact portrait prompt are copied into the library. Re-exporting the same character creates a separate library entry — use the Library Browser to clean up.
 
 ### Import
-During the wizard's **CHARACTERS** step, press `l` to open the Library Browser. Pick a character, then choose:
+During the wizard's **CHARACTERS** step, press `Ctrl+L` to open the Library Browser. Pick a character, then choose:
 
 - **Keep as-is** — added to your new story unchanged. Portrait PNG is *copied* (no image-provider API calls).
 - **Adapt to theme** — an LLM rewrites **only** the backstory to fit your new story's theme. Name, personality, and physical description are preserved so the existing portrait still matches.
@@ -457,10 +463,14 @@ As of v0.5.0. See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
 * **Text-to-Speech** — Multi-provider narration with provider/voice-aware audio caching and auto-read
 * **Auto-Play** — Random-choice auto-advance with image and TTS wait gating
 * **Export Book** — Standalone HTML book reader with 3D page turns, inline audio, and auto-read
+* **Story Templates & Presets** — Curated and custom presets; Quick Start from the menu, Load/Save Preset in the wizard
+* **Narrative Recap** — On-demand "Previously on..." summaries (`Shift+R`), auto-recap, and resume recap
+* **Relationship Tracking** — Pairwise character relationships extracted inline, viewable via `f`
+* **Image Style Gallery** — Browse and apply art styles from Settings
+* **Dynamic Pacing** — Slow / Moderate / Fast pacing per story
 
 ### Where we're going
 * Sound effects and music per scene
 * Multiplayer (shared story tree)
 * More image providers and art styles
-* Story templates and presets
 * Export stories as PDF

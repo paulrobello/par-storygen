@@ -22,6 +22,11 @@ make checkall         # fmt + lint + typecheck + test  (run before committing)
 make precommit        # Run pre-commit hooks on all files
 make package          # uv build (sdist + wheel)
 make clean            # Remove .pytest_cache, .ruff_cache, .pyright, build, dist, *.egg-info, __pycache__
+make api-dev          # uvicorn storygen_api.main:app --reload --port 8101  (requires `uv sync --extra api`)
+make api-prod         # uvicorn ... --port 8101 --workers 1
+make web-install      # cd web && npm install  (Next.js frontend deps)
+make web-dev          # Next.js dev server on :8100
+make web-build        # Next.js production build
 ```
 
 Single test or pattern:
@@ -55,6 +60,8 @@ storage  →  llm + images  →  widgets  →  screens  →  app
 ```
 
 Lower layers never import higher ones. `app.py` wires concrete providers/agents/pipelines into screens. See `docs/ARCHITECTURE.md` for full implementation details.
+
+**Optional web surface:** the package also ships a FastAPI server (`src/storygen_api/`, installed via the `[api]` extra; console script `storygen-api`) and a Next.js frontend (`web/`). The API is a second composition root over the same `storage`/`llm`/`images`/`pipeline` layers — see the "Web surface" section of `docs/ARCHITECTURE.md`. `web/` is excluded from pyright (`tool.pyright.exclude = ["web"]`). The API carries no auth and binds `0.0.0.0` by default — localhost/single-worker only unless hardened (see `AUDIT.md`).
 
 Key concepts: **3-stage beat pipeline** (cache → beat gen → concurrent illustration + portraits), **choice schema split** (`Choice` for LLM vs `StoredChoice` for storage), **tree graph** (not DAG, frozen nodes), **branch prefetch** (background-generates pending choices), **cross-game character library** (export/import with optional backstory adaptation via `adapt_backstory_system_prompt`), **TTS player** (4-state machine wrapping `par_tts`, per-node audio caching), **export book** (HTML with 3D page-turn rendering via `export/book.py`), **relationship tracking** (pairwise character relationships extracted inline during beat generation).
 

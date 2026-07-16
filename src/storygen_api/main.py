@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from storygen import __version__
 from storygen.storage import paths
 
 from storygen_api.deps import get_app_config, get_session_manager
@@ -31,11 +32,11 @@ def create_app() -> FastAPI:
     """Build and return the FastAPI application."""
     app = FastAPI(
         title="par-storygen API",
-        version="0.1.0",
+        version=__version__,
         lifespan=lifespan,
     )
 
-    # CORS — allow localhost:3000 for local dev frontend
+    # CORS — allow localhost:8100 for local dev frontend (matches Makefile web-dev)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://localhost:8100", "http://127.0.0.1:8100"],
