@@ -26,6 +26,10 @@ from storygen.config import AppConfig
 from storygen.images.provider_factory import resolve_image_base_url
 from storygen.llm.provider_factory import Provider, api_key_env_var, resolve_base_url
 from storygen.screens._confirm_modal import ConfirmModal
+from storygen.screens.controllers.settings_image import (
+    image_model_options,
+    model_select_state,
+)
 from storygen.screens.wizard import (
     READER_LEVEL_OPTIONS,
     STYLE_OPTIONS,
@@ -621,16 +625,8 @@ class SettingsScreen(Screen[None]):
             self._image_api_key_status.update(f"API key ({env_name}): {mark}")
 
     def _image_model_options(self, provider: str) -> list[tuple[str, str]]:
-        """Curated image-model choices for the Select widget, plus a Custom entry.
-
-        Returns ``[(label, value), ...]``. Each curated model becomes a
-        ``(model, model)`` entry; ``_CUSTOM_MODEL`` is appended so the user can
-        type a non-listed model in the Input without losing Select state.
-        """
-        curated = app_state.SUGGESTED_IMAGE_MODELS.get(provider, ())
-        options: list[tuple[str, str]] = [(m, m) for m in curated]
-        options.append(("Custom (type below)…", self._CUSTOM_MODEL))
-        return options
+        """Curated image-model choices for the Select widget, plus a Custom entry."""
+        return image_model_options(provider, self._CUSTOM_MODEL)
 
     def _sync_image_model_select(self, provider: str, model: str) -> None:
         """Rebuild the image-model Select options for ``provider`` and pick ``model``.
@@ -639,13 +635,11 @@ class SettingsScreen(Screen[None]):
         at it; otherwise the Select shows the Custom sentinel (the Input keeps
         the real value). The Input is only shown when Custom is selected.
         """
-        options = self._image_model_options(provider)
-        curated_values = {v for _, v in options if v != self._CUSTOM_MODEL}
-        target_value = model if model in curated_values else self._CUSTOM_MODEL
+        options, target_value, show_input = model_select_state(provider, model, self._CUSTOM_MODEL)
         with self._image_model_select.prevent(Select.Changed):
             self._image_model_select.set_options(options)
             self._image_model_select.value = target_value
-        self._image_model_input.display = target_value == self._CUSTOM_MODEL
+        self._image_model_input.display = show_input
 
     def _refresh_image_suggested(self, provider: str) -> None:
         models = app_state.SUGGESTED_IMAGE_MODELS.get(provider, ())
@@ -671,13 +665,11 @@ class SettingsScreen(Screen[None]):
         return self._image_model_options(provider)
 
     def _sync_character_image_model_select(self, provider: str, model: str) -> None:
-        options = self._character_image_model_options(provider)
-        curated_values = {v for _, v in options if v != self._CUSTOM_MODEL}
-        target_value = model if model in curated_values else self._CUSTOM_MODEL
+        options, target_value, show_input = model_select_state(provider, model, self._CUSTOM_MODEL)
         with self._character_image_model_select.prevent(Select.Changed):
             self._character_image_model_select.set_options(options)
             self._character_image_model_select.value = target_value
-        self._character_image_model_input.display = target_value == self._CUSTOM_MODEL
+        self._character_image_model_input.display = show_input
 
     def _refresh_character_image_suggested(self, provider: str) -> None:
         models = app_state.SUGGESTED_IMAGE_MODELS.get(provider, ())
