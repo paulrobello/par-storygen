@@ -40,6 +40,12 @@ from storygen.screens._outfit_modals import (
     OutfitCreateRequest,
 )
 from storygen.screens._ref_image_modals import ReferenceImageModal, ReferenceImageResult
+from storygen.screens.controllers.portraits_outfits import (
+    append_outfit,
+    delete_outfit,
+    revert_to_base,
+    set_outfit_current,
+)
 from storygen.storage import app_state, paths
 from storygen.storage.library import (
     LibraryCharacter,
@@ -220,20 +226,6 @@ def _atomic_write_png(dest: Path, png_bytes: bytes) -> None:
     tmp = dest.with_suffix(".png.tmp")
     tmp.write_bytes(png_bytes)
     os.replace(tmp, dest)
-
-
-def _base_portrait_relpath(save_id: str, char_id: str) -> str:
-    """Best available relative path for a character's base portrait.
-
-    Uses :func:`paths.latest_portrait_version` to pick the most recent
-    base portrait (v2, v3, ...) so reverting from an outfit doesn't lose
-    a manually-regenerated base. Falls back to ``-v1.png`` when no base
-    portrait has ever been written (art was disabled at wizard time);
-    the path may not exist on disk, but downstream renderers handle
-    missing files gracefully.
-    """
-    version = paths.latest_portrait_version(save_id, char_id) or 1
-    return paths.relative_character_portrait_path(char_id, version=version)
 
 
 class PortraitsScreen(Screen[None]):
@@ -1009,10 +1001,7 @@ class PortraitsScreen(Screen[None]):
 
     def _append_outfit(self, char_id: str, outfit: CharacterOutfit) -> None:
         """Append ``outfit`` to the named character (in-place on the save)."""
-        for idx, c in enumerate(self._save.characters):
-            if c.id == char_id:
-                self._save.characters[idx] = c.model_copy(update={"outfits": [*c.outfits, outfit]})
-                return
+        append_outfit(self._save, char_id, outfit)
 
     def _open_outfit_action_modal(self, char_id: str, outfit_id: str) -> None:
         char = next((c for c in self._save.characters if c.id == char_id), None)
@@ -1056,16 +1045,7 @@ class PortraitsScreen(Screen[None]):
             self._delete_outfit(char, outfit)
 
     def _set_outfit_as_current(self, char: Character, outfit: CharacterOutfit) -> None:
-        for idx, c in enumerate(self._save.characters):
-            if c.id == char.id:
-                self._save.characters[idx] = c.model_copy(
-                    update={
-                        "current_outfit_id": outfit.id,
-                        "portrait_path": outfit.portrait_path,
-                        "portrait_prompt": outfit.portrait_prompt,
-                    }
-                )
-                break
+        set_outfit_current(self._save, char, outfit)
         save_game(self._save)
         self._rebuild()
         self.notify(
@@ -1074,24 +1054,12 @@ class PortraitsScreen(Screen[None]):
         )
 
     def _delete_outfit(self, char: Character, outfit: CharacterOutfit) -> None:
-        was_current = outfit.id == char.current_outfit_id
-        save_id = str(self._save.id)
-        # Build the post-delete character: drop the outfit, optionally
-        # revert active fields back to the latest existing base portrait.
-        update: dict[str, object] = {
-            "outfits": [o for o in char.outfits if o.id != outfit.id],
-        }
-        if was_current:
-            update["current_outfit_id"] = None
-            update["portrait_path"] = _base_portrait_relpath(save_id, char.id)
-            update["portrait_prompt"] = char.physical_description
-        for idx, c in enumerate(self._save.characters):
-            if c.id == char.id:
-                self._save.characters[idx] = c.model_copy(update=update)
-                break
+        delete_outfit(self._save, char, outfit)
         # Best-effort delete of the on-disk PNG; missing file is fine.
         try:
-            paths.character_outfit_path(save_id, char.id, outfit.id).unlink(missing_ok=True)
+            paths.character_outfit_path(str(self._save.id), char.id, outfit.id).unlink(
+                missing_ok=True
+            )
         except OSError:
             _logger.debug("Could not remove outfit file", exc_info=True)
             self.notify(
@@ -1106,17 +1074,7 @@ class PortraitsScreen(Screen[None]):
     def _revert_to_base(self, char: Character) -> None:
         if char.current_outfit_id is None:
             return
-        save_id = str(self._save.id)
-        for idx, c in enumerate(self._save.characters):
-            if c.id == char.id:
-                self._save.characters[idx] = c.model_copy(
-                    update={
-                        "current_outfit_id": None,
-                        "portrait_path": _base_portrait_relpath(save_id, char.id),
-                        "portrait_prompt": char.physical_description,
-                    }
-                )
-                break
+        revert_to_base(self._save, char)
         save_game(self._save)
         self._rebuild()
         self.notify(f"Reverted {char.name} to base portrait.", timeout=5)
