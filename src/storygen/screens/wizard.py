@@ -59,6 +59,11 @@ from storygen.storage.save import (
 # Re-export so ``from storygen.screens.wizard import WizardFlow`` keeps working.
 __all__ = ["WizardFlow", "WizardScreen", "WizardStep"]
 
+# Order matches the pacing SelectionList in the wizard UI; index lookup happens
+# once per wizard run but keeping it module-level avoids rebuilding the tuple on
+# every _advance_worker call (QA-010) and documents the contract in one place.
+_PACING_OPTIONS: tuple[str, ...] = ("slow", "moderate", "fast")
+
 
 class WizardStep(Enum):
     """Ordered steps in the new-game wizard."""
@@ -834,8 +839,7 @@ class WizardScreen(Screen[None]):
                     app_state.MIN_TARGET_MAJOR_BEATS,
                     min(app_state.MAX_TARGET_MAJOR_BEATS, n),
                 )
-                # Capture pacing selection
-                _PACING_OPTIONS = ("slow", "moderate", "fast")
+                # Capture pacing selection (module-level _PACING_OPTIONS)
                 idx = self._pacing_input.pressed_index
                 self._pacing = (
                     _PACING_OPTIONS[idx] if 0 <= idx < len(_PACING_OPTIONS) else "moderate"
