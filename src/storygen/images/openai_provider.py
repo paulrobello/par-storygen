@@ -30,7 +30,6 @@ from storygen.images.constants import (
     SCENE_QUALITY,
     SCENE_SIZE,
 )
-from storygen.images.pricing import openai_image_cost as _openai_image_cost
 from storygen.images.prompts import build_portrait_prompt, build_scene_prompt
 
 # Re-export so existing ``from storygen.images.openai_provider import …``
@@ -42,29 +41,7 @@ __all__ = [
     "SCENE_QUALITY",
     "SCENE_SIZE",
     "OpenAIImageProvider",
-    "image_cost",
 ]
-
-
-def image_cost(
-    size: str,
-    quality: str = "auto",
-    *,
-    num_input_refs: int = 0,
-    partial_images: int = 0,
-) -> float:
-    """Estimate the USD cost of one OpenAI image generation call.
-
-    Thin re-export of :func:`storygen.images.pricing.openai_image_cost` kept
-    here for backward compatibility — v1.0 call sites (pipeline, wizard,
-    portraits screen) import ``image_cost`` from this module.
-    """
-    return _openai_image_cost(
-        size,
-        quality,
-        num_input_refs=num_input_refs,
-        partial_images=partial_images,
-    )
 
 
 class _EditKwargs(TypedDict, total=False):

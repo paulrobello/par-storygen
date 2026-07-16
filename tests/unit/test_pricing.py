@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from storygen.images.openai_provider import (
+from storygen.images.constants import (
     PORTRAIT_QUALITY,
     PORTRAIT_SIZE,
     SCENE_QUALITY,
     SCENE_SIZE,
 )
-from storygen.images.openai_provider import image_cost as openai_shim_cost
 from storygen.images.pricing import (
     gemini_image_cost,
     image_cost,
@@ -28,13 +27,15 @@ def test_openai_image_cost_matches_legacy_table() -> None:
     assert openai_image_cost("1024x1536", "auto") == 0.063
 
 
-def test_openai_shim_reexport_delegates_to_pricing() -> None:
-    """openai_provider.image_cost must keep working as a thin re-export."""
-    assert openai_shim_cost("1024x1024", "auto", num_input_refs=2) == openai_image_cost(
-        "1024x1024", "auto", num_input_refs=2
-    )
-    assert openai_shim_cost(PORTRAIT_SIZE, PORTRAIT_QUALITY) > 0.0
-    assert openai_shim_cost(SCENE_SIZE, SCENE_QUALITY) > 0.0
+def test_provider_constants_hit_price_table() -> None:
+    """The PORTRAIT/SCENE size+quality constants must resolve to a real price.
+
+    Guards against constant drift: if PORTRAIT_SIZE or SCENE_QUALITY ever
+    changes to a value missing from the OpenAI table, production cost tracking
+    would silently zero out. This catches that regression at test time.
+    """
+    assert openai_image_cost(PORTRAIT_SIZE, PORTRAIT_QUALITY) > 0.0
+    assert openai_image_cost(SCENE_SIZE, SCENE_QUALITY) > 0.0
 
 
 def test_openai_image_cost_unknown_returns_zero() -> None:

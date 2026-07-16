@@ -6,11 +6,10 @@ pricing shape (per-size-quality pair for OpenAI, per-resolution-tier for
 Gemini, free for Ollama, etc.) — the PlayScreen header and wizard need one
 number regardless of provider.
 
-This module is that single dispatch point.
-
-``openai_provider.image_cost`` is kept as a thin re-export of
-``openai_image_cost`` so existing call sites (pipeline, wizard, portraits
-screen) keep working unchanged.
+This module is that single dispatch point. All call sites import
+``image_cost`` from here; the legacy ``openai_provider.image_cost`` shim
+was removed in the QA-008 cleanup (it had a different signature from this
+function, creating a silent-wrong-pricing footgun).
 """
 
 from __future__ import annotations
