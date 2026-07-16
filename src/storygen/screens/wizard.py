@@ -46,6 +46,7 @@ from storygen.llm.models import (
 )
 from storygen.runtime.wizard_flow import WizardFlow  # re-exported below
 from storygen.screens._ref_image_modals import ReferenceImageModal, ReferenceImageResult
+from storygen.screens.controllers.wizard_summary import build_confirm_summary
 from storygen.screens.library_browser import CharacterCatalogScreen, LibraryPick
 from storygen.storage import app_state, paths
 from storygen.storage.library import LibraryCharacter, library_portrait_path
@@ -625,33 +626,21 @@ class WizardScreen(Screen[None]):
             self._next_button.label = _label_for_step(self.current_step)
 
     def _render_confirm_summary(self) -> None:
-        tone_str = ""
-        if self._tone is not None:
-            if self._tone.preset == "custom":
-                tone_str = f"custom: {self._tone.custom_descriptor}"
-            elif self._tone.custom_descriptor:
-                tone_str = f"{self._tone.preset} ({self._tone.custom_descriptor})"
-            else:
-                tone_str = self._tone.preset
-        cast_str = (
-            ", ".join(c.name for c in self._characters)
-            if self._characters
-            else "(no characters yet)"
-        )
         reader_label = next(
             (label for label, val in READER_LEVEL_OPTIONS if val == self._reader_level),
             self._reader_level,
         )
-        summary = (
-            f"Theme: {self._theme.title if self._theme else ''}\n"
-            f"Tone: {tone_str}\n"
-            f"Style: {self._style}\n"
-            f"Art: {self._art_style}\n"
-            f"Length: {self._target_major_beats} beats\n"
-            f"Reader level: {reader_label}\n"
-            f"Cast: {cast_str}"
+        self._confirm_summary.update(
+            build_confirm_summary(
+                theme=self._theme,
+                tone=self._tone,
+                style=self._style,
+                art_style=self._art_style,
+                target_major_beats=self._target_major_beats,
+                reader_label=reader_label,
+                characters=self._characters,
+            )
         )
-        self._confirm_summary.update(summary)
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id == "wizard-tone":
@@ -825,9 +814,7 @@ class WizardScreen(Screen[None]):
         try:
             handler_name = self._WIZARD_STEP_HANDLERS.get(self.current_step)
             if handler_name is not None:
-                handler = cast(
-                    "Callable[[], Awaitable[None]]", getattr(self, handler_name)
-                )
+                handler = cast("Callable[[], Awaitable[None]]", getattr(self, handler_name))
                 await handler()
         except Exception as exc:
             self._progress.update("")
@@ -878,9 +865,7 @@ class WizardScreen(Screen[None]):
         )
         # Capture pacing selection (module-level _PACING_OPTIONS)
         idx = self._pacing_input.pressed_index
-        self._pacing = (
-            _PACING_OPTIONS[idx] if 0 <= idx < len(_PACING_OPTIONS) else "moderate"
-        )
+        self._pacing = _PACING_OPTIONS[idx] if 0 <= idx < len(_PACING_OPTIONS) else "moderate"
         self.current_step = WizardStep.READER_LEVEL
 
     async def _advance_step_reader_level(self) -> None:
