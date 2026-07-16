@@ -79,3 +79,34 @@ jobs:
 
       - name: Build Next.js
         run: npm run build
+
+  # ARC-015: hermetic Playwright e2e. REST + WebSocket are mocked in-test, so
+  # this needs no live FastAPI/LLM backend — only Chromium and the Next dev
+  # server (booted by Playwright's webServer). Runs in parallel with the jobs
+  # above, so it does not extend the critical path.
+  web-e2e:
+    name: Web (Playwright e2e)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Set up Node
+        uses: actions/setup-node@v5.0.0
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # `--with-deps` installs the OS shared libs Chromium needs on ubuntu.
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright e2e
+        run: npm run e2e
