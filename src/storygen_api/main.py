@@ -1,3 +1,9 @@
+"""FastAPI application factory for the ``storygen_api`` REST + WebSocket surface.
+
+Wires lifespan (single-worker guard, ARC-004), CORS (SEC-008), route mounting,
+and static-asset serving.
+"""
+
 from __future__ import annotations
 
 import logging

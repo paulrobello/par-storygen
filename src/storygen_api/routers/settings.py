@@ -1,3 +1,8 @@
+"""App settings get/put routes.
+
+PUT validates provider base URLs against the SSRF allowlist (SEC-002).
+"""
+
 from __future__ import annotations
 
 import logging

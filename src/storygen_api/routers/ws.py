@@ -1,3 +1,10 @@
+"""WebSocket endpoint streaming live beat generation to the web client.
+
+Server-emitted events follow the contract in ``web/src/lib/ws-types.ts``
+(mirrored as pydantic models in ``tests/unit/test_api_ws.py``); client frames
+are validated against the save before ``pipeline.advance`` (ARC-007).
+"""
+
 from __future__ import annotations
 
 import contextlib

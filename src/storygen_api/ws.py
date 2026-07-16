@@ -1,3 +1,10 @@
+"""In-process WebSocket connection manager (ARC-001, ARC-009).
+
+``WebSocketManager`` holds the per-game connection registry and broadcasts
+events under an ``asyncio.Lock`` so ``disconnect`` cannot race a concurrent
+fan-out.
+"""
+
 from __future__ import annotations
 
 import asyncio

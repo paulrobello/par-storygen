@@ -1,3 +1,5 @@
+"""New-story wizard steps (theme / characters / world) over ``runtime.WizardFlow``."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends

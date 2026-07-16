@@ -1,3 +1,9 @@
+"""Game lifecycle routes: create / list / load / advance / delete / export.
+
+Cost-incurring routes (advance, regenerate) depend on the bearer-token guard
+(SEC-001) and the per-IP rate limiter (SEC-007).
+"""
+
 from __future__ import annotations
 
 import json

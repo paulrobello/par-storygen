@@ -1,3 +1,5 @@
+"""Text-to-speech synthesis and cached per-node audio serving routes."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
