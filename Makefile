@@ -35,7 +35,12 @@ fmt:
 typecheck:
 	uv run pyright
 
-checkall: fmt lint typecheck test
+# ARC-008: the gate is read-only — `fmt` MUTATES files (ruff format rewrites
+# the tree), so running it before `lint`/`typecheck` would auto-fix any
+# formatting drift and mask failures rather than surfacing them. Pre-commit
+# already runs `ruff format` on staged files; CI runs `make checkall` as the
+# authoritative green gate. Run `make fmt` explicitly to format.
+checkall: lint typecheck test
 
 Checkall: checkall
 
