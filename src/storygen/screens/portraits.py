@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import logging
 import os
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import ClassVar
@@ -495,59 +496,74 @@ class PortraitsScreen(Screen[None]):
             button_row.mount(Button("Revert to base", id=f"revert-outfit-{char.id}"))
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Dispatch per-character button presses by their ``<prefix>-<char_id>`` id.
+
+        Each button id is a prefix (the action) joined to a character id; this
+        table routes the prefix to a small handler that resolves the character
+        and invokes the action. No prefix is a prefix of another, so iteration
+        order is irrelevant.
+        """
         button_id = event.button.id or ""
-        if button_id.startswith("regen-"):
-            char_id = button_id[len("regen-") :]
-            char = next((c for c in self._save.characters if c.id == char_id), None)
-            if char is None:
+        handlers: list[tuple[str, Callable[[str, Button], None]]] = [
+            ("regen-", self._handle_regen),
+            ("edit-regen-", self._handle_edit_regen),
+            ("export-", self._handle_export),
+            ("edit-bio-", self._handle_edit_bio),
+            ("ref-image-", self._handle_ref_image),
+            ("rm-ref-", self._handle_rm_ref),
+            ("add-outfit-", self._handle_add_outfit),
+            ("revert-outfit-", self._handle_revert_outfit),
+        ]
+        for prefix, handler in handlers:
+            if button_id.startswith(prefix):
+                handler(button_id[len(prefix) :], event.button)
                 return
-            self._regenerate_worker(char, event.button)
+
+    def _find_char(self, char_id: str) -> Character | None:
+        """Resolve a character by id, or ``None`` if not on this save."""
+        return next((c for c in self._save.characters if c.id == char_id), None)
+
+    def _handle_regen(self, char_id: str, button: Button) -> None:
+        char = self._find_char(char_id)
+        if char is not None:
+            self._regenerate_worker(char, button)
+
+    def _handle_edit_regen(self, char_id: str, _button: Button) -> None:
+        char = self._find_char(char_id)
+        if char is not None:
+            self._open_edit_regen_modal(char)
+
+    def _handle_export(self, char_id: str, _button: Button) -> None:
+        char = self._find_char(char_id)
+        if char is None:
+            self.notify("Character not found", severity="error")
             return
-        if button_id.startswith("edit-regen-"):
-            char_id = button_id[len("edit-regen-") :]
-            char = next((c for c in self._save.characters if c.id == char_id), None)
-            if char is not None:
-                self._open_edit_regen_modal(char)
-            return
-        if button_id.startswith("export-"):
-            char_id = button_id[len("export-") :]
-            char = next((c for c in self._save.characters if c.id == char_id), None)
-            if char is None:
-                self.notify("Character not found", severity="error")
-                return
-            self._export_to_library(char)
-            return
-        if button_id.startswith("edit-bio-"):
-            char_id = button_id[len("edit-bio-") :]
-            char = next((c for c in self._save.characters if c.id == char_id), None)
-            if char is None:
-                return
+        self._export_to_library(char)
+
+    def _handle_edit_bio(self, char_id: str, _button: Button) -> None:
+        char = self._find_char(char_id)
+        if char is not None:
             self._open_edit_bio_modal(char)
+
+    def _handle_ref_image(self, char_id: str, _button: Button) -> None:
+        char = self._find_char(char_id)
+        if char:
+            self._open_ref_image_modal(char)
+
+    def _handle_rm_ref(self, char_id: str, _button: Button) -> None:
+        self._remove_reference_image(char_id)
+
+    def _handle_add_outfit(self, char_id: str, _button: Button) -> None:
+        char = self._find_char(char_id)
+        if char is None:
             return
-        if button_id.startswith("ref-image-"):
-            char_id = button_id[len("ref-image-") :]
-            char = next((c for c in self._save.characters if c.id == char_id), None)
-            if char:
-                self._open_ref_image_modal(char)
+        self._open_create_outfit_modal(char)
+
+    def _handle_revert_outfit(self, char_id: str, _button: Button) -> None:
+        char = self._find_char(char_id)
+        if char is None:
             return
-        if button_id.startswith("rm-ref-"):
-            char_id = button_id[len("rm-ref-") :]
-            self._remove_reference_image(char_id)
-            return
-        if button_id.startswith("add-outfit-"):
-            char_id = button_id[len("add-outfit-") :]
-            char = next((c for c in self._save.characters if c.id == char_id), None)
-            if char is None:
-                return
-            self._open_create_outfit_modal(char)
-            return
-        if button_id.startswith("revert-outfit-"):
-            char_id = button_id[len("revert-outfit-") :]
-            char = next((c for c in self._save.characters if c.id == char_id), None)
-            if char is None:
-                return
-            self._revert_to_base(char)
-            return
+        self._revert_to_base(char)
 
     def on_click(self, event: Click) -> None:
         """Outfit-thumb click → action modal.
