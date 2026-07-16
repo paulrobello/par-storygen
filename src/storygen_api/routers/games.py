@@ -3,17 +3,17 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime
+from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
-from typing import cast
 
 from storygen.config import AppConfig
 from storygen.core.models import NodeId, StoryNode
+from storygen.export.book import export_book, sanitize_title
 from storygen.storage import paths
 from storygen.storage.save import delete_game, load_game, prune_subtree, save_game
 from storygen.storage.tree import path_from_root
-
 from storygen_api.deps import build_pipeline, get_app_config, get_session_manager
 from storygen_api.rate_limit import enforce_rate_limit
 from storygen_api.schemas import (
@@ -31,7 +31,6 @@ from storygen_api.schemas import (
     RegenerateNodeRequest,
 )
 from storygen_api.security import verify_token
-from storygen.export.book import export_book, sanitize_title
 from storygen_api.session import PipelineSessionManager
 from storygen_api.ws import ws_manager
 
@@ -406,7 +405,6 @@ async def download_book(
     game_id: str,
 ) -> FileResponse:
     """Download the exported HTML book as a file."""
-    import os
 
     try:
         save = load_game(game_id)

@@ -19,7 +19,6 @@ tracking because the resulting ``TypeError`` was swallowed by the
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock
 
 import pytest
 
@@ -36,7 +35,6 @@ from storygen.llm.models import (
 from storygen.runtime.adapters import BeatAgentAdapter, IllustrationAdapter, SummaryAdapter
 from storygen.storage.save import GameSave, save_game
 from storygen_api import deps
-
 
 # ---------------------------------------------------------------------------
 # Test fixtures
@@ -226,8 +224,12 @@ async def test_summary_and_illustration_adapters_read_usage_property() -> None:
     illustration_adapter = IllustrationAdapter(
         _IllustrationAgent(), on_usage=illu_captured.append
     )
-    summary_out = await summary_adapter.run("p")
-    illustration_out = await illustration_adapter.run(_Beat(), [])  # type: ignore[arg-type]
+    # SummaryAdapter.run / IllustrationAdapter.run carry `# type: ignore[no-untyped-def]`
+    # at the definition site (see src/storygen/runtime/adapters.py) to match the loose-typed
+    # pydantic-ai adapter style documented in CLAUDE.md. The unknown-member cascade here is
+    # the downstream consequence of that intentional looseness.
+    summary_out: object = await summary_adapter.run("p")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    illustration_out: object = await illustration_adapter.run(_Beat(), [])  # type: ignore[arg-type]  # pyright: ignore[reportUnknownMemberType]
 
     assert summary_out == "summary"
     assert summary_captured == [{"input": 1}]

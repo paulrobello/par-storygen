@@ -15,6 +15,7 @@ Two test groups:
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -22,11 +23,12 @@ from uuid import uuid4
 import pytest
 from pydantic import BaseModel, ValidationError
 from starlette.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
+from storygen.core.models import ImageStatus
 from storygen_api.main import create_app
 from storygen_api.security import reset_token_cache
 from storygen_api.ws import WebSocketManager
-
 
 # ---------------------------------------------------------------------------
 # ws-types.ts contract — single source of truth (mirror of the TS file)
@@ -129,7 +131,7 @@ class _CapturingManager(WebSocketManager):
 
 def _sample_node(
     *,
-    image_status: str = "done",
+    image_status: ImageStatus = "done",
     image_path: str | None = "games/abc/scene-root.png",
     choices: list[dict[str, Any]] | None = None,
 ) -> Any:
@@ -272,7 +274,7 @@ async def test_new_characters_broadcast_includes_full_character_fields() -> None
     assert payload["type"] == "new_characters"
     assert isinstance(payload["characters"], list)
     assert payload["characters"], "new_characters must emit non-empty characters[]"
-    first = payload["characters"][0]
+    first: dict[str, Any] = payload["characters"][0]  # pyright: ignore[reportUnknownVariableType]
     assert first["id"] == "alyx"
     assert first["name"] == "Alyx"
     # The TS contract expects these fields on each character.
@@ -286,7 +288,7 @@ async def test_new_characters_broadcast_includes_full_character_fields() -> None
 
 
 @pytest.fixture(autouse=True)
-def _reset_ws_token_cache() -> None:
+def _reset_ws_token_cache() -> Iterator[None]:  # pyright: ignore[reportUnusedFunction]  # autouse fixture, invoked by pytest
     """Clear the bearer-token cache before and after each test."""
     reset_token_cache()
     yield
@@ -308,13 +310,15 @@ def test_ws_handshake_rejected_when_no_token_configured(xdg_tmp: Any) -> None:
 
     app = create_app()
     game_id = str(uuid4()).replace("-", "") * 1  # any non-empty segment
-    with TestClient(app) as client:
-        with pytest.raises(Exception):  # starlette WebSocketDisconnect or HTTPException
-            with client.websocket_connect(
-                f"/api/ws/{game_id}",
-                headers=_ws_headers_with_token("anything"),
-            ):
-                pass
+    with (
+        TestClient(app) as client,
+        pytest.raises(WebSocketDisconnect),  # SEC-001 fail-closed handshake reject
+        client.websocket_connect(
+            f"/api/ws/{game_id}",
+            headers=_ws_headers_with_token("anything"),
+        ),
+    ):
+        pass
 
 
 def test_ws_handshake_rejected_with_wrong_token(
@@ -326,13 +330,11 @@ def test_ws_handshake_rejected_with_wrong_token(
 
     app = create_app()
     game_id = str(uuid4()).replace("-", "")
-    with TestClient(app) as client:
-        with pytest.raises(Exception):
-            with client.websocket_connect(
-                f"/api/ws/{game_id}",
-                headers=_ws_headers_with_token("wrong-token"),
-            ):
-                pass
+    with TestClient(app) as client, pytest.raises(WebSocketDisconnect), client.websocket_connect(
+        f"/api/ws/{game_id}",
+        headers=_ws_headers_with_token("wrong-token"),
+    ):
+        pass
 
 
 def test_ws_handshake_accepted_with_correct_token_then_closes_on_unknown_game(
@@ -349,18 +351,18 @@ def test_ws_handshake_accepted_with_correct_token_then_closes_on_unknown_game(
 
     app = create_app()
     game_id = "0" * 32  # 32-hex format passes paths.py SEC-003 validation but doesn't exist
-    with TestClient(app) as client:
-        with client.websocket_connect(
+    with (
+        TestClient(app) as client,
+        client.websocket_connect(
             f"/api/ws/{game_id}",
             headers=_ws_headers_with_token("correct-token"),
-        ) as ws:
-            # The auth gate accepted us; the router then tried to load the
-            # (nonexistent) save and should close the connection. A subsequent
-            # receive should raise.
-            from starlette.websockets import WebSocketDisconnect
-
-            with pytest.raises(WebSocketDisconnect):
-                ws.receive_json()
+        ) as ws,
+        pytest.raises(WebSocketDisconnect),
+    ):
+        # The auth gate accepted us; the router then tried to load the
+        # (nonexistent) save and should close the connection. A subsequent
+        # receive should raise.
+        ws.receive_json()
 
 
 def test_error_event_broadcast_validates_against_contract() -> None:

@@ -13,6 +13,7 @@ fix for ARC-001 (WS protocol) reaches the wire.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -33,7 +34,6 @@ from storygen.llm.models import (
 from storygen.storage.save import GameSave, save_game
 from tests.integration._stub_pipeline import StubBeatPipeline
 
-
 # ---------------------------------------------------------------------------
 # SEC-001 auth on the REST wizard surface (HTTP path)
 # ---------------------------------------------------------------------------
@@ -42,7 +42,7 @@ from tests.integration._stub_pipeline import StubBeatPipeline
 @pytest.fixture
 def app_client(
     xdg_tmp: Any, monkeypatch: pytest.MonkeyPatch
-) -> TestClient:
+) -> Iterator[TestClient]:
     """Build a TestClient with STORYGEN_API_TOKEN set and the cache primed."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setenv("STORYGEN_API_TOKEN", "integration-test-token")
@@ -189,7 +189,6 @@ def test_ws_advance_emits_narration_then_beat_committed(
     from storygen_api.deps import get_session_manager
     from storygen_api.routers import ws as ws_router
 
-    from tests.integration._stub_pipeline import StubBeatPipeline
 
     mgr = get_session_manager()
     stub = StubBeatPipeline()
@@ -204,25 +203,24 @@ def test_ws_advance_emits_narration_then_beat_committed(
     from storygen_api.main import create_app
 
     app = create_app()
-    with TestClient(app) as client:
-        with client.websocket_connect(
-            f"/api/ws/{game_id}",
-            headers={"sec-websocket-protocol": "bearer.ws-test-token"},
-        ) as ws:
-            # Drive an advance; the stub emits narration_delta then beat_committed.
-            ws.send_json(
-                {"type": "advance", "choice_id": choice_id, "from_node_id": "root"}
-            )
-            # Collect up to 5 events or until beat_committed arrives.
-            events: list[dict[str, Any]] = []
-            for _ in range(5):
-                try:
-                    evt = ws.receive_json()
-                except WebSocketDisconnect:
-                    break
-                events.append(evt)
-                if evt.get("type") == "beat_committed":
-                    break
+    with TestClient(app) as client, client.websocket_connect(
+        f"/api/ws/{game_id}",
+        headers={"sec-websocket-protocol": "bearer.ws-test-token"},
+    ) as ws:
+        # Drive an advance; the stub emits narration_delta then beat_committed.
+        ws.send_json(
+            {"type": "advance", "choice_id": choice_id, "from_node_id": "root"}
+        )
+        # Collect up to 5 events or until beat_committed arrives.
+        events: list[dict[str, Any]] = []
+        for _ in range(5):
+            try:
+                evt = ws.receive_json()
+            except WebSocketDisconnect:
+                break
+            events.append(evt)
+            if evt.get("type") == "beat_committed":
+                break
 
     types = [e.get("type") for e in events]
     assert "narration_delta" in types, (
@@ -257,7 +255,6 @@ def test_ws_rejects_advance_with_missing_fields(
     reset_token_cache()
 
     from storygen_api.deps import get_session_manager
-    from tests.integration._stub_pipeline import StubBeatPipeline
 
     mgr = get_session_manager()
     mgr.get_or_create(game_id, save, StubBeatPipeline())  # type: ignore[arg-type]
@@ -265,13 +262,12 @@ def test_ws_rejects_advance_with_missing_fields(
     from storygen_api.main import create_app
 
     app = create_app()
-    with TestClient(app) as client:
-        with client.websocket_connect(
-            f"/api/ws/{game_id}",
-            headers={"sec-websocket-protocol": "bearer.ws-test-token"},
-        ) as ws:
-            ws.send_json({"type": "advance", "choice_id": "", "from_node_id": ""})
-            evt = ws.receive_json()
+    with TestClient(app) as client, client.websocket_connect(
+        f"/api/ws/{game_id}",
+        headers={"sec-websocket-protocol": "bearer.ws-test-token"},
+    ) as ws:
+        ws.send_json({"type": "advance", "choice_id": "", "from_node_id": ""})
+        evt = ws.receive_json()
     assert evt["type"] == "error"
     assert evt["code"] == "bad_request"
     assert "message" in evt  # SEC-004 contract: errors carry a message field

@@ -16,8 +16,8 @@ from rich.segment import Segment
 from rich.style import Style
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
-from textual.strip import Strip
 from textual.screen import Screen
+from textual.strip import Strip
 from textual.widgets import Footer, Header, Static, Tree
 from textual.widgets.tree import TreeNode
 

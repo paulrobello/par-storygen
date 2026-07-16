@@ -19,7 +19,6 @@ from storygen_api.deps import (
 )
 from storygen_api.rate_limit import enforce_rate_limit
 from storygen_api.schemas import (
-    OutfitActionRequest,
     OutfitRequest,
     PortraitEditRequest,
     SceneEditRequest,

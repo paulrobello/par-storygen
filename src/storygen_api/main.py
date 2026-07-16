@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 import typer
 import uvicorn
@@ -12,7 +12,6 @@ from fastapi.staticfiles import StaticFiles
 
 from storygen import __version__
 from storygen.storage import paths
-
 from storygen_api.deps import get_app_config, get_session_manager
 from storygen_api.routers import characters, games, images, presets, settings, tts, wizard
 from storygen_api.routers import ws as ws_router

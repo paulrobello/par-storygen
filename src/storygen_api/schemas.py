@@ -13,7 +13,6 @@ from pydantic import BaseModel
 
 from storygen.core.models import Character, NodeId
 
-
 # ---------------------------------------------------------------------------
 # Games
 # ---------------------------------------------------------------------------

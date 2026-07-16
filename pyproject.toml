@@ -155,6 +155,14 @@ ignore = [
     "E501",
 ]
 
+# FastAPI's documented idiom is `Depends(...)` in default arguments (and the
+# reusable `Annotated[..., Depends()]` aliases in security.py / rate_limit.py
+# don't cover every router site). B008 would force a rewrite of ~22 router
+# signatures for no functional gain; the per-file-ignore matches FastAPI's
+# own recommendation in RUF013/B008 docs.
+[tool.ruff.lint.per-file-ignores]
+"src/storygen_api/**" = ["B008"]
+
 [tool.pyright]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
