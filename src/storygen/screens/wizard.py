@@ -799,127 +799,36 @@ class WizardScreen(Screen[None]):
         """Per-step progress callback for build_initial_save."""
         self._progress.update(f"[dim]⏳ {message}[/dim]")
 
+    # ARC-012/QA-002: dispatch table replaces an 8-arm ``if self.current_step
+    # == WizardStep.X`` chain (was cc=34). Each handler advances one step and
+    # either sets ``self.current_step`` to the next step or returns early on a
+    # validation failure (matching the original early-``return`` semantics).
+    # The dispatcher below just looks up and awaits the matching handler; the
+    # try/except/finally (error toast + busy re-enable) stays here so a raise
+    # in any handler is caught and reported exactly as before.
+    _WIZARD_STEP_HANDLERS: ClassVar[dict[WizardStep, str]] = {
+        WizardStep.THEME: "_advance_step_theme",
+        WizardStep.TONE: "_advance_step_tone",
+        WizardStep.STYLE: "_advance_step_style",
+        WizardStep.ART_STYLE: "_advance_step_art_style",
+        WizardStep.LENGTH: "_advance_step_length",
+        WizardStep.READER_LEVEL: "_advance_step_reader_level",
+        WizardStep.CHARACTERS: "_advance_step_characters",
+        WizardStep.CONFIRM: "_advance_step_confirm",
+    }
+
     @work(exit_on_error=False)
     async def _advance_worker(self) -> None:
         if self._flow is None:
             return
         self._set_busy(True)
         try:
-            if self.current_step == WizardStep.THEME:
-                self._theme_area.read_only = True
-                self.notify("Generating theme…", timeout=5)
-                self._theme = await self._flow.propose_theme(self._theme_area.text)
-                self.current_step = WizardStep.TONE
-                return
-            if self.current_step == WizardStep.TONE:
-                preset = cast(str, self._tone_select.value)
-                descriptor = self._tone_descriptor.value.strip() or None
-                if preset == "custom" and not descriptor:
-                    self.notify("Custom tone needs a descriptor.", severity="warning")
-                    return
-                self._tone = Tone(preset=cast(_TonePreset, preset), custom_descriptor=descriptor)
-                self.current_step = WizardStep.STYLE
-                return
-            if self.current_step == WizardStep.STYLE:
-                self._style = cast(NarrationStyle, self._style_select.value)
-                self.current_step = WizardStep.ART_STYLE
-                return
-            if self.current_step == WizardStep.ART_STYLE:
-                text = self._art_style_input.value.strip()
-                self._art_style = text or self._defaults.art_style or app_state.DEFAULT_ART_STYLE
-                self.current_step = WizardStep.LENGTH
-                return
-            if self.current_step == WizardStep.LENGTH:
-                raw = self._length_input.value.strip()
-                try:
-                    n = int(raw) if raw else self._defaults.target_major_beats
-                except ValueError:
-                    n = self._defaults.target_major_beats
-                self._target_major_beats = max(
-                    app_state.MIN_TARGET_MAJOR_BEATS,
-                    min(app_state.MAX_TARGET_MAJOR_BEATS, n),
+            handler_name = self._WIZARD_STEP_HANDLERS.get(self.current_step)
+            if handler_name is not None:
+                handler = cast(
+                    "Callable[[], Awaitable[None]]", getattr(self, handler_name)
                 )
-                # Capture pacing selection (module-level _PACING_OPTIONS)
-                idx = self._pacing_input.pressed_index
-                self._pacing = (
-                    _PACING_OPTIONS[idx] if 0 <= idx < len(_PACING_OPTIONS) else "moderate"
-                )
-                self.current_step = WizardStep.READER_LEVEL
-                return
-            if self.current_step == WizardStep.READER_LEVEL:
-                self._reader_level = cast(str, self._reader_level_select.value)
-                self.current_step = WizardStep.CHARACTERS
-                return
-            if self.current_step == WizardStep.CHARACTERS:
-                if self._theme is None:
-                    self.notify("Theme not set — go back to the Theme step.", severity="warning")
-                    return
-                self.notify("Generating characters…", timeout=5)
-                self._user_character_prompt = self._char_area.text
-                # Preserve any library-imported characters across a Generate
-                # click; generate_characters returns only LLM-invented cast.
-                imported = [c for c in self._characters if c.id in self._imported_from_library_ids]
-                imported_names = {c.name.lower() for c in imported}
-                generated = await self._flow.generate_characters(
-                    self._theme,
-                    user_prompt=self._user_character_prompt,
-                    imported_characters=imported,
-                )
-                # LLM may ignore the "don't duplicate" instruction — dedup by
-                # full name and first name so "Paul Robello" and "Paul" collide.
-                seen_full: set[str] = set(imported_names)
-                seen_first: set[str] = {n.split()[0] for n in imported_names if n}
-                deduped: list[Character] = []
-                for c in generated:
-                    full = c.name.lower()
-                    first = full.split()[0] if full else ""
-                    if full in seen_full or (first and first in seen_first):
-                        continue
-                    seen_full.add(full)
-                    if first:
-                        seen_first.add(first)
-                    deduped.append(c)
-                self._characters = imported + deduped
-                self.current_step = WizardStep.CONFIRM
-                return
-            if self.current_step == WizardStep.CONFIRM:
-                if self._theme is None:
-                    self.notify("Theme not set — go back to the Theme step.", severity="warning")
-                    return
-                if self._tone is None:
-                    self.notify("Tone not set — go back to the Tone step.", severity="warning")
-                    return
-                self.notify("Building your story world…", timeout=5)
-                self._progress.update("[dim]⏳ Preparing…[/dim]")
-                # Build pending ref-image writes: char_id -> (ref_png, portrait_png_or_none)
-                pending_ref_writes = {
-                    cid: (data[1], self._pending_portrait_bytes.get(cid))
-                    for cid, data in self._pending_ref_images.items()
-                }
-                save = await self._flow.build_initial_save(
-                    theme=self._theme,
-                    tone=self._tone,
-                    narration_style=self._style,
-                    characters=self._characters,
-                    art_style=self._art_style,
-                    target_major_beats=self._target_major_beats,
-                    reader_level=self._reader_level,
-                    pacing=self._pacing,
-                    on_progress=self._notify_progress,
-                    theme_prompt=self._theme_area.text,
-                    character_prompt=self._user_character_prompt,
-                    library_import_ids=dict(self._imported_from_library_ids),
-                    pending_ref_writes=pending_ref_writes or None,
-                )
-                self._progress.update("[dim]⏳ Finishing up…[/dim]")
-                # Auto-export generated characters to catalog if checked.
-                if self._save_to_catalog_checkbox.value:
-                    self._auto_export_to_catalog(save)
-                if self._on_complete is not None:
-                    # _on_complete switches the screen to PlayScreen; do NOT
-                    # pop_screen afterward (that would pop PlayScreen).
-                    await self._on_complete(save)
-                return
+                await handler()
         except Exception as exc:
             self._progress.update("")
             self.notify(f"Error: {exc}", severity="error", timeout=5)
@@ -927,6 +836,130 @@ class WizardScreen(Screen[None]):
             # Re-enable button only if we're still on the wizard (CONFIRM exits).
             if self.is_attached:
                 self._set_busy(False)
+
+    async def _advance_step_theme(self) -> None:
+        # Defensive guard mirrors the dispatcher's ``self._flow is None: return``
+        # check; pyright does not carry self-attribute narrowing across the
+        # method boundary, so each handler that touches ``self._flow`` re-narrows.
+        if self._flow is None:
+            return
+        self._theme_area.read_only = True
+        self.notify("Generating theme…", timeout=5)
+        self._theme = await self._flow.propose_theme(self._theme_area.text)
+        self.current_step = WizardStep.TONE
+
+    async def _advance_step_tone(self) -> None:
+        preset = cast(str, self._tone_select.value)
+        descriptor = self._tone_descriptor.value.strip() or None
+        if preset == "custom" and not descriptor:
+            self.notify("Custom tone needs a descriptor.", severity="warning")
+            return
+        self._tone = Tone(preset=cast(_TonePreset, preset), custom_descriptor=descriptor)
+        self.current_step = WizardStep.STYLE
+
+    async def _advance_step_style(self) -> None:
+        self._style = cast(NarrationStyle, self._style_select.value)
+        self.current_step = WizardStep.ART_STYLE
+
+    async def _advance_step_art_style(self) -> None:
+        text = self._art_style_input.value.strip()
+        self._art_style = text or self._defaults.art_style or app_state.DEFAULT_ART_STYLE
+        self.current_step = WizardStep.LENGTH
+
+    async def _advance_step_length(self) -> None:
+        raw = self._length_input.value.strip()
+        try:
+            n = int(raw) if raw else self._defaults.target_major_beats
+        except ValueError:
+            n = self._defaults.target_major_beats
+        self._target_major_beats = max(
+            app_state.MIN_TARGET_MAJOR_BEATS,
+            min(app_state.MAX_TARGET_MAJOR_BEATS, n),
+        )
+        # Capture pacing selection (module-level _PACING_OPTIONS)
+        idx = self._pacing_input.pressed_index
+        self._pacing = (
+            _PACING_OPTIONS[idx] if 0 <= idx < len(_PACING_OPTIONS) else "moderate"
+        )
+        self.current_step = WizardStep.READER_LEVEL
+
+    async def _advance_step_reader_level(self) -> None:
+        self._reader_level = cast(str, self._reader_level_select.value)
+        self.current_step = WizardStep.CHARACTERS
+
+    async def _advance_step_characters(self) -> None:
+        if self._flow is None:
+            return
+        if self._theme is None:
+            self.notify("Theme not set — go back to the Theme step.", severity="warning")
+            return
+        self.notify("Generating characters…", timeout=5)
+        self._user_character_prompt = self._char_area.text
+        # Preserve any library-imported characters across a Generate
+        # click; generate_characters returns only LLM-invented cast.
+        imported = [c for c in self._characters if c.id in self._imported_from_library_ids]
+        imported_names = {c.name.lower() for c in imported}
+        generated = await self._flow.generate_characters(
+            self._theme,
+            user_prompt=self._user_character_prompt,
+            imported_characters=imported,
+        )
+        # LLM may ignore the "don't duplicate" instruction — dedup by
+        # full name and first name so "Paul Robello" and "Paul" collide.
+        seen_full: set[str] = set(imported_names)
+        seen_first: set[str] = {n.split()[0] for n in imported_names if n}
+        deduped: list[Character] = []
+        for c in generated:
+            full = c.name.lower()
+            first = full.split()[0] if full else ""
+            if full in seen_full or (first and first in seen_first):
+                continue
+            seen_full.add(full)
+            if first:
+                seen_first.add(first)
+            deduped.append(c)
+        self._characters = imported + deduped
+        self.current_step = WizardStep.CONFIRM
+
+    async def _advance_step_confirm(self) -> None:
+        if self._flow is None:
+            return
+        if self._theme is None:
+            self.notify("Theme not set — go back to the Theme step.", severity="warning")
+            return
+        if self._tone is None:
+            self.notify("Tone not set — go back to the Tone step.", severity="warning")
+            return
+        self.notify("Building your story world…", timeout=5)
+        self._progress.update("[dim]⏳ Preparing…[/dim]")
+        # Build pending ref-image writes: char_id -> (ref_png, portrait_png_or_none)
+        pending_ref_writes = {
+            cid: (data[1], self._pending_portrait_bytes.get(cid))
+            for cid, data in self._pending_ref_images.items()
+        }
+        save = await self._flow.build_initial_save(
+            theme=self._theme,
+            tone=self._tone,
+            narration_style=self._style,
+            characters=self._characters,
+            art_style=self._art_style,
+            target_major_beats=self._target_major_beats,
+            reader_level=self._reader_level,
+            pacing=self._pacing,
+            on_progress=self._notify_progress,
+            theme_prompt=self._theme_area.text,
+            character_prompt=self._user_character_prompt,
+            library_import_ids=dict(self._imported_from_library_ids),
+            pending_ref_writes=pending_ref_writes or None,
+        )
+        self._progress.update("[dim]⏳ Finishing up…[/dim]")
+        # Auto-export generated characters to catalog if checked.
+        if self._save_to_catalog_checkbox.value:
+            self._auto_export_to_catalog(save)
+        if self._on_complete is not None:
+            # _on_complete switches the screen to PlayScreen; do NOT
+            # pop_screen afterward (that would pop PlayScreen).
+            await self._on_complete(save)
 
 
 def _label_for_step(step: WizardStep) -> str:

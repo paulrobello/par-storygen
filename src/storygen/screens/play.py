@@ -5,8 +5,9 @@ from __future__ import annotations
 import asyncio
 import random
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, cast
 
 from pyfiglet import Figlet
 from rich.align import Align
@@ -318,6 +319,28 @@ class PlayScreen(Screen[None]):
             with_images=app_state.prefetch_images_enabled(),
         )
 
+    # ARC-012/QA-002: dispatch table replaces a 13-arm ``if action == "X"``
+    # chain (was cc=31). Each handler takes the current node (already fetched
+    # and non-None) and returns bool | None per Textual's check_action contract.
+    # "pick" is parameterized so it is special-cased before the lookup. The
+    # cross-cutting _loading / _auto_selecting guards stay in check_action
+    # itself (they apply to ALL actions and must run before the dispatch).
+    _ACTION_CHECKS: ClassVar[dict[str, str]] = {
+        "pick_highlighted": "_check_pick_highlighted",
+        "highlight_next": "_check_highlight_nav",
+        "highlight_prev": "_check_highlight_nav",
+        "go_back": "_check_go_back",
+        "regen_picker": "_check_always_true",
+        "info_picker": "_check_always_true",
+        "tts_toggle": "_check_tts_toggle",
+        "tts_restart": "_check_tts_restart",
+        "tts_stop": "_check_tts_stop",
+        "auto_select": "_check_auto_select",
+        "export_book": "_check_export_book",
+        "recap": "_check_always_true",
+        "menu": "_check_always_true",
+    }
+
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         # While a beat is generating, keep navigation disabled so actions don't
         # apply to stale choices; TTS controls are safe and must remain available
@@ -344,55 +367,74 @@ class PlayScreen(Screen[None]):
         node = self._save.nodes.get(self._save.current_node_id)
         if node is None:
             return True
+        # "pick" is parameterized: pick(N) → choose the Nth choice.
         if action == "pick":
-            # parameters is (n,) for parameterized action pick(N)
-            if parameters:
-                try:
-                    n = int(str(parameters[0]))
-                    return n <= len(node.choices)
-                except (ValueError, TypeError):
-                    return None
+            return self._check_pick(parameters, node)
+        handler_name = self._ACTION_CHECKS.get(action)
+        if handler_name is None:
             return None
-        if action == "pick_highlighted":
-            return bool(node.choices) and self._choices.highlighted is not None
-        if action in ("highlight_next", "highlight_prev"):
-            return bool(node.choices)
-        if action == "go_back":
-            return node.parent_id is not None
-        if action == "regen_picker":
-            return True
-        if action == "info_picker":
-            return True
-        if action == "tts_toggle":
-            return self._tts_player is not None and self._tts_player.is_configured
-        if action == "tts_restart":
-            if self._tts_player is None:
-                return False
-            return self._tts_player.state in (TTSState.PLAYING, TTSState.PAUSED)
-        if action == "tts_stop":
-            if self._tts_player is None:
-                return False
-            return self._tts_player.state in (
-                TTSState.PLAYING,
-                TTSState.PAUSED,
-                TTSState.GENERATING,
-            )
-        if action == "auto_select":
-            return self._pipeline is not None
-        if action == "export_book":
-            node = self._save.nodes.get(self._save.current_node_id)
-            if node is None or not node.is_ending:
-                return False
-            if self._loading or self._edit_regen_active or self._image_regen_active:
-                return False
-            return not (
-                self._tts_player is not None and self._tts_player.state == TTSState.GENERATING
-            )
-        if action == "recap":
-            return True
-        if action == "menu":
-            return True
-        return None
+        handler = cast(
+            "Callable[[StoryNode], bool | None]", getattr(self, handler_name)
+        )
+        return handler(node)
+
+    def _check_pick(
+        self, parameters: tuple[object, ...], node: StoryNode
+    ) -> bool | None:
+        # parameters is (n,) for parameterized action pick(N).
+        if not parameters:
+            return None
+        try:
+            n = int(str(parameters[0]))
+            return n <= len(node.choices)
+        except (ValueError, TypeError):
+            return None
+
+    def _check_pick_highlighted(self, node: StoryNode) -> bool | None:
+        return bool(node.choices) and self._choices.highlighted is not None
+
+    def _check_highlight_nav(self, node: StoryNode) -> bool | None:
+        return bool(node.choices)
+
+    def _check_go_back(self, node: StoryNode) -> bool | None:
+        return node.parent_id is not None
+
+    def _check_always_true(self, node: StoryNode) -> bool | None:
+        del node
+        return True
+
+    def _check_tts_toggle(self, node: StoryNode) -> bool | None:
+        del node
+        return self._tts_player is not None and self._tts_player.is_configured
+
+    def _check_tts_restart(self, node: StoryNode) -> bool | None:
+        del node
+        if self._tts_player is None:
+            return False
+        return self._tts_player.state in (TTSState.PLAYING, TTSState.PAUSED)
+
+    def _check_tts_stop(self, node: StoryNode) -> bool | None:
+        del node
+        if self._tts_player is None:
+            return False
+        return self._tts_player.state in (
+            TTSState.PLAYING,
+            TTSState.PAUSED,
+            TTSState.GENERATING,
+        )
+
+    def _check_auto_select(self, node: StoryNode) -> bool | None:
+        del node
+        return self._pipeline is not None
+
+    def _check_export_book(self, node: StoryNode) -> bool | None:
+        if not node.is_ending:
+            return False
+        if self._loading or self._edit_regen_active or self._image_regen_active:
+            return False
+        return not (
+            self._tts_player is not None and self._tts_player.state == TTSState.GENERATING
+        )
 
     def _render_image_for(self, status: str, image_path: str | None) -> None:
         # If a partial or final image is on disk, show it regardless of
