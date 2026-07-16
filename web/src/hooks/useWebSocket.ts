@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import type { ServerEvent } from "@/lib/ws-types";
 import type { StoryNode } from "@/lib/api";
+import { API_BASE, WS_BASE } from "@/lib/config";
 import { useGameStore } from "@/stores/game-store";
 
 interface UseWebSocketOptions {
@@ -22,7 +23,7 @@ export function useWebSocket({ gameId, enabled = true }: UseWebSocketOptions) {
   const connect = useCallback(() => {
     if (!gameId || !enabled) return;
 
-    const ws = new WebSocket(`ws://localhost:8101/api/ws/${gameId}`);
+    const ws = new WebSocket(`${WS_BASE}/api/ws/${gameId}`);
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -70,7 +71,7 @@ export function useWebSocket({ gameId, enabled = true }: UseWebSocketOptions) {
             break;
           case "image_committed":
             setCurrentImageUrl(
-              `http://localhost:8101/api/images/${gameId}/scene/${msg.node_id}`
+              `${API_BASE}/api/images/${gameId}/scene/${msg.node_id}`
             );
             break;
           case "image_failed":

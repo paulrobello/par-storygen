@@ -1,8 +1,11 @@
 /** Typed fetch wrapper for the par-storygen FastAPI backend. */
 
-// SEC-008 / ARC-016: API base is configurable via NEXT_PUBLIC_API_BASE so the
-// frontend doesn't hard-code a port. Default matches `make api-dev` (:8101).
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8101";
+// ARC-016: API_BASE lives in a single config module so every frontend route,
+// hook, and component derives from one source. Re-exported here so existing
+// `import { API_BASE } from "@/lib/api"` call sites keep working.
+import { API_BASE } from "@/lib/config";
+
+export { API_BASE };
 
 // ---------------------------------------------------------------------------
 // Domain types matching the FastAPI / Python models

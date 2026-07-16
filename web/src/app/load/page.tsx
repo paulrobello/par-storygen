@@ -11,8 +11,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { apiGet, apiDelete, apiPost } from "@/lib/api";
 import type { GameSummary, GameSave } from "@/lib/api";
 import { Trash2, Play, BookOpen, RefreshCw, Info } from "lucide-react";
-
-const API_BASE = "http://localhost:8101";
+import { API_BASE } from "@/lib/config";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (

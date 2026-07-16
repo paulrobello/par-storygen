@@ -30,7 +30,7 @@ web/
 
 ## API client
 
-`web/src/lib/api.ts` is the single source of truth for HTTP. It hard-codes `API_BASE = "http://localhost:8101"` and exports:
+`web/src/lib/api.ts` is the single source of truth for HTTP. The backend base lives in `web/src/lib/config.ts` (ARC-016) — it reads `NEXT_PUBLIC_API_BASE` (default `http://localhost:8101`) and exports both `API_BASE` and a derived `WS_BASE`. Every route, hook, and component imports from `config.ts` so no port is hard-coded in more than one place. `api.ts` re-exports `API_BASE` and provides:
 
 - `apiGet<T>`, `apiPost<T>`, `apiPut<T>`, `apiPostForm<T>`, `apiDelete` — typed fetch wrappers used by every page.
 - Domain interfaces (`GameSave`, `StoryNode`, `Character`, `Relationship`, `SettingsResponse`, `WizardThemeResponse`, …) that mirror the Pydantic models in `src/storygen/core/models.py` and `src/storygen_api/schemas.py`. When you change a Python model, update the matching interface here.

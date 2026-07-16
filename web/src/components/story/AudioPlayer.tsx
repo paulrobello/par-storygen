@@ -3,8 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Volume2, VolumeX, Loader2, Play, Pause } from "lucide-react";
 import { apiPost } from "@/lib/api";
-
-const API_BASE = "http://localhost:8101";
+import { API_BASE } from "@/lib/config";
 
 interface AudioPlayerProps {
   gameId: string;

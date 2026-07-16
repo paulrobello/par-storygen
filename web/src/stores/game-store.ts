@@ -9,8 +9,7 @@ import {
   apiGet,
   apiPost,
 } from "@/lib/api";
-
-const API = "http://localhost:8101";
+import { API_BASE } from "@/lib/config";
 
 interface GraphEdge {
   parent_id: string;
@@ -79,7 +78,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       const currentNode = game.nodes[game.current_node_id] ?? null;
       const imageUrl =
         currentNode?.image_status === "done"
-          ? `${API}/api/images/${gameId}/scene/${game.current_node_id}`
+          ? `${API_BASE}/api/images/${gameId}/scene/${game.current_node_id}`
           : null;
       set({
         currentGame: game,
@@ -108,7 +107,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       );
       const imageUrl =
         result.node.image_status === "done"
-          ? `${API}/api/images/${game.id}/scene/${result.node.id}`
+          ? `${API_BASE}/api/images/${game.id}/scene/${result.node.id}`
           : null;
 
       const updatedNodes = { ...game.nodes, [result.node.id]: result.node };
@@ -140,7 +139,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!node) return;
     const imageUrl =
       node.image_status === "done"
-        ? `${API}/api/images/${game.id}/scene/${node.id}`
+        ? `${API_BASE}/api/images/${game.id}/scene/${node.id}`
         : null;
     set({
       currentNode: node,
@@ -230,7 +229,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       );
       const imageUrl =
         result.node.image_status === "done"
-          ? `${API}/api/images/${gameId}/scene/${result.node.id}`
+          ? `${API_BASE}/api/images/${gameId}/scene/${result.node.id}`
           : null;
       const game = get().currentGame;
       const updatedNodes = { ...game?.nodes, [result.node.id]: result.node };
@@ -275,7 +274,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       const currentNode = game.nodes[nodeId] ?? null;
       const imageUrl =
         currentNode?.image_status === "done"
-          ? `${API}/api/images/${gameId}/scene/${nodeId}`
+          ? `${API_BASE}/api/images/${gameId}/scene/${nodeId}`
           : null;
       set((state) => ({
         currentGame: game,

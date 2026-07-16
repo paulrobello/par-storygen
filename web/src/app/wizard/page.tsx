@@ -10,8 +10,7 @@ import { Modal } from "@/components/ui/Modal";
 import { apiGet, apiPost } from "@/lib/api";
 import type { Theme, Character, NarrationStyle, ReaderLevel, Pacing, LibraryCharacter, CharacterLibraryResponse } from "@/lib/api";
 import { ChevronLeft, ChevronRight, Wand2, Download, User, Check } from "lucide-react";
-
-const API_BASE = "http://localhost:8101";
+import { API_BASE } from "@/lib/config";
 
 const STEPS = [
   "Theme",

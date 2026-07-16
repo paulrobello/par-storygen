@@ -21,8 +21,7 @@ import ReactMarkdown from "react-markdown";
 import { AudioPlayer } from "@/components/story/AudioPlayer";
 import { GameMenu } from "@/components/story/GameMenu";
 import { StoryGraph } from "@/components/story/StoryGraph";
-
-const API = "http://localhost:8101";
+import { API_BASE as API } from "@/lib/config";
 
 const REL_TYPE_COLORS: Record<string, string> = {
   ally: "bg-green-600/30 text-green-400 border-green-600/40",

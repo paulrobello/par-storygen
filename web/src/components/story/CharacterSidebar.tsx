@@ -3,14 +3,13 @@
 import { useState } from "react";
 import type { Character } from "@/lib/api";
 import { User, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { API_BASE } from "@/lib/config";
 
 interface CharacterSidebarProps {
   characters: Character[];
   gameId?: string;
   onCharacterClick?: (character: Character) => void;
 }
-
-const API_BASE = "http://localhost:8101";
 
 export function CharacterSidebar({ characters, gameId, onCharacterClick }: CharacterSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);

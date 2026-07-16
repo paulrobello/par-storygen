@@ -36,8 +36,7 @@ import {
   ChevronRight,
   Save,
 } from "lucide-react";
-
-const API_BASE = "http://localhost:8101";
+import { API_BASE } from "@/lib/config";
 
 // ---------------------------------------------------------------------------
 // Local form state type
