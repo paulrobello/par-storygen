@@ -146,6 +146,35 @@ async def websocket_endpoint(
                     break
                 mgr.update_save(game_id, save)
 
+                # ARC-007: validate choice_id / from_node_id against the
+                # actual save BEFORE invoking pipeline.advance. Pre-ARC-007
+                # arbitrary strings were passed straight through; an unknown
+                # id either tripped the pipeline's internal ValueError after
+                # LLM/image work had already started, or — for a malformed
+                # from_node_id — silently produced a bogus beat. Reject
+                # early with a clean bad_request event instead.
+                parent_node = save.nodes.get(from_node_id)
+                if parent_node is None:
+                    await ws.send_json(
+                        {
+                            "type": "error",
+                            "code": "bad_request",
+                            "message": f"unknown from_node_id: {from_node_id}",
+                        }
+                    )
+                    continue
+                if not any(c.id == choice_id for c in parent_node.choices):
+                    await ws.send_json(
+                        {
+                            "type": "error",
+                            "code": "bad_request",
+                            "message": (
+                                f"choice_id {choice_id} is not on node {from_node_id}"
+                            ),
+                        }
+                    )
+                    continue
+
                 pipeline = mgr.get_pipeline(game_id)
                 if pipeline is None:
                     await ws.send_json(
@@ -189,4 +218,4 @@ async def websocket_endpoint(
     finally:
         if ws.client_state == WebSocketState.CONNECTED:
             with contextlib.suppress(RuntimeError):
-                ws_manager.disconnect(game_id, ws)
+                await ws_manager.disconnect(game_id, ws)

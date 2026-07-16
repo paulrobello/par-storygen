@@ -271,3 +271,75 @@ def test_ws_rejects_advance_with_missing_fields(
     assert evt["type"] == "error"
     assert evt["code"] == "bad_request"
     assert "message" in evt  # SEC-004 contract: errors carry a message field
+
+
+def test_ws_rejects_advance_with_unknown_from_node_id(
+    xdg_tmp: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ARC-007: advance against a from_node_id not in the save → bad_request.
+
+    Pre-ARC-007 the unknown id was passed straight to pipeline.advance, which
+    either tripped the pipeline's internal ValueError after LLM/image work had
+    already started, or silently produced a bogus beat. The fix rejects early
+    with a clean bad_request event and never invokes the pipeline.
+    """
+    save, game_id, _ = _make_save_with_choice(xdg_tmp)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("STORYGEN_API_TOKEN", "ws-test-token")
+    from storygen_api.security import reset_token_cache
+
+    reset_token_cache()
+
+    from storygen_api.deps import get_session_manager
+
+    mgr = get_session_manager()
+    # Stub pipeline's advance must NOT be called for an unknown node — if it
+    # is, the test fails loudly via the stub's assertion-free canned reply.
+    stub = StubBeatPipeline()
+    mgr.get_or_create(game_id, save, stub)  # type: ignore[arg-type]
+
+    from storygen_api.main import create_app
+
+    app = create_app()
+    with TestClient(app) as client, client.websocket_connect(
+        f"/api/ws/{game_id}",
+        headers={"sec-websocket-protocol": "bearer.ws-test-token"},
+    ) as ws:
+        ws.send_json(
+            {"type": "advance", "choice_id": "c1", "from_node_id": "does-not-exist"}
+        )
+        evt = ws.receive_json()
+    assert evt["type"] == "error"
+    assert evt["code"] == "bad_request"
+    assert "from_node_id" in evt["message"]
+
+
+def test_ws_rejects_advance_with_unknown_choice_id(
+    xdg_tmp: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ARC-007: advance with a choice_id that is not on from_node_id → bad_request."""
+    save, game_id, _ = _make_save_with_choice(xdg_tmp)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("STORYGEN_API_TOKEN", "ws-test-token")
+    from storygen_api.security import reset_token_cache
+
+    reset_token_cache()
+
+    from storygen_api.deps import get_session_manager
+
+    mgr = get_session_manager()
+    mgr.get_or_create(game_id, save, StubBeatPipeline())  # type: ignore[arg-type]
+
+    from storygen_api.main import create_app
+
+    app = create_app()
+    with TestClient(app) as client, client.websocket_connect(
+        f"/api/ws/{game_id}",
+        headers={"sec-websocket-protocol": "bearer.ws-test-token"},
+    ) as ws:
+        # root has only choice c1; c9 is not on it.
+        ws.send_json({"type": "advance", "choice_id": "c9", "from_node_id": "root"})
+        evt = ws.receive_json()
+    assert evt["type"] == "error"
+    assert evt["code"] == "bad_request"
+    assert "choice_id" in evt["message"]

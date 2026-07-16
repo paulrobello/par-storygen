@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 from datetime import UTC, datetime
@@ -25,23 +26,39 @@ class WebSocketManager:
 
     def __init__(self) -> None:
         self._connections: dict[str, list[WebSocket]] = {}
+        # ARC-009: guard mutation of ``_connections`` so a concurrent
+        # ``disconnect`` (e.g. from a peer dropping mid-broadcast) cannot
+        # mutate the list while ``_broadcast`` is iterating it. Pre-ARC-009
+        # the for-loop held a live reference to the per-game list and a
+        # concurrent ``remove`` raised ``RuntimeError: list changed size
+        # during iteration``.
+        self._lock: asyncio.Lock = asyncio.Lock()
 
     async def connect(self, game_id: str, ws: WebSocket) -> None:
         await ws.accept()
-        if game_id not in self._connections:
-            self._connections[game_id] = []
-        self._connections[game_id].append(ws)
+        async with self._lock:
+            self._connections.setdefault(game_id, []).append(ws)
 
-    def disconnect(self, game_id: str, ws: WebSocket) -> None:
-        conns = self._connections.get(game_id)
-        if conns is not None:
-            with contextlib.suppress(ValueError):
-                conns.remove(ws)
-            if not conns:
-                del self._connections[game_id]
+    async def disconnect(self, game_id: str, ws: WebSocket) -> None:
+        """Remove ``ws`` from the per-game list (no-op if not present).
+
+        Async so it can acquire :attr:`_lock` — callers must ``await`` it.
+        """
+        async with self._lock:
+            conns = self._connections.get(game_id)
+            if conns is not None:
+                with contextlib.suppress(ValueError):
+                    conns.remove(ws)
+                if not conns:
+                    del self._connections[game_id]
 
     async def _broadcast(self, game_id: str, data: dict[str, Any]) -> None:
-        conns = self._connections.get(game_id, [])
+        # Snapshot the connection list under the lock so a concurrent
+        # ``disconnect`` cannot mutate it mid-iteration (ARC-009). The
+        # per-socket ``send_json`` awaits while holding NO lock, so a slow
+        # peer does not block connect/disconnect on other sockets.
+        async with self._lock:
+            conns = list(self._connections.get(game_id, []))
         dead: list[WebSocket] = []
         for ws in conns:
             try:
@@ -49,7 +66,7 @@ class WebSocketManager:
             except Exception:
                 dead.append(ws)
         for ws in dead:
-            self.disconnect(game_id, ws)
+            await self.disconnect(game_id, ws)
 
     async def broadcast_error(
         self, game_id: str, *, message: str, code: str = "internal_error"

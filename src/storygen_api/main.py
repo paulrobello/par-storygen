@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -16,10 +17,56 @@ from storygen_api.deps import get_app_config, get_session_manager
 from storygen_api.routers import characters, games, images, presets, settings, tts, wizard
 from storygen_api.routers import ws as ws_router
 
+_logger = logging.getLogger(__name__)
+
+# ARC-004: this server holds in-process state that does NOT survive a second
+# uvicorn worker — ``SessionManager``'s pipeline registry, ``WebSocketManager``'s
+# connection lists, and the TTS player all live in module-level singletons. A
+# deploy that scales horizontally (``--workers N``, gunicorn ``-w N``, or a
+# platform that sets ``WEB_CONCURRENCY``) silently desyncs game state: a WS
+# handshake hit on worker A advances a pipeline on worker B, whose callbacks
+# broadcast to a connection list that does not include the player. Until these
+# singletons move to a shared store (Redis / DB), the server is single-worker.
+# ``WEB_CONCURRENCY`` is the conventional signal from gunicorn, Heroku, Render,
+# Fly.io, etc.; we fail-fast on it and warn loudly otherwise.
+
+
+def _enforce_single_worker() -> None:
+    """Fail-fast if the process manager signals more than one worker.
+
+    Reads ``WEB_CONCURRENCY`` (the standard signal from gunicorn / Heroku /
+    Render / Fly.io). A value > 1 raises at lifespan startup so uvicorn refuses
+    to serve rather than silently desyncing in-process state. ``uvicorn
+    --workers N`` run directly does NOT set this env var, so we additionally
+    log a prominent startup warning documenting the single-worker constraint.
+    """
+    raw = os.environ.get("WEB_CONCURRENCY", "").strip()
+    if raw:
+        try:
+            workers = int(raw)
+        except ValueError:
+            workers = 1  # malformed value; treat as single and warn below
+        else:
+            if workers > 1:
+                raise RuntimeError(
+                    "storygen_api must run with a single worker until "
+                    "SessionManager / WebSocketManager / TTS state move to a "
+                    f"shared store (WEB_CONCURRENCY={workers}). Re-launch with "
+                    "WEB_CONCURRENCY=1, or `uvicorn storygen_api.main:app "
+                    "--workers 1`."
+                )
+    _logger.warning(
+        "storygen_api is single-worker only: SessionManager, "
+        "WebSocketManager, and the TTS player hold in-process state. "
+        "Scaling workers will desync game sessions."
+    )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    """Startup: load config. Shutdown: cleanup all pipelines."""
+    """Startup: load config, assert single-worker. Shutdown: cleanup pipelines."""
+    # ARC-004: refuse to serve if the process manager spun up >1 worker.
+    _enforce_single_worker()
     # Pre-load config at startup
     get_app_config()
     yield
