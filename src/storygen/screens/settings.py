@@ -100,6 +100,23 @@ def _image_base_url_placeholder(provider: str) -> str:
     return resolve_image_base_url(provider)
 
 
+def _require(value: str, message: str) -> str | None:
+    """Return ``message`` when ``value`` is empty, else ``None``."""
+    return message if not value else None
+
+
+def _valid_url(url: str, message: str) -> str | None:
+    """Return ``message`` when ``url`` is non-empty but not ``http(s)://``."""
+    if url and not (url.startswith("http://") or url.startswith("https://")):
+        return message
+    return None
+
+
+def _fallback_model_error(fallback_provider: str, fallback_model: str, message: str) -> str | None:
+    """Return ``message`` when a fallback provider is set without a model."""
+    return message if fallback_provider and not fallback_model else None
+
+
 class SettingsScreen(Screen[None]):
     """Editable text/image provider prefs, wizard defaults, and the global art toggle."""
 
@@ -1213,85 +1230,78 @@ class SettingsScreen(Screen[None]):
         Validates everything up front; if any validation fails we bail without
         writing anything so the screen stays consistent with on-disk state.
         """
-        # --- Image provider validation ---
+        # --- Image + fallback validation (first error wins) ---
         image_provider = self._current_primary_image_provider()
         image_model = self._image_model_input.value.strip()
         image_base_url = self._image_base_url_input.value.strip()
         fallback_provider = self._current_fallback_image_provider()
         fallback_model = self._fallback_model_input.value.strip()
 
-        if not image_model:
+        error = next(
+            (
+                e
+                for e in (
+                    _require(image_model, "Image model cannot be empty — settings not saved."),
+                    _valid_url(
+                        image_base_url,
+                        "Image base URL must start with http:// or https:// — settings not saved.",
+                    ),
+                    _fallback_model_error(
+                        fallback_provider,
+                        fallback_model,
+                        "Fallback model cannot be empty — settings not saved.",
+                    ),
+                )
+                if e
+            ),
+            None,
+        )
+        if error is not None:
+            self.notify(error, severity="error", timeout=5)
+            return
+        # Non-fatal: the fallback adds no coverage when it mirrors the primary,
+        # but we still save. Emitted after the image/fallback errors so a later
+        # character/text error still leaves the warning visible — matching the
+        # original position between the two validation groups.
+        if fallback_provider and fallback_provider == image_provider:
             self.notify(
-                "Image model cannot be empty — settings not saved.",
-                severity="error",
+                "Fallback provider matches primary — it won't be used.",
+                severity="warning",
                 timeout=5,
             )
-            return
-        if image_base_url and not (
-            image_base_url.startswith("http://") or image_base_url.startswith("https://")
-        ):
-            self.notify(
-                "Image base URL must start with http:// or https:// — settings not saved.",
-                severity="error",
-                timeout=5,
-            )
-            return
-        if fallback_provider:
-            if not fallback_model:
-                self.notify(
-                    "Fallback model cannot be empty — settings not saved.",
-                    severity="error",
-                    timeout=5,
-                )
-                return
-            if fallback_provider == image_provider:
-                self.notify(
-                    "Fallback provider matches primary — it won't be used.",
-                    severity="warning",
-                    timeout=5,
-                )
 
-        # --- Character image provider validation ---
+        # --- Character + text validation (first error wins) ---
         character_image_provider = self._current_character_image_provider()
         character_image_model = self._character_image_model_input.value.strip()
         character_image_base_url = self._character_image_base_url_input.value.strip()
-
-        if not character_image_model:
-            self.notify(
-                "Character image model cannot be empty — settings not saved.",
-                severity="error",
-                timeout=5,
-            )
-            return
-        if character_image_base_url and not (
-            character_image_base_url.startswith("http://")
-            or character_image_base_url.startswith("https://")
-        ):
-            self.notify(
-                "Character image base URL must start with http:// or https:// — settings not saved.",
-                severity="error",
-                timeout=5,
-            )
-            return
-
-        # --- Text provider validation ---
         provider = cast(str, self._provider_select.value)
         model = self._model_input.value.strip()
         base_url = self._base_url_input.value.strip()
 
-        if not model:
-            self.notify(
-                "Model name cannot be empty — settings not saved.",
-                severity="error",
-                timeout=5,
-            )
-            return
-        if base_url and not (base_url.startswith("http://") or base_url.startswith("https://")):
-            self.notify(
-                "Base URL must start with http:// or https:// — settings not saved.",
-                severity="error",
-                timeout=5,
-            )
+        error = next(
+            (
+                e
+                for e in (
+                    _require(
+                        character_image_model,
+                        "Character image model cannot be empty — settings not saved.",
+                    ),
+                    _valid_url(
+                        character_image_base_url,
+                        "Character image base URL must start with http:// or https:// — settings not saved.",
+                    ),
+                    _require(model, "Model name cannot be empty — settings not saved."),
+                    _valid_url(
+                        base_url,
+                        "Base URL must start with http:// or https:// — settings not saved.",
+                    ),
+                )
+                if e
+            ),
+            None,
+        )
+        if error is not None:
+            self.notify(error, severity="error", timeout=5)
             return
 
         # Validation passed — build the frozen pref records.
