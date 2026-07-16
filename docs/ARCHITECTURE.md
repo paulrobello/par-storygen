@@ -36,7 +36,47 @@ Lower layers never import higher ones. `core` is a neutral bottom layer holding 
 
 ## Web surface (optional API + frontend)
 
-The TUI is the primary surface, but the package also ships an optional HTTP/WebSocket API (`src/storygen_api/`, installed via the `[api]` extra) and a Next.js frontend (`web/`). The API is a **second composition root over the same lower layers**: `storygen_api/deps.py` builds a `BeatPipeline` + image/text providers exactly as `app.py` does, `session.py` keeps a per-game pipeline registry (`PipelineSessionManager`), and `ws.py`'s `WebSocketManager.make_callbacks()` produces `PipelineCallbacks` that broadcast `narration_delta` / `beat_committed` / `image_committed` / `image_failed` events to connected web clients. Routers under `storygen_api/routers/` (games, wizard, images, characters, presets, tts, settings, ws) expose the wizard + play loop over REST plus a `/api/ws/{game_id}` socket, and `main.py` mounts saved-game image directories at `/api/images`. `storygen_api/security.py` gates every state-changing / cost-incurring route behind `verify_token`, which reads `STORYGEN_API_TOKEN` and fails closed (`503`) when the variable is unset. Run with `make api-dev` (FastAPI on `:8101`) and `make web-dev` (Next.js on `:8100`). The server binds `127.0.0.1` by default and is designed for single-process (`--workers 1`) loopback use; to expose it on a LAN, pass `--host 0.0.0.0` **and** set `STORYGEN_API_TOKEN` (see `AUDIT.md` SEC-001/SEC-006). The `web/` frontend is a thin client — `web/src/lib/api.ts` is its typed fetch wrapper and `web/src/hooks/useWebSocket.ts` dispatches the events above into a Zustand `game-store`; see `web/README.md` and `web/AGENTS.md` for the route map and data flow.
+The TUI is the primary surface, but the package also ships an optional HTTP/WebSocket API (`src/storygen_api/`, installed via the `[api]` extra; console script `storygen-api`) and a Next.js 16 frontend (`web/`). The API is a **second composition root over the same lower layers** — it reuses `storage` / `llm` / `images` / `pipeline` wholesale and owns no game logic of its own. Run with `make api-dev` (FastAPI on `:8101`) and `make web-dev` (Next.js on `:8100`); the two servers are meant to run side-by-side on a developer's machine.
+
+### Composition root
+
+`storygen_api/deps.py::build_pipeline(save, config, *, callbacks)` mirrors `app.py`'s TUI wiring: it constructs a `BeatPipeline` and the routed/fallback image provider chain from the same `app_config` providers, then hands them to a `PipelineSessionManager` (`session.py`). The session manager keeps a per-`game_id` registry of `(save, pipeline)` pairs so a WebSocket reconnect or a follow-up REST request reuses the same pipeline rather than rebuilding it. Routers under `storygen_api/routers/` (games, wizard, images, characters, presets, tts, settings, ws) expose the full wizard + play loop over REST plus a `/api/ws/{game_id}` socket; `main.py` also mounts saved-game image directories at `/api/images` so the frontend can `<img src=>` scene/portrait PNGs directly.
+
+### Single-worker constraint (in-process state)
+
+The server holds three module-level singletons that do **not** survive a second uvicorn worker: `PipelineSessionManager`'s pipeline registry, `WebSocketManager`'s per-game connection lists, and the TTS player. Scaling horizontally (gunicorn `-w N`, a platform that sets `WEB_CONCURRENCY`, or `uvicorn --workers N`) silently desyncs game state — a WS handshake landing on worker A drives a pipeline on worker B whose callbacks broadcast to a connection list that does not include the player. `main.py::lifespan` therefore calls `_enforce_single_worker()` at startup: if `WEB_CONCURRENCY > 1` the server raises `RuntimeError` and refuses to serve, and it logs a prominent warning otherwise (ARC-004). The Makefile's `api-prod` target pins `--workers 1`. Until those singletons move to a shared store (Redis / DB), this server is structurally single-process.
+
+### WebSocket event contract
+
+`ws.py::WebSocketManager.make_callbacks(game_id)` produces a `PipelineCallbacks` whose handlers broadcast the events the React frontend renders. The source of truth for the payload shapes is the TypeScript union `ServerEvent` in `web/src/lib/ws-types.ts`; the server mirrors it exactly and `tests/unit/test_api_ws.py` pins every payload against a pydantic mirror of the TS file (ARC-001). Events:
+
+- `narration_delta` `{type, node_id, text}` — streaming narration chunk.
+- `beat_committed` `{type, node_id, is_ending, choices[]}` — fired when the beat lands; `choices[]` must be non-empty so the player can pick the next step.
+- `image_committed` `{type, node_id, image_path}` — scene illustration landed.
+- `image_failed` `{type, node_id, error}` — scene illustration failed.
+- `new_characters` `{type, characters[{id, name, backstory, personality, physical_description, portrait_path}]}` — full character cards (not just `{id, name}`).
+- `error` `{type, code, message}` — note `message`, not `error`, matching `ServerError` in `ws-types.ts`.
+
+`WebSocketManager._broadcast` snapshots the per-game connection list under an `asyncio.Lock` before iterating, so a concurrent `disconnect` (a peer dropping in another task) cannot mutate the list mid-iteration with `RuntimeError: list changed size during iteration` (ARC-009).
+
+### WebSocket input validation
+
+`routers/ws.py` authenticates the handshake before accepting (SEC-001; bearer token via `Sec-WebSocket-Protocol: bearer.<token>` for browsers or the `Authorization: Bearer` header for non-browser clients, fail-closed when `STORYGEN_API_TOKEN` is unset), checks the browser `Origin` against an allowlist (SEC-011), and caps inbound messages at 64 KiB. ARC-007 adds payload validation: an `advance` frame's `from_node_id` must exist in `save.nodes` and `choice_id` must be one of that node's `choices[].id`. Unknown ids are rejected with a `bad_request` error event before the pipeline is invoked — pre-ARC-007 they were passed straight through and either tripped the pipeline's internal `ValueError` after LLM/image work had started, or silently produced a bogus beat.
+
+### Auth + SSRF defense
+
+`storygen_api/security.py` gates every state-changing / cost-incurring REST route behind `verify_token`, which reads `STORYGEN_API_TOKEN` and fails closed (`503`) when the variable is unset, and uses `hmac.compare_digest` to avoid timing side channels. The same module enforces the SEC-002 SSRF defense: `validate_provider_base_url` rejects user-supplied `base_url` values that point at private / link-local / reserved IPs or hosts outside a small sanctioned-provider allowlist (OpenAI, OpenRouter, Z.AI, Gemini, ElevenLabs, Deepgram; loopback allowed only for Ollama). The WS handshake uses a parallel `ws_authorize` + `ws_check_origin` pair so the same guarantees apply to the socket surface.
+
+### Server-side configuration sources
+
+- Bind host: `storygen-api serve --host` (defaults to `127.0.0.1`, SEC-006). Pass `--host 0.0.0.0` **and** set `STORYGEN_API_TOKEN` for LAN exposure.
+- CORS origins: `STORYGEN_API_ALLOWED_ORIGINS` (comma-separated; defaults to the dev frontend origins `http://{localhost,127.0.0.1}:8100`). `allow_methods`/`allow_headers` are pinned to the set the API actually uses (SEC-008).
+- WS origin allowlist: `STORYGEN_WS_ALLOWED_ORIGINS` (defaults mirror CORS).
+- Auth token: `STORYGEN_API_TOKEN` (required for any non-loopback deploy).
+
+### Frontend data flow
+
+`web/` is a thin client — it owns no game logic. Single source of truth for the backend base is `web/src/lib/config.ts` (ARC-016): it reads `NEXT_PUBLIC_API_BASE` (default `http://localhost:8101`) and exports both `API_BASE` and a derived `WS_BASE` (`http://` → `ws://`, `https://` → `wss://`). Every route, hook, and component imports from there — no port is hard-coded in more than one place. `web/src/lib/api.ts` is the typed fetch wrapper (`apiGet` / `apiPost` / `apiPut` / `apiPostForm` / `apiDelete` + domain interfaces mirroring the Pydantic models); `web/src/hooks/useWebSocket.ts` dispatches the events above into a Zustand `game-store` that components re-render off. See `web/README.md` and `web/AGENTS.md` for the route map, the per-feature data flow, and the Next.js 16 conventions the frontend follows.
 
 ## The 3-stage beat pipeline (`src/storygen/pipeline.py`)
 
