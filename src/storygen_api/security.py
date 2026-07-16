@@ -308,3 +308,59 @@ def is_valid_token_format(token: str) -> bool:
     :func:`verify_token` regardless of format.
     """
     return bool(_BEARER_TOKEN_PATTERN.fullmatch(token))
+
+
+# ---------------------------------------------------------------------------
+# WebSocket origin allowlist (SEC-011)
+# ---------------------------------------------------------------------------
+
+# Comma-separated env var for overriding the WS origin allowlist. Defaults
+# mirror the CORS allowlist (web dev server on :8100).
+WS_ALLOWED_ORIGINS_ENV = "STORYGEN_WS_ALLOWED_ORIGINS"
+_DEFAULT_WS_ORIGINS: tuple[str, ...] = (
+    "http://localhost:8100",
+    "http://127.0.0.1:8100",
+)
+
+
+@lru_cache(maxsize=1)
+def _ws_allowed_origins() -> frozenset[str]:
+    """Return the configured WebSocket origin allowlist.
+
+    Reads :data:`WS_ALLOWED_ORIGINS_ENV` (comma-separated); falls back to the
+    default localhost dev origins. Tests should call
+    :func:`reset_token_cache` (which also clears this cache) after env mutation.
+    """
+    raw = os.environ.get(WS_ALLOWED_ORIGINS_ENV, "")
+    if not raw or not raw.strip():
+        return frozenset(_DEFAULT_WS_ORIGINS)
+    parts = {p.strip().lower() for p in raw.split(",") if p.strip()}
+    return frozenset(parts)
+
+
+def reset_origin_cache() -> None:
+    """Clear the cached WS origin allowlist (test helper)."""
+    _ws_allowed_origins.cache_clear()
+
+
+def ws_check_origin(conn: HTTPConnection) -> bool:
+    """Validate the WebSocket handshake ``Origin`` header against the allowlist.
+
+    SEC-011: a browser always sends ``Origin`` on a WS handshake; if the header
+    is present and not on the allowlist, the handshake is rejected (defense
+    against CSRF-style cross-origin abuse when a token leaks into a cookie
+    or browser session). When ``Origin`` is absent (non-browser clients, the
+    Starlette ``TestClient``, curl), the check is skipped — bearer-token auth
+    remains the gate.
+
+    Args:
+        conn: The WebSocket (or its HTTP connection).
+
+    Returns:
+        ``True`` if the origin is allowlisted or no ``Origin`` header was sent.
+    """
+    origin = conn.headers.get("origin")
+    if not origin:
+        # Non-browser client (curl, native, TestClient). Auth handles gate.
+        return True
+    return origin.lower() in _ws_allowed_origins()

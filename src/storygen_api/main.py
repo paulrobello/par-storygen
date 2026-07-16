@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -36,13 +37,19 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS — allow localhost:8100 for local dev frontend (matches Makefile web-dev)
+    # CORS — allow the dev frontend origin (Makefile ``web-dev`` serves on
+    # ``:8100``). SEC-008: methods and headers are pinned to the set the API
+    # actually uses rather than the wildcard, and origins are configurable via
+    # ``STORYGEN_API_ALLOWED_ORIGINS`` (comma-separated) for non-default deploys.
+    default_origins = "http://localhost:8100,http://127.0.0.1:8100"
+    raw_origins = os.environ.get("STORYGEN_API_ALLOWED_ORIGINS", default_origins)
+    allowed_origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:8100", "http://127.0.0.1:8100"],
+        allow_origins=allowed_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+        allow_headers=["Authorization", "Content-Type"],
     )
 
     # Include all routers

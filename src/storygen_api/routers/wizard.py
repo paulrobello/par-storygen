@@ -10,6 +10,7 @@ from storygen.llm.provider_factory import build_text_model
 from storygen.runtime.wizard_flow import WizardFlow
 
 from storygen_api.deps import build_split_image_provider_for_wizard, get_app_config
+from storygen_api.rate_limit import enforce_rate_limit
 from storygen_api.schemas import (
     WizardCharactersRequest,
     WizardCharactersResponse,
@@ -24,7 +25,8 @@ router = APIRouter(
     prefix="/api/wizard",
     tags=["wizard"],
     # SEC-001: every wizard route triggers cost-incurring LLM/image generation.
-    dependencies=[Depends(verify_token)],
+    # SEC-007: per-IP rate limit applies because every call burns LLM credit.
+    dependencies=[Depends(verify_token), Depends(enforce_rate_limit)],
 )
 
 _character_list_adapter = TypeAdapter(list[Character])

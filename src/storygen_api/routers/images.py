@@ -17,6 +17,7 @@ from storygen_api.deps import (
     get_app_config,
     get_session_manager,
 )
+from storygen_api.rate_limit import enforce_rate_limit
 from storygen_api.schemas import (
     OutfitActionRequest,
     OutfitRequest,
@@ -59,7 +60,10 @@ async def get_portrait_image(game_id: str, char_id: str) -> FileResponse:
     return FileResponse(portrait_path, media_type="image/png")
 
 
-@router.post("/{game_id}/scene/{node_id}/retry")
+@router.post(
+    "/{game_id}/scene/{node_id}/retry",
+    dependencies=[Depends(enforce_rate_limit)],
+)
 async def retry_scene(
     game_id: str,
     node_id: str,
@@ -90,7 +94,10 @@ async def retry_scene(
     return {"status": node.image_status}
 
 
-@router.post("/{game_id}/scene/{node_id}/edit")
+@router.post(
+    "/{game_id}/scene/{node_id}/edit",
+    dependencies=[Depends(enforce_rate_limit)],
+)
 async def edit_scene(
     game_id: str,
     node_id: str,
@@ -127,7 +134,10 @@ async def edit_scene(
     return {"status": node.image_status}
 
 
-@router.post("/{game_id}/portrait/{char_id}/retry")
+@router.post(
+    "/{game_id}/portrait/{char_id}/retry",
+    dependencies=[Depends(enforce_rate_limit)],
+)
 async def retry_portrait(
     game_id: str,
     char_id: str,
@@ -190,7 +200,10 @@ async def retry_portrait(
     return {"status": "done", "character_id": char_id}
 
 
-@router.post("/{game_id}/portrait/{char_id}/edit")
+@router.post(
+    "/{game_id}/portrait/{char_id}/edit",
+    dependencies=[Depends(enforce_rate_limit)],
+)
 async def edit_portrait(
     game_id: str,
     char_id: str,
@@ -270,7 +283,10 @@ async def edit_portrait(
     return {"status": "done", "character_id": char_id}
 
 
-@router.post("/{game_id}/cover/regenerate")
+@router.post(
+    "/{game_id}/cover/regenerate",
+    dependencies=[Depends(enforce_rate_limit)],
+)
 async def regenerate_cover(
     game_id: str,
     mgr: PipelineSessionManager = Depends(get_session_manager),
@@ -309,7 +325,10 @@ async def regenerate_cover(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/{game_id}/portrait/{char_id}/outfit")
+@router.post(
+    "/{game_id}/portrait/{char_id}/outfit",
+    dependencies=[Depends(enforce_rate_limit)],
+)
 async def add_outfit(
     game_id: str,
     char_id: str,

@@ -27,6 +27,7 @@ from storygen.storage.library import (
 )
 from storygen.storage.save import load_game
 from storygen_api.deps import get_app_config, get_wizard_image_provider
+from storygen_api.rate_limit import enforce_rate_limit
 from storygen_api.schemas import (
     CharacterCreateRequest,
     CharacterExportRequest,
@@ -202,7 +203,11 @@ async def update_character(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/{library_id}/regenerate-portrait", response_model=CharacterLibraryEntry)
+@router.post(
+    "/{library_id}/regenerate-portrait",
+    response_model=CharacterLibraryEntry,
+    dependencies=[Depends(enforce_rate_limit)],
+)
 async def regenerate_portrait(
     library_id: str,
     body: PortraitRegenerateRequest,
@@ -229,7 +234,11 @@ async def regenerate_portrait(
     return _lib_to_entry(char)
 
 
-@router.post("/{library_id}/edit-portrait", response_model=CharacterLibraryEntry)
+@router.post(
+    "/{library_id}/edit-portrait",
+    response_model=CharacterLibraryEntry,
+    dependencies=[Depends(enforce_rate_limit)],
+)
 async def edit_portrait(
     library_id: str,
     body: PortraitEditRequest,
@@ -270,7 +279,11 @@ async def edit_portrait(
     return _lib_to_entry(char)
 
 
-@router.post("/{library_id}/reference-image", response_model=CharacterLibraryEntry)
+@router.post(
+    "/{library_id}/reference-image",
+    response_model=CharacterLibraryEntry,
+    dependencies=[Depends(enforce_rate_limit)],
+)
 async def upload_reference_image(
     library_id: str,
     image: UploadFile,
@@ -357,7 +370,12 @@ async def get_reference_image(library_id: str) -> Response:
     return FileResponse(str(ref_path), media_type="image/png")
 
 
-@router.post("/create", response_model=CharacterLibraryEntry, status_code=201)
+@router.post(
+    "/create",
+    response_model=CharacterLibraryEntry,
+    status_code=201,
+    dependencies=[Depends(enforce_rate_limit)],
+)
 async def create_character(
     body: CharacterCreateRequest,
     image_provider: SplitImageProvider = Depends(get_wizard_image_provider),

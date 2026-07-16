@@ -15,6 +15,7 @@ from storygen.storage.save import delete_game, load_game, prune_subtree, save_ga
 from storygen.storage.tree import path_from_root
 
 from storygen_api.deps import build_pipeline, get_app_config, get_session_manager
+from storygen_api.rate_limit import enforce_rate_limit
 from storygen_api.schemas import (
     AdvanceRequest,
     AdvanceResponse,
@@ -30,7 +31,7 @@ from storygen_api.schemas import (
     RegenerateNodeRequest,
 )
 from storygen_api.security import verify_token
-from storygen.export.book import export_book
+from storygen.export.book import export_book, sanitize_title
 from storygen_api.session import PipelineSessionManager
 from storygen_api.ws import ws_manager
 
@@ -166,7 +167,11 @@ async def get_game(game_id: str) -> GameDetail:
     )
 
 
-@router.post("/{game_id}/advance", response_model=AdvanceResponse)
+@router.post(
+    "/{game_id}/advance",
+    response_model=AdvanceResponse,
+    dependencies=[Depends(enforce_rate_limit)],
+)
 async def advance_game(
     game_id: str,
     body: AdvanceRequest,
@@ -291,7 +296,11 @@ async def prune_subtree_endpoint(
     return {"removed_count": count}
 
 
-@router.post("/{game_id}/regenerate-node", response_model=AdvanceResponse)
+@router.post(
+    "/{game_id}/regenerate-node",
+    response_model=AdvanceResponse,
+    dependencies=[Depends(enforce_rate_limit)],
+)
 async def regenerate_node(
     game_id: str,
     body: RegenerateNodeRequest,
@@ -420,5 +429,8 @@ async def download_book(
     if not html_path.exists():
         raise HTTPException(status_code=404, detail="Book file not found")
 
-    filename = f"{save.theme.title.replace(' ', '_')}_Book.html"
+    # SEC-009: theme.title is LLM-generated; run it through sanitize_title so
+    # the Content-Disposition filename can't carry path separators or other
+    # surprising characters. Defense-in-depth — Starlette also escapes.
+    filename = f"{sanitize_title(save.theme.title)}_Book.html"
     return FileResponse(html_path, media_type="text/html", filename=filename)

@@ -121,11 +121,18 @@ def write_app_state(data: dict[str, Any]) -> None:
 
     Clears the read cache so the next :func:`read_app_state` call sees the
     freshly written values without waiting for the TTL to expire.
+
+    SEC-005: the temp file is chmod'd to ``0o600`` before ``os.replace`` so the
+    persisted state (which carries provider API keys) is never world-readable,
+    matching the file-mode hardening already applied to library files.
     """
     path = paths.config_root() / STATE_FILENAME
     paths.config_root().mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    # SEC-005: restrictive mode before the file is renamed into place. The
+    # umask might leave group/world bits set; chmod ensures owner-only.
+    os.chmod(tmp, 0o600)
     os.replace(tmp, path)
     # Evict any cache entry for this path (keyed with old mtime).
     path_prefix = str(path) + ":"
