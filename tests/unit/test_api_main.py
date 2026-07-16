@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import pytest
 
-from storygen_api.main import _enforce_single_worker  # pyright: ignore[reportPrivateUsage] - tested in isolation; the function is private but the startup guard has a load-bearing contract worth pinning directly
+from storygen_api.main import (
+    _enforce_single_worker,  # pyright: ignore[reportPrivateUsage] - tested in isolation; the function is private but the startup guard has a load-bearing contract worth pinning directly
+)
 
 
 def test_enforce_single_worker_passes_when_env_unset(

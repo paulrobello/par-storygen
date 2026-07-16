@@ -47,10 +47,13 @@ keywords = [
 ]
 requires-python = ">=3.13"
 dependencies = [
-    "textual>=8.2.8",
+    # ARC-014: bound high-churn deps to >=current,<MAJOR+1 so a major
+    # release cannot land via a bare `uv lock` / `uv sync` without an
+    # intentional bump here. uv.lock pins the exact resolved version.
+    "textual>=8.2.8,<9",
     "pydantic>=2.13.4",
-    "pydantic-ai>=2.11.0",
-    "openai>=2.45.0",
+    "pydantic-ai>=2.11.0,<3",
+    "openai>=2.45.0,<3",
     "rich>=15.0.0",
     "par-textual-image>=0.1.0",
     "typer>=0.27.0",
