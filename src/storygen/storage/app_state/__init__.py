@@ -1,0 +1,178 @@
+"""Per-user application state — small JSON file under XDG_CONFIG_HOME.
+
+Historically a single 730-LOC module mixing defaults + prefs dataclasses +
+atomic I/O + ~25 readers/writers; split for clarity into three sub-modules:
+
+- :mod:`.defaults` — constants, choice tuples, and allow-lists
+- :mod:`.models` — frozen prefs dataclasses (``ProviderPrefs`` et al.)
+- :mod:`.io` — atomic JSON I/O and per-section readers/writers
+
+This package's ``__init__`` re-exports the full public surface so existing
+imports continue to work unchanged:
+
+    from storygen.storage import app_state
+    app_state.read_provider_prefs()
+
+    from storygen.storage.app_state import WizardDefaults, DEFAULT_PACING
+
+Distinct from ``storygen.config`` which loads provider/model settings from env
+vars; this module persists *runtime* state across launches (e.g. which story
+was opened most recently so ``--resume`` knows where to pick up).
+"""
+
+from __future__ import annotations
+
+# Public names — re-exported by listing them; standard import form.
+from storygen.storage.app_state.defaults import (
+    DEFAULT_ART_STYLE,
+    DEFAULT_AUTO_RECAP,
+    DEFAULT_CHARACTER_IMAGE_MODEL,
+    DEFAULT_CHARACTER_IMAGE_PROVIDER,
+    DEFAULT_GRAPHICS_MODE,
+    DEFAULT_IMAGE_MODEL,
+    DEFAULT_IMAGE_PROVIDER,
+    DEFAULT_NARRATION_STYLE,
+    DEFAULT_PACING,
+    DEFAULT_READER_LEVEL,
+    DEFAULT_RECAP_INTERVAL,
+    DEFAULT_RESUME_RECAP,
+    DEFAULT_TARGET_MAJOR_BEATS,
+    DEFAULT_TEXT_MODEL,
+    DEFAULT_TEXT_PROVIDER,
+    DEFAULT_TONE_PRESET,
+    DEFAULT_TTS_AUTO_READ,
+    DEFAULT_TTS_AUTO_READ_RECAP,
+    DEFAULT_TTS_PROVIDER,
+    DEFAULT_TTS_VOICE,
+    GRAPHICS_MODE_CHOICES,
+    IMAGE_API_KEY_ENV,
+    IMAGE_PROVIDER_CHOICES,
+    MAX_TARGET_MAJOR_BEATS,
+    MIN_TARGET_MAJOR_BEATS,
+    PROVIDER_CHOICES,
+    PROVIDER_SUPPORTS_REFS,
+    SUGGESTED_IMAGE_MODELS,
+    SUGGESTED_MODELS,
+    TTS_API_KEY_ENV,
+    TTS_PROVIDER_CHOICES,
+)
+from storygen.storage.app_state.io import (
+    art_enabled,
+    auto_open_art_enabled,
+    auto_recap_enabled,
+    auto_select_enabled,
+    coerce_reader_level,
+    image_streaming_enabled,
+    last_story_id,
+    llm_cache_enabled,
+    prefetch_enabled,
+    prefetch_images_enabled,
+    read_app_state,
+    read_character_image_provider_prefs,
+    read_graphics_mode,
+    read_image_provider_prefs,
+    read_provider_prefs,
+    read_tts_prefs,
+    read_wizard_defaults,
+    recap_interval,
+    remember_last_story,
+    resume_recap_enabled,
+    set_art_enabled,
+    set_auto_open_art_enabled,
+    set_auto_recap,
+    set_auto_select_enabled,
+    set_image_streaming_enabled,
+    set_llm_cache_enabled,
+    set_prefetch_enabled,
+    set_prefetch_images_enabled,
+    set_recap_interval,
+    set_resume_recap,
+    write_all_settings,
+    write_app_state,
+    write_character_image_provider_prefs,
+    write_image_provider_prefs,
+    write_provider_prefs,
+    write_wizard_defaults,
+)
+from storygen.storage.app_state.models import (
+    CharacterImageProviderPrefs,
+    ImageProviderPrefs,
+    ProviderPrefs,
+    TTSPrefs,
+    WizardDefaults,
+)
+
+__all__ = (
+    "DEFAULT_ART_STYLE",
+    "DEFAULT_AUTO_RECAP",
+    "DEFAULT_CHARACTER_IMAGE_MODEL",
+    "DEFAULT_CHARACTER_IMAGE_PROVIDER",
+    "DEFAULT_GRAPHICS_MODE",
+    "DEFAULT_IMAGE_MODEL",
+    "DEFAULT_IMAGE_PROVIDER",
+    "DEFAULT_NARRATION_STYLE",
+    "DEFAULT_PACING",
+    "DEFAULT_READER_LEVEL",
+    "DEFAULT_RECAP_INTERVAL",
+    "DEFAULT_RESUME_RECAP",
+    "DEFAULT_TARGET_MAJOR_BEATS",
+    "DEFAULT_TEXT_MODEL",
+    "DEFAULT_TEXT_PROVIDER",
+    "DEFAULT_TONE_PRESET",
+    "DEFAULT_TTS_AUTO_READ",
+    "DEFAULT_TTS_AUTO_READ_RECAP",
+    "DEFAULT_TTS_PROVIDER",
+    "DEFAULT_TTS_VOICE",
+    "GRAPHICS_MODE_CHOICES",
+    "IMAGE_API_KEY_ENV",
+    "IMAGE_PROVIDER_CHOICES",
+    "MAX_TARGET_MAJOR_BEATS",
+    "MIN_TARGET_MAJOR_BEATS",
+    "PROVIDER_CHOICES",
+    "PROVIDER_SUPPORTS_REFS",
+    "SUGGESTED_IMAGE_MODELS",
+    "SUGGESTED_MODELS",
+    "TTS_API_KEY_ENV",
+    "TTS_PROVIDER_CHOICES",
+    "CharacterImageProviderPrefs",
+    "ImageProviderPrefs",
+    "ProviderPrefs",
+    "TTSPrefs",
+    "WizardDefaults",
+    "art_enabled",
+    "auto_open_art_enabled",
+    "auto_recap_enabled",
+    "auto_select_enabled",
+    "coerce_reader_level",
+    "image_streaming_enabled",
+    "last_story_id",
+    "llm_cache_enabled",
+    "prefetch_enabled",
+    "prefetch_images_enabled",
+    "read_app_state",
+    "read_character_image_provider_prefs",
+    "read_graphics_mode",
+    "read_image_provider_prefs",
+    "read_provider_prefs",
+    "read_tts_prefs",
+    "read_wizard_defaults",
+    "recap_interval",
+    "remember_last_story",
+    "resume_recap_enabled",
+    "set_art_enabled",
+    "set_auto_open_art_enabled",
+    "set_auto_recap",
+    "set_auto_select_enabled",
+    "set_image_streaming_enabled",
+    "set_llm_cache_enabled",
+    "set_prefetch_enabled",
+    "set_prefetch_images_enabled",
+    "set_recap_interval",
+    "set_resume_recap",
+    "write_all_settings",
+    "write_app_state",
+    "write_character_image_provider_prefs",
+    "write_image_provider_prefs",
+    "write_provider_prefs",
+    "write_wizard_defaults",
+)
