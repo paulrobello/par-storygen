@@ -1,161 +1,24 @@
 from __future__ import annotations
 
-import contextlib
-from collections.abc import Callable
 from functools import lru_cache
-from typing import cast
 
 from fastapi import Depends
 
 from storygen.config import AppConfig, load_config
-from storygen.images.provider_factory import (
-    ImageProviderName,
-    build_routed_image_provider,
-    default_fallback_model,
-)
-from storygen.images.routed_provider import RoutedImageProvider
 from storygen.images.split_provider import SplitImageProvider
 from storygen.llm import agents as agent_mod
-from storygen.llm.models import ImageProviderConfig
 from storygen.llm.provider_factory import build_text_model
 from storygen.llm.usage import record_usage_on_save
 from storygen.pipeline import BeatPipeline, PipelineCallbacks
-from storygen.storage import app_state
+from storygen.runtime.adapters import (
+    BeatAgentAdapter,
+    IllustrationAdapter,
+    SummaryAdapter,
+    build_split_provider,
+    build_split_provider_for_save,
+)
 from storygen.storage.save import GameSave, save_game
 from storygen_api.session import PipelineSessionManager
-
-# ---------------------------------------------------------------------------
-# Adapter classes — mirror app.py's adapters for pydantic-ai agents
-# ---------------------------------------------------------------------------
-
-
-class _BeatAgentAdapter:
-    """Adapter: runs a pydantic-ai beat agent and emits narration as one delta.
-
-    Implements the ``BeatAgentLike`` protocol.
-    """
-
-    def __init__(
-        self,
-        agent,  # type: ignore[no-untyped-def]
-        *,
-        on_usage: Callable[[object], None] | None = None,
-    ) -> None:
-        self._agent = agent  # pyright: ignore[reportUnknownMemberType]
-        self._on_usage = on_usage
-
-    async def run(self, prompt, on_narration_delta, raw_sink=None):  # type: ignore[no-untyped-def]
-        result = await self._agent.run(prompt)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-        if self._on_usage is not None:
-            with contextlib.suppress(Exception):
-                self._on_usage(result.usage())  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
-        if raw_sink is not None:
-            with contextlib.suppress(Exception):
-                raw_sink(result.all_messages_json())  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
-        beat = result.output  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-        narration = getattr(beat, "narration", "") or ""  # pyright: ignore[reportUnknownArgumentType]
-        if narration:
-            await on_narration_delta(narration)  # pyright: ignore[reportUnknownArgumentType]
-        return beat  # pyright: ignore[reportUnknownVariableType]
-
-
-class _SummaryAdapter:
-    """Adapter: turns a pydantic-ai summary agent into the pipeline protocol."""
-
-    def __init__(
-        self,
-        agent,  # type: ignore[no-untyped-def]
-        *,
-        on_usage: Callable[[object], None] | None = None,
-    ) -> None:
-        self._agent = agent  # pyright: ignore[reportUnknownMemberType]
-        self._on_usage = on_usage
-
-    async def run(self, path_summary_prompt, raw_sink=None):  # type: ignore[no-untyped-def]
-        result = await self._agent.run(path_summary_prompt)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-        if self._on_usage is not None:
-            with contextlib.suppress(Exception):
-                self._on_usage(result.usage())  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
-        if raw_sink is not None:
-            with contextlib.suppress(Exception):
-                raw_sink(result.all_messages_json())  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
-        return result.output  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-
-
-class _IllustrationAdapter:
-    """Adapter: turns a pydantic-ai illustration agent into the pipeline protocol."""
-
-    def __init__(
-        self,
-        agent,  # type: ignore[no-untyped-def]
-        *,
-        on_usage: Callable[[object], None] | None = None,
-    ) -> None:
-        self._agent = agent  # pyright: ignore[reportUnknownMemberType]
-        self._on_usage = on_usage
-
-    async def run(self, beat, characters, raw_sink=None):  # type: ignore[no-untyped-def]
-        summary = f"BEAT:\n{beat.narration}\n\nCHARACTERS:\n" + "\n".join(  # pyright: ignore[reportUnknownMemberType]
-            f"- {c.id}: {c.name} — {c.physical_description}"  # pyright: ignore[reportUnknownMemberType]
-            for c in characters  # pyright: ignore[reportUnknownVariableType]
-        )
-        result = await self._agent.run(summary)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-        if self._on_usage is not None:
-            with contextlib.suppress(Exception):
-                self._on_usage(result.usage())  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
-        if raw_sink is not None:
-            with contextlib.suppress(Exception):
-                raw_sink(result.all_messages_json())  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
-        return result.output  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-
-
-# ---------------------------------------------------------------------------
-# Image provider helpers
-# ---------------------------------------------------------------------------
-
-
-def _resolve_fallback_cfg(
-    primary: ImageProviderConfig,
-) -> ImageProviderConfig | None:
-    """Resolve fallback image-provider config from persisted prefs."""
-    prefs = app_state.read_image_provider_prefs()
-    if not prefs.fallback_provider:
-        return None
-    if prefs.fallback_provider == primary.provider:
-        return None
-    model = prefs.fallback_model or default_fallback_model(prefs.fallback_provider)
-    if not model:
-        return None
-    return ImageProviderConfig(
-        provider=cast(ImageProviderName, prefs.fallback_provider),
-        model=model,
-        base_url=None,
-        api_key=None,
-    )
-
-
-def _build_routed_image_provider(
-    config: ImageProviderConfig,
-) -> RoutedImageProvider:
-    return build_routed_image_provider(
-        config,
-        fallback_cfg=_resolve_fallback_cfg(config),
-    )
-
-
-def _build_split_image_provider(
-    save: GameSave,
-    config: AppConfig,
-) -> SplitImageProvider:
-    """Build a save-pinned split image provider."""
-    art_router = _build_routed_image_provider(save.image_config)
-    character_router = _build_routed_image_provider(save.character_image_config)
-    return SplitImageProvider(character_provider=character_router, art_provider=art_router)
-
-
-# Public alias so routers can import without triggering reportPrivateUsage.
-build_split_image_provider = _build_split_image_provider
-
 
 # ---------------------------------------------------------------------------
 # Pipeline construction
@@ -170,8 +33,11 @@ def build_pipeline(
 ) -> tuple[BeatPipeline, SplitImageProvider]:
     """Build a BeatPipeline + image provider for a given save.
 
-    Mirrors ``StoryGenApp._start_game`` wiring.
+    Mirrors ``StoryGenApp._start_game`` wiring. Adapters and image-provider
+    helpers come from the shared :mod:`storygen.runtime.adapters` module
+    (ARC-003) so the TUI and API surfaces can't diverge again.
     """
+    _ = config  # kept for back-compat with existing call sites; not used here
     model_name = save.text_config.model
     text_model = build_text_model(save.text_config)
 
@@ -179,7 +45,7 @@ def build_pipeline(
         record_usage_on_save(save, model=model_name, usage=usage)
         save_game(save)
 
-    beat_agent = _BeatAgentAdapter(
+    beat_agent = BeatAgentAdapter(
         agent_mod.build_beat_agent(
             text_model,
             theme=save.theme,
@@ -191,16 +57,16 @@ def build_pipeline(
         ),
         on_usage=_on_usage,
     )
-    illustration_agent = _IllustrationAdapter(
+    illustration_agent = IllustrationAdapter(
         agent_mod.build_illustration_agent(text_model),
         on_usage=_on_usage,
     )
-    summary_agent = _SummaryAdapter(
+    summary_agent = SummaryAdapter(
         agent_mod.build_summary_agent(text_model),
         on_usage=_on_usage,
     )
 
-    image_provider = _build_split_image_provider(save, config)
+    image_provider = build_split_provider_for_save(save)
 
     pipeline = BeatPipeline(
         beat_agent=beat_agent,
@@ -219,9 +85,22 @@ def build_pipeline(
 
 def build_split_image_provider_for_wizard(config: AppConfig) -> SplitImageProvider:
     """Build a split image provider from app config (for wizard, before a save exists)."""
-    art_router = _build_routed_image_provider(config.image_config)
-    character_router = _build_routed_image_provider(config.character_image_config)
-    return SplitImageProvider(character_provider=character_router, art_provider=art_router)
+    return build_split_provider(
+        art_config=config.image_config,
+        character_config=config.character_image_config,
+    )
+
+
+# Public alias so existing router imports keep resolving (back-compat).
+# ``routers/images.py`` imports ``build_split_image_provider`` for save-pinned
+# provider construction; the signature mirrors the historical one
+# ``(save, config)`` even though ``config`` is no longer needed.
+def build_split_image_provider(
+    save: GameSave,
+    config: AppConfig,  # kept for back-compat with router call sites (was unused pre-ARC-003 too)
+) -> SplitImageProvider:
+    """Build a save-pinned split image provider."""
+    return build_split_provider_for_save(save)
 
 
 # ---------------------------------------------------------------------------

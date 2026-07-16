@@ -122,7 +122,7 @@ async def test_make_wizard_uses_app_split_provider_and_current_image_configs(
         return _FakeStartImageProvider()
 
     monkeypatch.setattr(
-        "storygen.app.build_routed_image_provider",
+        "storygen.runtime.adapters.build_routed_image_provider",
         spy_build_routed_image_provider,
     )
 
@@ -301,7 +301,7 @@ async def test_start_game_builds_art_and_character_routers_from_save_configs(
         return _FakeStartImageProvider()
 
     monkeypatch.setattr(
-        "storygen.app.build_routed_image_provider",
+        "storygen.runtime.adapters.build_routed_image_provider",
         spy_build_routed_image_provider,
     )
     monkeypatch.setattr(app_state, "art_enabled", lambda: False)
@@ -359,7 +359,7 @@ async def test_start_game_passes_fallback_cfg_to_art_and_character_routers(
         return _FakeStartImageProvider()
 
     monkeypatch.setattr(
-        "storygen.app.build_routed_image_provider",
+        "storygen.runtime.adapters.build_routed_image_provider",
         spy_build_routed_image_provider,
     )
     monkeypatch.setattr(app_state, "art_enabled", lambda: False)
@@ -471,12 +471,10 @@ async def test_resolve_fallback_cfg_returns_none_when_no_fallback(
             fallback_model="",
         )
     )
-    app = StoryGenApp()
-    async with app.run_test() as pilot:
-        await pilot.pause()
-        primary = ImageProviderConfig(provider="openai", model="gpt-image-2")
-        result = app._resolve_fallback_cfg(primary)  # pyright: ignore[reportPrivateUsage]
-    assert result is None
+    from storygen.runtime.adapters import resolve_fallback_cfg
+
+    primary = ImageProviderConfig(provider="openai", model="gpt-image-2")
+    assert resolve_fallback_cfg(primary) is None
 
 
 @pytest.mark.asyncio
@@ -494,12 +492,10 @@ async def test_resolve_fallback_cfg_returns_none_when_matches_primary(
             fallback_model="gpt-image-1",
         )
     )
-    app = StoryGenApp()
-    async with app.run_test() as pilot:
-        await pilot.pause()
-        primary = ImageProviderConfig(provider="openai", model="gpt-image-2")
-        result = app._resolve_fallback_cfg(primary)  # pyright: ignore[reportPrivateUsage]
-    assert result is None
+    from storygen.runtime.adapters import resolve_fallback_cfg
+
+    primary = ImageProviderConfig(provider="openai", model="gpt-image-2")
+    assert resolve_fallback_cfg(primary) is None
 
 
 @pytest.mark.asyncio
@@ -518,11 +514,10 @@ async def test_resolve_fallback_cfg_builds_config_for_distinct_fallback(
             fallback_model="gemini-3-pro-image-preview",
         )
     )
-    app = StoryGenApp()
-    async with app.run_test() as pilot:
-        await pilot.pause()
-        primary = ImageProviderConfig(provider="openai", model="gpt-image-2")
-        result = app._resolve_fallback_cfg(primary)  # pyright: ignore[reportPrivateUsage]
+    from storygen.runtime.adapters import resolve_fallback_cfg
+
+    primary = ImageProviderConfig(provider="openai", model="gpt-image-2")
+    result = resolve_fallback_cfg(primary)
     assert result is not None
     assert result.provider == "gemini"
     assert result.model == "gemini-3-pro-image-preview"
@@ -547,11 +542,10 @@ async def test_resolve_fallback_cfg_fills_default_model_when_blank(
             fallback_model="",
         )
     )
-    app = StoryGenApp()
-    async with app.run_test() as pilot:
-        await pilot.pause()
-        primary = ImageProviderConfig(provider="openai", model="gpt-image-2")
-        result = app._resolve_fallback_cfg(primary)  # pyright: ignore[reportPrivateUsage]
+    from storygen.runtime.adapters import resolve_fallback_cfg
+
+    primary = ImageProviderConfig(provider="openai", model="gpt-image-2")
+    result = resolve_fallback_cfg(primary)
     assert result is not None
     assert result.provider == "zai"
     # SUGGESTED_IMAGE_MODELS["zai"][0] == "glm-image"
@@ -571,14 +565,16 @@ async def test_start_game_builds_per_save_routed_provider(
     reset_dotenv_cache_for_tests()
 
     primary_cfgs: list[ImageProviderConfig] = []
-    real = __import__("storygen.app", fromlist=["build_routed_image_provider"])
+    real = __import__(
+        "storygen.runtime.adapters", fromlist=["build_routed_image_provider"]
+    )
     real_fn = real.build_routed_image_provider
 
     def _spy(primary_cfg: ImageProviderConfig, **kwargs: object) -> object:
         primary_cfgs.append(primary_cfg)
         return real_fn(primary_cfg, **kwargs)  # type: ignore[arg-type]
 
-    monkeypatch.setattr("storygen.app.build_routed_image_provider", _spy)
+    monkeypatch.setattr("storygen.runtime.adapters.build_routed_image_provider", _spy)
 
     # Disable art so _backfill_cover_if_missing is a no-op (this test focuses on provider routing).
     monkeypatch.setattr(app_state, "art_enabled", lambda: False)

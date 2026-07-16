@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from collections.abc import Callable
-from typing import Protocol, cast, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from textual import work
 from textual.app import App
@@ -16,19 +15,19 @@ from storygen.config import AppConfig, load_config
 from storygen.images._prompts import build_cover_prompt
 from storygen.images.base import ImageProvider
 from storygen.images.constants import SCENE_QUALITY, SCENE_SIZE
-from storygen.images.provider_factory import (
-    ImageProviderName,
-    build_routed_image_provider,
-    default_fallback_model,
-)
-from storygen.images.routed_provider import RoutedImageProvider
 from storygen.images.split_provider import SplitImageProvider
 from storygen.llm import agents as agent_mod
-from storygen.llm.models import ImageProviderConfig
 from storygen.llm.provider_factory import build_text_model
 from storygen.llm.usage import record_usage_on_save
 from storygen.pipeline import BeatPipeline, PipelineCallbacks
 from storygen.pipeline import background_tasks as _background_tasks
+from storygen.runtime.adapters import (
+    BeatAgentAdapter,
+    IllustrationAdapter,
+    SummaryAdapter,
+    build_split_provider,
+    build_split_provider_for_save,
+)
 from storygen.screens.intro import IntroScreen
 from storygen.screens.library_browser import CharacterCatalogScreen
 from storygen.screens.load import LoadGameScreen
@@ -61,98 +60,6 @@ class _RenderCurrentable(Protocol):
     """Protocol for screens that expose _render_current."""
 
     def _render_current(self) -> None: ...
-
-
-class _BeatAgentAdapter:
-    """Adapter: runs a pydantic-ai beat agent and emits the narration as one delta.
-
-    Implements :class:`storygen.pipeline.BeatAgentLike` (the ``run`` method).
-    Despite the original class name suggesting streaming, this uses
-    ``agent.run()`` rather than ``agent.run_stream()``: pydantic-ai's stream
-    API does NOT retry on output-validation failure (raises
-    ``UnexpectedModelBehavior`` immediately), and the StoryBeat schema's
-    ending-vs-choices validator triggers that path occasionally.  ``agent.run()``
-    retries validation failures up to the agent's budget, and beat generation
-    is fast enough (~5-10 s) that the player doesn't need character-by-character
-    streaming. The whole narration is delivered in a single ``on_narration_delta``
-    call after ``run()`` resolves.
-    """
-
-    def __init__(
-        self,
-        agent,  # type: ignore[no-untyped-def]
-        *,
-        on_usage: Callable[[object], None] | None = None,
-    ) -> None:
-        self._agent = agent  # pyright: ignore[reportUnknownMemberType]
-        self._on_usage = on_usage
-
-    async def run(self, prompt, on_narration_delta, raw_sink=None):  # type: ignore[no-untyped-def]
-        result = await self._agent.run(prompt)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-        if self._on_usage is not None:
-            # Never let usage tracking crash a beat.
-            with contextlib.suppress(Exception):
-                self._on_usage(result.usage)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
-        if raw_sink is not None:
-            # Debug-only raw cache; must never crash the pipeline.
-            with contextlib.suppress(Exception):
-                raw_sink(result.all_messages_json())  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
-        beat = result.output  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-        narration = getattr(beat, "narration", "") or ""  # pyright: ignore[reportUnknownArgumentType]
-        if narration:
-            await on_narration_delta(narration)  # pyright: ignore[reportUnknownArgumentType]
-        return beat  # pyright: ignore[reportUnknownVariableType]
-
-
-class _SummaryAdapter:
-    """Adapter: turns a pydantic-ai summary agent into the pipeline protocol."""
-
-    def __init__(
-        self,
-        agent,  # type: ignore[no-untyped-def]
-        *,
-        on_usage: Callable[[object], None] | None = None,
-    ) -> None:
-        self._agent = agent  # pyright: ignore[reportUnknownMemberType]
-        self._on_usage = on_usage
-
-    async def run(self, path_summary_prompt, raw_sink=None):  # type: ignore[no-untyped-def]
-        result = await self._agent.run(path_summary_prompt)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-        if self._on_usage is not None:
-            with contextlib.suppress(Exception):
-                self._on_usage(result.usage)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
-        if raw_sink is not None:
-            with contextlib.suppress(Exception):
-                raw_sink(result.all_messages_json())  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
-        return result.output  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-
-
-class _IllustrationAdapter:
-    """Adapter: turns a pydantic-ai illustration agent into the pipeline protocol."""
-
-    def __init__(
-        self,
-        agent,  # type: ignore[no-untyped-def]
-        *,
-        on_usage: Callable[[object], None] | None = None,
-    ) -> None:
-        self._agent = agent  # pyright: ignore[reportUnknownMemberType]
-        self._on_usage = on_usage
-
-    async def run(self, beat, characters, raw_sink=None):  # type: ignore[no-untyped-def]
-        summary = f"BEAT:\n{beat.narration}\n\nCHARACTERS:\n" + "\n".join(  # pyright: ignore[reportUnknownMemberType]
-            f"- {c.id}: {c.name} — {c.physical_description}"  # pyright: ignore[reportUnknownMemberType]
-            for c in characters  # pyright: ignore[reportUnknownVariableType]
-        )
-        result = await self._agent.run(summary)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-        if self._on_usage is not None:
-            # Never let usage tracking crash a beat.
-            with contextlib.suppress(Exception):
-                self._on_usage(result.usage)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
-        if raw_sink is not None:
-            with contextlib.suppress(Exception):
-                raw_sink(result.all_messages_json())  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
-        return result.output  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
 
 
 class StoryGenApp(App[None]):
@@ -252,31 +159,18 @@ class StoryGenApp(App[None]):
             timeout=5,
         )
 
-    def _build_routed_image_provider(self, config: ImageProviderConfig) -> RoutedImageProvider:
-        """Build one routed image provider from a pinned config + app fallback prefs."""
-        return build_routed_image_provider(
-            config,
-            fallback_cfg=self._resolve_fallback_cfg(config),
-            on_ref_loss=self._handle_ref_loss,
-            on_fallback=self._handle_fallback,
-        )
-
-    def _build_split_image_provider(
-        self,
-        *,
-        art_config: ImageProviderConfig,
-        character_config: ImageProviderConfig,
-    ) -> SplitImageProvider:
-        """Build a split provider with fallback routing applied to both halves."""
-        art_router = self._build_routed_image_provider(art_config)
-        character_router = self._build_routed_image_provider(character_config)
-        return SplitImageProvider(character_provider=character_router, art_provider=art_router)
-
     def _build_app_image_provider(self) -> SplitImageProvider:
-        """Build the app-level split image provider from current config + prefs."""
-        return self._build_split_image_provider(
+        """Build the app-level split image provider from current config + prefs.
+
+        Delegates to :func:`storygen.runtime.adapters.build_split_provider`
+        (ARC-003 shared module), wiring the TUI's toast handlers as the
+        fallback/ref-loss callbacks.
+        """
+        return build_split_provider(
             art_config=self._config.image_config,
             character_config=self._config.character_image_config,
+            on_ref_loss=self._handle_ref_loss,
+            on_fallback=self._handle_fallback,
         )
 
     def _rebuild_image_provider(self) -> None:
@@ -288,38 +182,6 @@ class StoryGenApp(App[None]):
         them again after an unrelated Settings change would be noise.
         """
         self._image_provider = self._build_app_image_provider()
-
-    def _resolve_fallback_cfg(self, primary: ImageProviderConfig) -> ImageProviderConfig | None:
-        """Resolve the fallback image-provider config from persisted prefs.
-
-        Returns ``None`` when:
-        - no fallback provider is configured (``fallback_provider == ""``),
-        - or the fallback provider matches the primary (degenerate — no
-          real fallback).
-
-        Otherwise returns an :class:`ImageProviderConfig` with
-        ``base_url=None`` and ``api_key=None`` so the fallback provider
-        resolves its credentials from the env. Per-save api_key pinning is
-        a primary-only feature.
-        """
-        prefs = app_state.read_image_provider_prefs()
-        if not prefs.fallback_provider:
-            return None
-        if prefs.fallback_provider == primary.provider:
-            return None
-        model = prefs.fallback_model or default_fallback_model(prefs.fallback_provider)
-        if not model:
-            return None
-        return ImageProviderConfig(
-            # prefs.fallback_provider is validated at read time against the
-            # allow-list (see app_state.read_image_provider_prefs), so we
-            # narrow from ``str`` to ``ImageProviderName`` via cast rather
-            # than a type: ignore.
-            provider=cast(ImageProviderName, prefs.fallback_provider),
-            model=model,
-            base_url=None,
-            api_key=None,
-        )
 
     def _handle_ref_loss(self, provider_label: str) -> None:
         """Surface a one-per-session toast when a non-ref provider drops refs."""
@@ -367,10 +229,15 @@ class StoryGenApp(App[None]):
         )
 
     def _build_save_image_provider(self, save: GameSave) -> SplitImageProvider:
-        """Build a save-pinned split provider for art and portraits."""
-        return self._build_split_image_provider(
-            art_config=save.image_config,
-            character_config=save.character_image_config,
+        """Build a save-pinned split provider for art and portraits.
+
+        Delegates to :func:`storygen.runtime.adapters.build_split_provider_for_save`,
+        wiring the TUI's toast handlers as the fallback/ref-loss callbacks.
+        """
+        return build_split_provider_for_save(
+            save,
+            on_ref_loss=self._handle_ref_loss,
+            on_fallback=self._handle_fallback,
         )
 
     def _make_catalog(self) -> CharacterCatalogScreen:
@@ -546,7 +413,7 @@ class StoryGenApp(App[None]):
                 if isinstance(screen, _HeaderUpdatable):
                     screen._apply_header()  # pyright: ignore[reportPrivateUsage]
 
-        beat_agent = _BeatAgentAdapter(
+        beat_agent = BeatAgentAdapter(
             agent_mod.build_beat_agent(
                 text_model,
                 theme=save.theme,
@@ -558,11 +425,11 @@ class StoryGenApp(App[None]):
             ),
             on_usage=_on_usage,
         )
-        illustration_agent = _IllustrationAdapter(
+        illustration_agent = IllustrationAdapter(
             agent_mod.build_illustration_agent(text_model),
             on_usage=_on_usage,
         )
-        summary_agent = _SummaryAdapter(
+        summary_agent = SummaryAdapter(
             agent_mod.build_summary_agent(text_model),
             on_usage=_on_usage,
         )
