@@ -159,9 +159,7 @@ class _StoryTree(Tree[dict[str, object]]):
         self._path_node_ids = path_node_ids
         self._path_ids = frozenset(path_node_ids)
 
-    def _color_span(
-        self, path: Sequence[TreeNode[dict[str, object]]]
-    ) -> tuple[int, int] | None:
+    def _color_span(self, path: Sequence[TreeNode[dict[str, object]]]) -> tuple[int, int] | None:
         """Return the column span ``[start, end)`` to colour, or None for no colour."""
         gd = self.guide_depth
 
