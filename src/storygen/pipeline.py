@@ -52,6 +52,12 @@ from storygen.storage.tree import path_from_root, segment_since_last_summary
 # call inside `_prefetch_one`.
 _PREFETCH_CONCURRENCY: int = 3
 
+# Module logger for operator-visible background failures (initial-portrait
+# generation, stage-3 image failure, prefetch await). The handlers in
+# screens/* already surface user-facing toasts; this is the diagnostic
+# backstop that tells operators *why* a portrait or illustration is blank.
+_logger = logging.getLogger(__name__)
+
 
 class BeatAgentLike(Protocol):
     """Protocol for a beat agent that delivers narration.
@@ -501,8 +507,17 @@ class BeatPipeline:
         try:
             return await task
         except Exception:
-            # _prefetch_one already swallows; defense in depth in case the
-            # task was cancelled or otherwise raised outside _prefetch_one.
+            # _prefetch_one already swallows + dedup-logs the normal failure
+            # path; reaching here means the task was cancelled or raised
+            # outside _prefetch_one's try/except (e.g. during await cleanup).
+            # Warning rather than info because this branch is exceptional and
+            # the L466 dedup log does not cover it.
+            _logger.warning(
+                "prefetch await raised for (%s, %s); falling through to normal advance",
+                from_node_id,
+                choice_id,
+                exc_info=True,
+            )
             return None
 
     async def cancel_all_prefetches(self) -> None:
@@ -767,7 +782,16 @@ class BeatPipeline:
                 )
             except Exception:
                 # Skip this character; leave portrait_path empty. The next
-                # PortraitsScreen open will let the user retry.
+                # PortraitsScreen open will let the user retry. Logged so
+                # operators can see *which* character failed and why — the UI
+                # shows an empty portrait with no diagnostic.
+                _logger.warning(
+                    "initial portrait generation failed for character %r in game %s; "
+                    "leaving portrait_path empty (user can retry from Portraits screen)",
+                    char.id,
+                    save_id,
+                    exc_info=True,
+                )
                 continue
             save.total_image_cost_usd += image_cost(
                 save.character_image_config.provider,
@@ -874,6 +898,17 @@ class BeatPipeline:
             await cb.on_image_committed(done)
             return done
         except Exception:
+            # Mark the node's image as failed and notify the UI, but log the
+            # underlying cause so operators can diagnose silent blank-scene
+            # bugs (provider outage, prompt policy refusal, etc.). The
+            # on_image_failed callback surfaces the failure to the user; this
+            # log surfaces it to the operator.
+            _logger.warning(
+                "stage-3 illustration failed for node %s in game %s; marking image_status=failed",
+                node_id,
+                save.id,
+                exc_info=True,
+            )
             failed = save.nodes[node_id].model_copy(update={"image_status": "failed"})
             save.nodes[node_id] = failed
             save_game(save)
