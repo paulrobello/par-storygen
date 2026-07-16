@@ -11,6 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Graph path highlighting precision** — In the graph view, cyan path highlighting now follows the direct root-to-current lineage only. Path-node rows show cyan on the branch connector (├── / └──), expand icon, and label; ancestor guide columns stay default. "Between" rows (siblings of a path node that come before it, plus their descendants) get only the single T-junction cell highlighted. Rows past where the path branches off and descendants of the current node are no longer highlighted. The internal `_StoryTree` was refactored to compute a single column span per row and split segments at character boundaries for partial cells.
 
+### Security
+
+- **Web API hardened** — The FastAPI surface (`src/storygen_api`) is now auth-gated (bearer token via `STORYGEN_API_TOKEN`, fail-closed 503 when unset), loopback-bound by default, SSRF-allowlisted (provider base-URL allowlist rejecting private/link-local IP ranges), path-validated (uuid/node/char id checks at every path builder), rate-limited (sliding-window per IP), and no longer leaks exception strings in error responses. CORS is pinned to actual method/header usage with configurable origins. (Audit SEC-001…011)
+
+### Changed
+
+- **WebSocket protocol fixed** — The server now emits the exact fields the web frontend expects (`narration_delta.text`, `beat_committed.choices[]`, `image_committed`/`image_failed`, full `new_characters` cards, `error.message`) and validates `from_node_id`/`choice_id` against the save before invoking the pipeline. Broadcast mutation races fixed via an `asyncio.Lock` snapshot. (ARC-001/007/009)
+- **Shared headless runtime layer** — Duplicated LLM adapters and `WizardFlow` extracted into `src/storygen/runtime/` so the FastAPI surface reuses them without importing Textual. Fixed a usage-tracking divergence that silently dropped token accounting on API-side calls. (ARC-003/005)
+- **`app_state` split** — The God module is now `app_state/{defaults,models,io}.py` with a back-compat re-export; state files are written `0600`. (ARC-013/SEC-005)
+- **Dependency bounds** — `textual`, `pydantic-ai`, `openai` pinned to `<MAJOR+1>`; `_private` cross-module imports renamed to public (`_prompts` → `prompts`, `_image_util` → `image_util`, `_header_util` → `header_util`). (ARC-014/QA-007)
+
+### Internal
+
+- **CI gate green** — `make checkall` (lint + typecheck + test) is now read-only and passing: 0 ruff / 0 pyright (was 75 + 5 red throughout the audit), 902 tests (was 769). A GitHub Actions gate runs on push/PR covering the Python gate, web build, and Playwright e2e. (QA-001/ARC-006/ARC-008/ARC-015)
+- **API + web test layer** — Added Python API/WebSocket/security/rate-limit tests, a vitest layer for the WS contract + config, and a hermetic Playwright e2e that drives the play surface against a mocked backend. (ARC-002/ARC-015)
+- **God-screen targeted extraction** — Separable pure logic pulled out of the four large screens into `src/storygen/screens/controllers/` (portraits outfit bookkeeping, settings image-model select logic, wizard confirm-summary builder), each unit-tested without a Textual `App`. The screens keep their `@work` workers and message handlers, which Textual pins in place by design. (ARC-012/QA-006)
+
 ## [0.5.0] - 2026-05-18
 
 ### Fixed
