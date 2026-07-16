@@ -10,6 +10,75 @@ from xdg_base_dirs import xdg_config_home, xdg_data_home
 
 _APP = "storygen"
 
+# UUID canonical forms accepted for ``game_id`` — either the hyphenated
+# 36-char form produced by ``str(UUID(...))`` or the 32-char hex form
+# produced by ``UUID(...).hex``. Mirrors the library_id pattern in
+# ``storage/library.py`` but accepts both real-world spellings.
+_GAME_ID_PATTERN = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    r"|^[0-9a-fA-F]{32}$"
+)
+
+# Node/char/outfit IDs reject only path-traversal characters. They are not
+# restricted to uuid-hex because legacy saves (and some test fixtures) use
+# short identifiers like ``"root"`` or ``"a1"``. The threat surface is
+# ``/ \ ..`` and leading ``-`` (glob/CLI flag injection), not format purity.
+_SUB_ID_PATTERN = re.compile(r"^[A-Za-z0-9_.\-]+$")
+
+
+def _validate_game_id(game_id: str) -> None:
+    """Reject anything that isn't a canonical UUID string (SEC-003).
+
+    Raises:
+        ValueError: If ``game_id`` is not the hyphenated or hex form of a
+            UUID. Prevents path traversal via ``..`` and restricts the
+            ``StaticFiles`` mount to genuine save directories.
+    """
+    if not _GAME_ID_PATTERN.fullmatch(game_id):
+        raise ValueError(
+            f"invalid game_id: must be a canonical UUID (hyphenated 36-char or "
+            f"32-char hex), got {game_id!r}"
+        )
+
+
+def _validate_sub_id(value: str, *, kind: str) -> None:
+    """Reject empty or non-filesystem-safe sub-IDs (SEC-003, SEC-010).
+
+    Used for ``node_id`` and ``char_id`` path parameters that flow into
+    ``os.path`` joins and ``glob()`` patterns. Rejects ``/``, ``\\``,
+    leading ``-`` (CLI-flag / glob-meta injection), ``..`` traversal, and
+    empty strings. Unlike :func:`_validate_game_id`, this does NOT enforce
+    a uuid shape — only that the value is path-safe.
+
+    Args:
+        value: The node/char/outfit identifier.
+        kind: Human-readable label (``"node_id"``, ``"char_id"``) used in
+            the error message.
+
+    Raises:
+        ValueError: If ``value`` is empty, contains ``/`` or ``\\``,
+            equals ``..`` / ``.``, starts with ``-``, or contains any
+            character outside ``[A-Za-z0-9_.-]``.
+    """
+    if not value:
+        raise ValueError(f"invalid {kind}: must be a non-empty string")
+    if value in (".", ".."):
+        raise ValueError(f"invalid {kind}: {value!r} traversal disallowed")
+    if value.startswith("-"):
+        raise ValueError(f"invalid {kind}: leading '-' disallowed")
+    if not _SUB_ID_PATTERN.fullmatch(value):
+        raise ValueError(
+            f"invalid {kind}: only [A-Za-z0-9_.-] allowed, got {value!r}"
+        )
+
+
+def _validate_node_id(node_id: str) -> None:
+    _validate_sub_id(node_id, kind="node_id")
+
+
+def _validate_char_id(char_id: str) -> None:
+    _validate_sub_id(char_id, kind="char_id")
+
 
 def safe_join(base: Path, relative: str) -> Path:
     """Join ``relative`` to ``base``, raising ``ValueError`` on path traversal.
@@ -69,11 +138,13 @@ def presets_dir() -> Path:
 
 def game_dir(game_id: str) -> Path:
     """Directory for a single game save."""
+    _validate_game_id(game_id)
     return games_root() / game_id
 
 
 def game_save_file(game_id: str) -> Path:
     """Absolute path to a game's `game.json`."""
+    _validate_game_id(game_id)
     return game_dir(game_id) / "game.json"
 
 
@@ -96,6 +167,7 @@ def character_portrait_path(game_id: str, character_id: str, version: int = 1) -
         version: 1-based portrait version. Each regeneration writes a new
             version so old portraits remain on disk.
     """
+    _validate_char_id(character_id)
     return game_dir(game_id) / relative_character_portrait_path(character_id, version)
 
 
@@ -120,6 +192,8 @@ def character_outfit_path(game_id: str, character_id: str, outfit_id: str) -> Pa
         character_id: The character identifier.
         outfit_id: The outfit identifier (uuid4 hex).
     """
+    _validate_char_id(character_id)
+    _validate_sub_id(outfit_id, kind="outfit_id")
     return game_dir(game_id) / relative_character_outfit_path(character_id, outfit_id)
 
 
@@ -133,6 +207,7 @@ def character_reference_path(game_id: str, char_id: str) -> Path:
 
     There is one reference image per character (overwritten on re-upload).
     """
+    _validate_char_id(char_id)
     return game_dir(game_id) / relative_character_reference_path(char_id)
 
 
@@ -143,6 +218,7 @@ def next_portrait_version(game_id: str, character_id: str) -> int:
     and returns ``max(N) + 1``, or ``1`` if no prior versions exist. Safe for
     single-process use; not race-safe across processes.
     """
+    _validate_char_id(character_id)
     chars_dir = game_dir(game_id) / "images" / "characters"
     if not chars_dir.is_dir():
         return 1
@@ -162,6 +238,7 @@ def latest_portrait_version(game_id: str, character_id: str) -> int | None:
     portrait rather than blindly snapping to v1. Returns None when no base
     portrait has ever been written (e.g. art was disabled at wizard time).
     """
+    _validate_char_id(character_id)
     chars_dir = game_dir(game_id) / "images" / "characters"
     if not chars_dir.is_dir():
         return None
@@ -176,6 +253,7 @@ def latest_portrait_version(game_id: str, character_id: str) -> int | None:
 
 def node_image_path(game_id: str, node_id: str) -> Path:
     """Absolute path to a story node scene PNG."""
+    _validate_node_id(node_id)
     return game_dir(game_id) / "images" / "nodes" / f"{node_id}.png"
 
 
@@ -220,6 +298,7 @@ def tts_audio_path(
     ext: str = "mp3",
 ) -> Path:
     """Absolute path to a story node TTS audio file."""
+    _validate_node_id(node_id)
     return game_dir(game_id) / relative_tts_audio_path(
         node_id,
         provider=provider,
@@ -247,7 +326,10 @@ def ensure_game_dirs(game_id: str) -> None:
 
 def node_audio_glob(game_id: str, node_id: str) -> list[Path]:
     """Return all TTS audio files matching a node id on disk."""
+    _validate_node_id(node_id)
     audio_dir = game_dir(game_id) / "audio"
     if not audio_dir.is_dir():
         return []
+    # ``node_id`` is validated above to contain no glob metacharacters, so
+    # this interpolation is safe from pattern-injection (SEC-010).
     return sorted(audio_dir.glob(f"{node_id}-*.*"))

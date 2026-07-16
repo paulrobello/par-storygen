@@ -54,8 +54,9 @@ class TestReferencePaths:
         self, tmp_path: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
-        result = paths.character_reference_path("game1", "char1")
-        expected = paths.game_dir("game1") / "images" / "characters" / "char1-ref.png"
+        gid = "11111111-1111-1111-1111-111111111111"
+        result = paths.character_reference_path(gid, "char1")
+        expected = paths.game_dir(gid) / "images" / "characters" / "char1-ref.png"
         assert result == expected
 
 

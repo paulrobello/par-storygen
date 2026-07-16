@@ -1,12 +1,23 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException
 
 from storygen.storage import app_state
 from storygen.storage.app_state import TTSPrefs
 from storygen_api.schemas import SettingsResponse, SettingsUpdateRequest
+from storygen_api.security import ProviderURLError, validate_provider_url_for, verify_token
 
-router = APIRouter(prefix="/api/settings", tags=["settings"])
+router = APIRouter(
+    prefix="/api/settings",
+    tags=["settings"],
+    # SEC-001: settings reads expose API-key presence / provider config;
+    # settings writes are the SSRF / credential-exfiltration vector (SEC-002).
+    dependencies=[Depends(verify_token)],
+)
+
+_logger = logging.getLogger(__name__)
 
 
 @router.get("", response_model=SettingsResponse)
@@ -73,9 +84,26 @@ def _str_or_default(d: dict[str, object], key: str, default: str) -> str:
     return str(val) if isinstance(val, str) else default
 
 
+def _validate_provider_field(provider: str, base_url: str) -> None:
+    """SEC-002: reject base URLs that point off-allowlist before persisting."""
+    try:
+        validate_provider_url_for(provider, base_url)
+    except ProviderURLError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"rejected provider base_url: {exc}",
+        ) from exc
+
+
 @router.put("", response_model=SettingsResponse)
 async def update_settings(body: SettingsUpdateRequest) -> SettingsResponse:
-    """Write settings and return the updated state."""
+    """Write settings and return the updated state.
+
+    SEC-002: provider ``base_url`` values are validated against a curated
+    allowlist (and private/link-local IP ranges are rejected) before being
+    persisted, so the next outbound LLM/image request cannot leak the user's
+    API key to an attacker-controlled host.
+    """
     text_prefs = app_state.read_provider_prefs()
     image_prefs = app_state.read_image_provider_prefs()
     char_image_prefs = app_state.read_character_image_provider_prefs()
@@ -83,19 +111,25 @@ async def update_settings(body: SettingsUpdateRequest) -> SettingsResponse:
 
     if body.text_provider is not None:
         tp = body.text_provider
+        provider = _str_or_default(tp, "provider", text_prefs.provider)
+        base_url = _str_or_default(tp, "base_url", text_prefs.base_url)
+        _validate_provider_field(provider, base_url)
         text_prefs = app_state.ProviderPrefs(
-            provider=_str_or_default(tp, "provider", text_prefs.provider),
+            provider=provider,
             model=_str_or_default(tp, "model", text_prefs.model),
-            base_url=_str_or_default(tp, "base_url", text_prefs.base_url),
+            base_url=base_url,
             api_key=_str_or_default(tp, "api_key", text_prefs.api_key),
         )
 
     if body.image_provider is not None:
         ip = body.image_provider
+        provider = _str_or_default(ip, "provider", image_prefs.provider)
+        base_url = _str_or_default(ip, "base_url", image_prefs.base_url)
+        _validate_provider_field(provider, base_url)
         image_prefs = app_state.ImageProviderPrefs(
-            provider=_str_or_default(ip, "provider", image_prefs.provider),
+            provider=provider,
             model=_str_or_default(ip, "model", image_prefs.model),
-            base_url=_str_or_default(ip, "base_url", image_prefs.base_url),
+            base_url=base_url,
             api_key=_str_or_default(ip, "api_key", image_prefs.api_key),
             fallback_provider=_str_or_default(
                 ip, "fallback_provider", image_prefs.fallback_provider
@@ -105,10 +139,13 @@ async def update_settings(body: SettingsUpdateRequest) -> SettingsResponse:
 
     if body.character_image_provider is not None:
         cp = body.character_image_provider
+        provider = _str_or_default(cp, "provider", char_image_prefs.provider)
+        base_url = _str_or_default(cp, "base_url", char_image_prefs.base_url)
+        _validate_provider_field(provider, base_url)
         char_image_prefs = app_state.CharacterImageProviderPrefs(
-            provider=_str_or_default(cp, "provider", char_image_prefs.provider),
+            provider=provider,
             model=_str_or_default(cp, "model", char_image_prefs.model),
-            base_url=_str_or_default(cp, "base_url", char_image_prefs.base_url),
+            base_url=base_url,
             api_key=_str_or_default(cp, "api_key", char_image_prefs.api_key),
         )
 

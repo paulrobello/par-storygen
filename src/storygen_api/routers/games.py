@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -28,11 +29,20 @@ from storygen_api.schemas import (
     PruneRequest,
     RegenerateNodeRequest,
 )
+from storygen_api.security import verify_token
 from storygen.export.book import export_book
 from storygen_api.session import PipelineSessionManager
 from storygen_api.ws import ws_manager
 
-router = APIRouter(prefix="/api/games", tags=["games"])
+router = APIRouter(
+    prefix="/api/games",
+    tags=["games"],
+    # SEC-001: every games route reads or mutates user content; gate all of them
+    # behind the shared bearer token. GET /api/health on the root app stays open.
+    dependencies=[Depends(verify_token)],
+)
+
+_logger = logging.getLogger(__name__)
 
 
 def _node_to_detail(node: StoryNode) -> NodeDetail:
@@ -132,8 +142,8 @@ async def get_game(game_id: str) -> GameDetail:
     """Return full game state."""
     try:
         save = load_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
     node_details = {nid: _node_to_detail(n) for nid, n in save.nodes.items()}
     return GameDetail(
         id=str(save.id),
@@ -166,8 +176,8 @@ async def advance_game(
     """Pick a choice and advance the story."""
     try:
         save = load_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
 
     pipeline = mgr.get_pipeline(game_id)
     if pipeline is None:
@@ -187,9 +197,11 @@ async def advance_game(
             callbacks=callbacks,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        # SEC-004: do not leak the provider/pipeline exception string.
+        _logger.exception("advance_game failed for game %s", game_id)
+        raise HTTPException(status_code=500, detail="internal error") from exc
 
     mgr.update_save(game_id, save)
 
@@ -213,8 +225,8 @@ async def delete_game_endpoint(
     await mgr.cleanup(game_id)
     try:
         delete_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
 
 
 @router.post("/{game_id}/jump", response_model=GameDetail)
@@ -222,8 +234,8 @@ async def jump_to_node(game_id: str, body: JumpRequest) -> GameDetail:
     """Set the current node to a target node."""
     try:
         save = load_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
     if body.target_node_id not in save.nodes:
         raise HTTPException(status_code=404, detail="Node not found")
     save.current_node_id = body.target_node_id
@@ -236,8 +248,8 @@ async def get_graph(game_id: str) -> GraphResponse:
     """Return all choice edges for the story graph (visited + unvisited)."""
     try:
         save = load_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
     edges: list[GraphEdge] = []
     for parent_id, node in save.nodes.items():
         for c in node.choices:
@@ -257,8 +269,8 @@ async def list_endings(game_id: str) -> list[NodeId]:
     """List reached ending node IDs."""
     try:
         save = load_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
     return save.endings_reached
 
 
@@ -270,12 +282,12 @@ async def prune_subtree_endpoint(
     """Prune a subtree starting at the given node."""
     try:
         save = load_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
     try:
         count = prune_subtree(save, node_id=body.node_id)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"removed_count": count}
 
 
@@ -289,8 +301,8 @@ async def regenerate_node(
     """Regenerate the current node by pruning it and re-advending from parent."""
     try:
         save = load_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
 
     node = save.nodes.get(save.current_node_id)
     if node is None:
@@ -323,7 +335,9 @@ async def regenerate_node(
             callbacks=callbacks,
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        # SEC-004: do not leak the provider/pipeline exception string.
+        _logger.exception("regenerate_node failed for game %s", game_id)
+        raise HTTPException(status_code=500, detail="internal error") from exc
 
     mgr.update_save(game_id, save)
     save = load_game(game_id)
@@ -343,8 +357,8 @@ async def get_path(
     """Return the path from root to target node."""
     try:
         save = load_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
     if target_node_id not in save.nodes:
         raise HTTPException(status_code=404, detail="Node not found")
     chain = path_from_root(save, target_node_id)
@@ -361,8 +375,8 @@ async def export_book_endpoint(
 
     try:
         save = load_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
 
     node = save.nodes.get(save.current_node_id)
     if node is None:
@@ -371,7 +385,9 @@ async def export_book_endpoint(
     try:
         out = await asyncio.to_thread(export_book, save, node.id, open_browser=False)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        # SEC-004: log full traceback server-side; return generic message.
+        _logger.exception("export_book failed for game %s", game_id)
+        raise HTTPException(status_code=500, detail="internal error") from exc
 
     return {"path": str(out), "filename": os.path.basename(out)}
 
@@ -385,8 +401,8 @@ async def download_book(
 
     try:
         save = load_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
 
     node = save.nodes.get(save.current_node_id)
     if node is None:
@@ -395,7 +411,9 @@ async def download_book(
     try:
         out = await __import__("asyncio").to_thread(export_book, save, node.id, open_browser=False)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        # SEC-004: log full traceback server-side; return generic message.
+        _logger.exception("download_book failed for game %s", game_id)
+        raise HTTPException(status_code=500, detail="internal error") from exc
 
     # out is the directory path; the main file is index.html inside it
     html_path = out / "index.html"

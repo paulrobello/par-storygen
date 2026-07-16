@@ -168,7 +168,9 @@ def test_save_is_atomic_no_tmp_left_behind(monkeypatch: pytest.MonkeyPatch, tmp_
 def test_load_missing_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     try:
-        load_game("does-not-exist")
+        # Use a valid UUID shape (SEC-003 path validation now rejects non-UUID
+        # game_ids with ValueError before checking existence).
+        load_game("55555555-5555-5555-5555-555555555555")
     except FileNotFoundError:
         return
     raise AssertionError("expected FileNotFoundError")

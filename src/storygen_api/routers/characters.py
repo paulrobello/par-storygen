@@ -37,8 +37,15 @@ from storygen_api.schemas import (
     PortraitRegenerateRequest,
     StoryImportRequest,
 )
+from storygen_api.security import verify_token
 
-router = APIRouter(prefix="/api/characters", tags=["characters"])
+router = APIRouter(
+    prefix="/api/characters",
+    tags=["characters"],
+    # SEC-001: every characters route reads, mutates user content, or triggers
+    # cost-incurring LLM/image generation. Gate all of them.
+    dependencies=[Depends(verify_token)],
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -65,10 +72,10 @@ def _load_char_or_404(library_id: str) -> LibraryCharacter:
     """Load a library character or raise HTTPException."""
     try:
         return load_library_character(library_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Character not found")
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid library ID")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Character not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid library ID") from exc
 
 
 def _get_ref_bytes(char: LibraryCharacter) -> bytes | None:
@@ -113,8 +120,8 @@ async def get_character_portrait(library_id: str) -> FileResponse:
     """Serve a library character's portrait PNG."""
     try:
         portrait_path = library_portrait_path(library_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid library ID")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid library ID") from exc
     if not portrait_path.exists():
         raise HTTPException(status_code=404, detail="Portrait not found")
     return FileResponse(str(portrait_path), media_type="image/png")
@@ -153,8 +160,8 @@ async def delete_character(library_id: str) -> None:
     """Remove a character from the library."""
     try:
         delete_library_character(library_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid library ID")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid library ID") from exc
 
 
 @router.put("/{library_id}", response_model=CharacterLibraryEntry)
@@ -213,9 +220,10 @@ async def regenerate_portrait(
             art_style=body.art_style,
             reference_image=ref_bytes,
         )
-    except Exception:
+    except Exception as exc:
+        # SEC-004: log server-side; return a generic message (no str(exc)).
         _logger.exception("Portrait regeneration failed")
-        raise HTTPException(status_code=500, detail="Portrait generation failed")
+        raise HTTPException(status_code=500, detail="Portrait generation failed") from exc
 
     save_library_character(char, portrait_bytes)
     return _lib_to_entry(char)
@@ -252,9 +260,10 @@ async def edit_portrait(
             art_style=body.art_style,
             reference_image=ref_bytes,
         )
-    except Exception:
+    except Exception as exc:
+        # SEC-004: log server-side; return a generic message (no str(exc)).
         _logger.exception("Portrait edit-regen failed")
-        raise HTTPException(status_code=500, detail="Portrait generation failed")
+        raise HTTPException(status_code=500, detail="Portrait generation failed") from exc
 
     char = char.model_copy(update={"portrait_prompt": description})
     save_library_character(char, portrait_bytes)
@@ -281,8 +290,8 @@ async def upload_reference_image(
 
     try:
         png_bytes = _image_to_png_bytes(raw_bytes)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid image file")
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid image file") from exc
 
     if mode == "use_as_is":
         portrait_bytes = png_bytes
@@ -301,9 +310,12 @@ async def upload_reference_image(
                 art_style=app_state.DEFAULT_ART_STYLE,
                 reference_image=png_bytes,
             )
-        except Exception:
+        except Exception as exc:
+            # SEC-004: log server-side; return a generic message (no str(exc)).
             _logger.exception("Style-transfer failed")
-            raise HTTPException(status_code=500, detail="Style-transfer generation failed")
+            raise HTTPException(
+                status_code=500, detail="Style-transfer generation failed"
+            ) from exc
         char = char.model_copy(
             update={
                 "portrait_prompt": char.physical_description,
@@ -338,8 +350,8 @@ async def get_reference_image(library_id: str) -> Response:
     """Serve a library character's reference image PNG."""
     try:
         ref_path = library_reference_path(library_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid library ID")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid library ID") from exc
     if not ref_path.exists():
         raise HTTPException(status_code=404, detail="Reference image not found")
     return FileResponse(str(ref_path), media_type="image/png")
@@ -363,9 +375,10 @@ async def create_character(
     try:
         result = await agent.run(prompt)  # type: ignore[reportUnknownMemberType]
         raw_output = getattr(result, "output", None)
-    except Exception:
+    except Exception as exc:
+        # SEC-004: log server-side; return a generic message (no str(exc)).
         _logger.exception("Character generation LLM call failed")
-        raise HTTPException(status_code=500, detail="Character generation failed")
+        raise HTTPException(status_code=500, detail="Character generation failed") from exc
 
     if not isinstance(raw_output, list) or not raw_output:
         raise HTTPException(status_code=500, detail="LLM returned no characters")
@@ -387,6 +400,7 @@ async def create_character(
             art_style=app_state.DEFAULT_ART_STYLE,
         )
     except Exception:
+        # Not a SEC-004 leak (no str(exc)); placeholder is the documented fallback.
         _logger.exception("Portrait generation failed during character creation")
         # Continue with placeholder
 
@@ -411,10 +425,10 @@ async def import_from_story(
     """Import characters from a saved game into the library."""
     try:
         save = load_game(body.save_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Save not found")
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid save_id")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Save not found") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid save_id") from exc
 
     save_id = str(save.id)
     created: list[CharacterLibraryEntry] = []

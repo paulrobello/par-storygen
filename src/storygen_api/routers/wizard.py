@@ -18,8 +18,14 @@ from storygen_api.schemas import (
     WizardThemeRequest,
     WizardThemeResponse,
 )
+from storygen_api.security import verify_token
 
-router = APIRouter(prefix="/api/wizard", tags=["wizard"])
+router = APIRouter(
+    prefix="/api/wizard",
+    tags=["wizard"],
+    # SEC-001: every wizard route triggers cost-incurring LLM/image generation.
+    dependencies=[Depends(verify_token)],
+)
 
 _character_list_adapter = TypeAdapter(list[Character])
 

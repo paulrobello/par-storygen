@@ -1,13 +1,19 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 
 from storygen.storage import app_state, paths
 from storygen.storage.save import load_game
 from storygen.tts.player import TTSPlayer
+from storygen_api.security import verify_token
 
-router = APIRouter(prefix="/api/tts", tags=["tts"])
+router = APIRouter(
+    prefix="/api/tts",
+    tags=["tts"],
+    # SEC-001: TTS generate is cost-incurring; status/audio reads reveal user content.
+    dependencies=[Depends(verify_token)],
+)
 
 # Module-level TTS player (configured from app state on each request).
 _player = TTSPlayer()
@@ -29,8 +35,8 @@ async def generate_tts(game_id: str, node_id: str) -> JSONResponse:
     _configure_player()
     try:
         save = load_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
 
     node = save.nodes.get(node_id)
     if node is None:

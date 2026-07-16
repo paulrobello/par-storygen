@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -22,10 +23,19 @@ from storygen_api.schemas import (
     PortraitEditRequest,
     SceneEditRequest,
 )
+from storygen_api.security import verify_token
 from storygen_api.session import PipelineSessionManager
 from storygen_api.ws import ws_manager
 
-router = APIRouter(prefix="/api/images", tags=["images"])
+router = APIRouter(
+    prefix="/api/images",
+    tags=["images"],
+    # SEC-001: image routes serve, mutate save content, or trigger
+    # cost-incurring image generation. Gate all of them.
+    dependencies=[Depends(verify_token)],
+)
+
+_logger = logging.getLogger(__name__)
 
 
 @router.get("/{game_id}/scene/{node_id}")
@@ -59,8 +69,8 @@ async def retry_scene(
     """Retry scene image generation for a node."""
     try:
         save = load_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
 
     pipeline = mgr.get_pipeline(game_id)
     if pipeline is None:
@@ -74,7 +84,7 @@ async def retry_scene(
     try:
         node = await pipeline.retry_scene(save, node_id=node_id, callbacks=callbacks)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     mgr.update_save(game_id, save)
     return {"status": node.image_status}
@@ -91,8 +101,8 @@ async def edit_scene(
     """Edit scene prompt and regenerate."""
     try:
         save = load_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
 
     pipeline = mgr.get_pipeline(game_id)
     if pipeline is None:
@@ -111,7 +121,7 @@ async def edit_scene(
             callbacks=callbacks,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     mgr.update_save(game_id, save)
     return {"status": node.image_status}
@@ -126,8 +136,8 @@ async def retry_portrait(
     """Retry (regenerate) a character portrait using the stored portrait_prompt."""
     try:
         save = load_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
 
     char_idx = next((i for i, c in enumerate(save.characters) if c.id == char_id), None)
     if char_idx is None:
@@ -151,8 +161,10 @@ async def retry_portrait(
             art_style=save.art_style,
             reference_image=ref_bytes,
         )
-    except Exception:
-        raise HTTPException(status_code=500, detail="Portrait generation failed")
+    except Exception as exc:
+        # SEC-004: log server-side; return a generic message (no str(exc)).
+        _logger.exception("retry_portrait failed for char %s", char_id)
+        raise HTTPException(status_code=500, detail="Portrait generation failed") from exc
 
     # Track cost
     save.total_image_cost_usd += image_cost(
@@ -188,8 +200,8 @@ async def edit_portrait(
     """Edit a character portrait prompt and regenerate."""
     try:
         save = load_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
 
     char_idx = next((i for i, c in enumerate(save.characters) if c.id == char_id), None)
     if char_idx is None:
@@ -227,8 +239,10 @@ async def edit_portrait(
             art_style=save.art_style,
             reference_image=ref_bytes,
         )
-    except Exception:
-        raise HTTPException(status_code=500, detail="Portrait generation failed")
+    except Exception as exc:
+        # SEC-004: log server-side; return a generic message (no str(exc)).
+        _logger.exception("edit_portrait failed for char %s", char_id)
+        raise HTTPException(status_code=500, detail="Portrait generation failed") from exc
 
     # Track cost
     save.total_image_cost_usd += image_cost(
@@ -265,8 +279,8 @@ async def regenerate_cover(
     """Regenerate the cover art (root node scene image)."""
     try:
         save = load_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
 
     root_node = save.nodes.get(save.root_node_id)
     if root_node is None:
@@ -284,7 +298,7 @@ async def regenerate_cover(
     try:
         node = await pipeline.retry_scene(save, node_id=save.root_node_id, callbacks=callbacks)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     mgr.update_save(game_id, save)
     return {"status": node.image_status}
@@ -310,8 +324,8 @@ async def add_outfit(
 
     try:
         save = load_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
 
     char_idx = next((i for i, c in enumerate(save.characters) if c.id == char_id), None)
     if char_idx is None:
@@ -335,8 +349,12 @@ async def add_outfit(
             art_style=save.art_style,
             reference_image=ref_bytes,
         )
-    except Exception:
-        raise HTTPException(status_code=500, detail="Outfit portrait generation failed")
+    except Exception as exc:
+        # SEC-004: log server-side; return a generic message (no str(exc)).
+        _logger.exception("add_outfit failed for char %s", char_id)
+        raise HTTPException(
+            status_code=500, detail="Outfit portrait generation failed"
+        ) from exc
 
     dest = paths.character_outfit_path(game_id, char_id, outfit_id)
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -364,8 +382,8 @@ async def set_outfit(game_id: str, char_id: str, outfit_id: str) -> dict[str, st
     """Set an outfit as the current active outfit."""
     try:
         save = load_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
 
     char_idx = next((i for i, c in enumerate(save.characters) if c.id == char_id), None)
     if char_idx is None:
@@ -392,8 +410,8 @@ async def delete_outfit(game_id: str, char_id: str, outfit_id: str) -> dict[str,
     """Delete an outfit."""
     try:
         save = load_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
 
     char_idx = next((i for i, c in enumerate(save.characters) if c.id == char_id), None)
     if char_idx is None:
@@ -429,8 +447,8 @@ async def revert_outfit(game_id: str, char_id: str) -> dict[str, str]:
     """Revert to the base portrait (unset current outfit)."""
     try:
         save = load_game(game_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Game not found")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Game not found") from exc
 
     char_idx = next((i for i, c in enumerate(save.characters) if c.id == char_id), None)
     if char_idx is None:
