@@ -52,7 +52,7 @@ jobs:
         run: make checkall
 
   web-build:
-    name: Web (next build)
+    name: Web (vitest + next build)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -72,6 +72,10 @@ jobs:
       # frontend job fails loudly rather than silently drifting.
       - name: Install frontend dependencies
         run: npm ci
+
+      # ARC-015: vitest layer for the WS event contract + config module.
+      - name: Run vitest
+        run: npm run test
 
       - name: Build Next.js
         run: npm run build
