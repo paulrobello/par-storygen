@@ -1,3 +1,10 @@
+"""Pydantic request/response models for the ``storygen_api`` REST surface.
+
+These DTOs decouple the wire schema from the richer domain models in
+:mod:`storygen.core.models` and :mod:`storygen.storage.save` — routers
+translate between the two at the boundary.
+"""
+
 from __future__ import annotations
 
 from datetime import datetime

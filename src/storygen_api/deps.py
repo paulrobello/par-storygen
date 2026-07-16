@@ -1,3 +1,13 @@
+"""FastAPI composition root for the ``storygen_api`` surface.
+
+Mirrors ``storygen.app.StoryGenApp``: builds an ``AppConfig``, a per-save
+``BeatPipeline``, and a ``SplitImageProvider`` from the same
+:mod:`storygen.runtime.adapters` helpers the TUI uses, so the two composition
+roots cannot silently diverge (ARC-003). Also exposes the FastAPI dependencies
+(``get_app_config``, ``get_session_manager``, ``get_wizard_image_provider``)
+that the routers depend on.
+"""
+
 from __future__ import annotations
 
 from functools import lru_cache

@@ -63,6 +63,18 @@ class _RenderCurrentable(Protocol):
 
 
 class StoryGenApp(App[None]):
+    """Top-level Textual app for par-storygen.
+
+    Composition root for the TUI surface: loads :class:`AppConfig`, builds the
+    shared text model + ``SplitImageProvider`` + ``TTSPlayer``, and wires the
+    ``BeatPipeline`` (via the adapters in :mod:`storygen.runtime.adapters`) into
+    each screen. Owns cross-screen concerns: reference-image fallback toasts,
+    blurb backfill on legacy saves, ``--resume`` handling, and the intro → menu
+    → wizard → play screen stack. The FastAPI surface in
+    :mod:`storygen_api.deps` is the second composition root over the same lower
+    layers.
+    """
+
     TITLE = "par-storygen"
     SUB_TITLE = "AI-driven choose-your-own-adventure"
 

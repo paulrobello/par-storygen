@@ -31,9 +31,12 @@
 * [Text-to-speech](#text-to-speech)
 * [Auto-play](#auto-play)
 * [Export book](#export-book)
+* [Keyboard shortcuts](#keyboard-shortcuts)
+* [Web API and frontend (optional)](#web-api-and-frontend-optional)
 * [Contributing](#contributing)
 * [Roadmap](#roadmap)
 
+![CI](https://github.com/paulrobello/par-storygen/actions/workflows/ci.yml/badge.svg)
 ![PyPI - Python Version](https://img.shields.io/badge/python-3.13-blue)
 ![Runs on Linux | MacOS | Windows](https://img.shields.io/badge/runs%20on-Linux%20%7C%20MacOS%20%7C%20Windows-blue)
 ![Arch x86-64 | ARM | AppleSilicon](https://img.shields.io/badge/arch-x86--64%20%7C%20ARM%20%7C%20AppleSilicon-blue)
@@ -70,7 +73,7 @@ A configurable LLM (via pydantic-ai) drives theme, characters, narration, and ch
 - **Export Book**: Export any story path as a standalone HTML book reader with 3D page turns, audio player, and auto-read
 - **Story Templates / Presets**: Six curated presets plus your own saved presets; "Quick Start" from the main menu or "Load Preset" / "Save as Preset" in the wizard
 - **Narrative Recap**: Press `Shift+R` for an on-demand "Previously on..." summary; optional auto-recap every N major beats and on resume
-- **Relationship Tracking**: Press `f` to view pairwise character relationships (ally, rival, romantic, mentor, …) with strength bars, extracted inline as the story progresses
+- **Relationship Tracking**: View pairwise character relationships (ally, rival, romantic, mentor, …) with strength bars via `i` → Relationships, extracted inline as the story progresses
 - **Image Style Gallery**: Browse and apply art styles from the Settings screen
 - **Graph Prune**: Press `p` in the story graph to delete a node and all its descendants (with confirmation)
 - **Dynamic Pacing**: Choose Slow / Moderate / Fast pacing per story (wizard LENGTH step) to control narration length and choice frequency
@@ -107,12 +110,12 @@ A configurable LLM (via pydantic-ai) drives theme, characters, narration, and ch
 ![Story play screen](https://raw.githubusercontent.com/paulrobello/par-storygen/main/screenshots/sc_story_panel.png)
 ![Beat generation](https://raw.githubusercontent.com/paulrobello/par-storygen/main/screenshots/sc_story_generate.png)
 
-**Character Portraits** — Press `p` to view full portraits for every character in the current scene. High-res zoom available for ref-aware providers.
+**Character Portraits** — Press `i` → Portraits to view full portraits for every character in the current scene. High-res zoom available for ref-aware providers.
 
 ![Character roster](https://raw.githubusercontent.com/paulrobello/par-storygen/main/screenshots/sc_story_roster.png)
 
 
-**Story Graph** — Press `g` for a full tree view with marker legend, current-node arrow, and unexplored-choice leaves. Press `r` on any node for branch replay.
+**Story Graph** — Press `i` → Graph for a full tree view with marker legend, current-node arrow, and unexplored-choice leaves. Press `r` on any node for branch replay; press `p` to prune a subtree.
 
 ![Story graph](https://raw.githubusercontent.com/paulrobello/par-storygen/main/screenshots/sc_story_graph.png)
 
@@ -320,13 +323,13 @@ The Library Browser has per-entry **Delete** buttons with confirmation. Press `s
 
 Once you've played through to one or more endings, two read-only views let you revisit the journey.
 
-### Endings gallery (`e` from PlayScreen)
-Press `e` to open a card per ending you've reached. Each card shows the scene image, a narration excerpt, and the path of choices you took. Press **Jump** on any ending to set the playhead to that node.
+### Endings gallery (`i` → Endings from PlayScreen)
+Press `i` → Endings to open a card per ending you've reached. Each card shows the scene image, a narration excerpt, and the path of choices you took. Press **Jump** on any ending to set the playhead to that node.
 
-The `e` binding is hidden when no endings have been reached yet.
+The Endings entry is hidden when no endings have been reached yet.
 
 ### Branch replay (`r` from GraphScreen)
-Open the graph (`g` from PlayScreen), highlight any explored node, and press `r` to walk through every beat from root to that node. Use `space`/`right`/`n` to advance, `left`/`p` to go back, `j` to jump to live play at the current step, and `escape` to exit.
+Open the graph (`i` → Graph from PlayScreen), highlight any explored node, and press `r` to walk through every beat from root to that node. Use `space`/`right`/`n` to advance, `left`/`p` to go back, `j` to jump to live play at the current step, and `escape` to exit.
 
 Replay is read-only — no regeneration, no LLM calls.
 
@@ -355,7 +358,7 @@ For each pending choice from the current beat:
 Define multiple looks for a single character and switch between them at will. Each outfit is its own portrait, used as the reference image for scene generation so your character appears in the picked outfit across subsequent beats.
 
 ### Creating an outfit
-From PlayScreen, press `p` to open Portraits. For any character:
+From PlayScreen, press `i` → Portraits. For any character:
 1. Click **Add outfit**.
 2. Give it a short name (e.g. "ballroom gown", "armored", "swimwear").
 3. Write a one-sentence description (e.g. "wearing a flowing red gown with gold trim").
@@ -418,6 +421,73 @@ Press `x` from the play screen when viewing an ending to export the entire story
 - **Scene images** copied alongside `index.html` into `~/Desktop/<Title>_Book/`
 
 No server required — the entire book is a single HTML file with inline CSS/JS plus local image and audio assets.
+
+## Keyboard shortcuts
+
+par-storygen consolidates secondary views behind an **info picker** (`i`) so the most common play actions stay on single keys. The `i` modal lists Portraits, Graph, Endings, and Relationships — each entry is hidden when the current save has nothing to show for it.
+
+### PlayScreen
+
+| Key | Action |
+|-----|--------|
+| `1`–`9` | Pick choice 1–9 |
+| `j` / `↓` | Highlight next choice |
+| `k` / `↑` | Highlight previous choice |
+| `enter` | Pick the highlighted choice |
+| `i` | Info picker — Portraits / Graph / Endings / Relationships |
+| `r` | Regen picker — beat / scene image / portrait / audio |
+| `b` | Back one node |
+| `R` (Shift+R) | "Previously on..." recap (on demand) |
+| `a` | Auto-play toggle (random choices, waits for image + TTS) |
+| `t` | TTS read aloud / pause / resume (context-dependent) |
+| `T` | Restart narration from the beginning |
+| `s` | Stop TTS playback immediately |
+| `x` | Export book (when viewing an ending) |
+| `m` / `esc` | Return to main menu |
+
+During beat generation, `_loading` blocks every action except `menu`. During auto-play, only `menu`, `a` (stop), and the TTS keys (`t`/`T`/`s`) are available.
+
+### GraphScreen (reached via `i` → Graph)
+
+| Key | Action |
+|-----|--------|
+| `r` | Branch replay from the selected node |
+| `p` | Prune the selected subtree (asks for confirmation) |
+| `esc` | Back to PlayScreen |
+
+Replay advances with `space` / `right` / `n`, steps back with `left` / `p`, jumps to live play with `j`, and exits with `escape`.
+
+## Web API and frontend (optional)
+
+The TUI is the primary surface, but par-storygen also ships an optional HTTP/WebSocket API and a Next.js frontend that drives it. Both layers reuse the same `storage` / `llm` / `images` / `pipeline` code as the TUI — they are second composition roots, not a separate product.
+
+### FastAPI server (`src/storygen_api/`)
+
+Installed via the `[api]` extra; the `storygen-api` console script exposes the wizard + play loop over REST plus a WebSocket for live narration.
+
+```bash
+uv sync --extra api      # install fastapi, uvicorn[standard], websockets, python-multipart
+make api-dev             # uvicorn storygen_api.main:app --reload --port 8101
+make api-prod            # uvicorn ... --port 8101 --workers 1
+```
+
+- **Auto-docs:** open `http://localhost:8101/docs` for the interactive OpenAPI UI.
+- **WebSocket:** connect to `/api/ws/{game_id}` to receive `narration_delta`, `beat_committed`, `image_committed`, and `image_failed` events during play.
+- **Single worker only:** the server keeps in-memory session/WebSocket/TTS state per process, so always run with `--workers 1` (the Makefile target does this). A second worker silently desyncs game state.
+
+> **Security — bind address and auth.** As of v0.5.x the server binds to `127.0.0.1` by default (loopback only). To expose it on a LAN, pass `--host 0.0.0.0` **and** set `STORYGEN_API_TOKEN` so every state-changing or cost-incurring route is gated by a shared bearer token. When `STORYGEN_API_TOKEN` is unset, those protected routes fail closed with `503`. See `.env.example` for the variable and the expected `Authorization: Bearer <token>` (HTTP) and `Sec-WebSocket-Protocol: bearer.<token>` (WebSocket) usage.
+
+### Next.js frontend (`web/`)
+
+A separate Next.js 16 app under `web/` that drives the API from a browser. See [`web/README.md`](./web/README.md) for the full route map and data flow.
+
+```bash
+make web-install         # cd web && npm install
+make web-dev             # Next.js dev server on :8100 (run alongside `make api-dev`)
+make web-build           # production build
+```
+
+The dev server origin (`http://localhost:8100`) is the one the API allows for CORS; keep both ports at their defaults or update the CORS allowlist in `src/storygen_api/main.py` and `API_BASE` in `web/src/lib/api.ts` together.
 
 ## Contributing
 

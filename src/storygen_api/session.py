@@ -1,3 +1,11 @@
+"""In-memory per-game pipeline registry for the FastAPI surface.
+
+``PipelineSessionManager`` keeps the live ``BeatPipeline`` + ``GameSave`` pair
+for each active ``game_id`` so WebSocket frames and subsequent REST calls in
+the same game hit the same pipeline state. State is process-local — the API
+must run with ``--workers 1`` or this registry silently desyncs (ARC-004).
+"""
+
 from __future__ import annotations
 
 import threading

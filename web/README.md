@@ -1,36 +1,88 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# par-storygen web frontend
 
-## Getting Started
+Next.js 16 (App Router) frontend for [par-storygen](https://github.com/paulrobello/par-storygen). It drives the optional FastAPI server (`src/storygen_api/`) over REST + WebSocket so the same story engine that powers the Textual TUI can be played in the browser.
 
-First, run the development server:
+This frontend is the reason the API exists — it has no game logic of its own. Every action is a fetch or WebSocket frame against `http://localhost:8101`.
+
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Install](#install)
+- [Run](#run)
+- [Route map](#route-map)
+- [Data flow](#data-flow)
+- [Scripts](#scripts)
+- [Related documentation](#related-documentation)
+
+## Prerequisites
+
+- Node.js (see `web/package.json` for the pinned Next.js / React versions)
+- The par-storygen FastAPI server running on `:8101` — see [Run](#run) below
+
+## Install
+
+From the repository root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+make web-install     # cd web && npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Or directly:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cd web
+npm install
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Run
 
-## Learn More
+The frontend expects the companion API on `:8101`. Start both in separate terminals:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+make api-dev         # FastAPI on :8101 (requires `uv sync --extra api`)
+make web-dev         # Next.js dev server on :8100
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Open [http://localhost:8100](http://localhost:8100).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+> **Security:** The API binds to `127.0.0.1` by default and (when `STORYGEN_API_TOKEN` is set) requires every state-changing or cost-incurring route to carry a matching bearer token. The frontend does not yet forward that token; for now run with the token unset on loopback only. Do not expose the API on `0.0.0.0` without the token configured — protected routes fail closed (503) when the token is missing.
 
-## Deploy on Vercel
+The dev server's origin (`http://localhost:8100`) is the one the API allows for CORS. Keep both ports at their defaults or update the CORS allowlist in `src/storygen_api/main.py` and `API_BASE` in `web/src/lib/api.ts` together.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Route map
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+App Router pages live under `web/src/app/`:
+
+| Route | Purpose |
+| --- | --- |
+| `/` (`page.tsx`) | Splash + redirect to menu or wizard |
+| `/menu` | Main menu (new / load / quick start / settings) |
+| `/wizard` | 8-step new-story wizard (theme, tone, style, art, length, reader level, characters, confirm) |
+| `/play` | Main gameplay loop with scene image, narrative, and choices |
+| `/load` | Browse and resume existing saves |
+| `/characters` | Cross-game character catalog (exported characters from all saves) |
+| `/presets` | Story templates and saved presets |
+| `/settings` | Provider defaults, art toggles, prefetch, TTS, developer options |
+| `/style-gallery` | Image Style Gallery — browse and apply art styles |
+
+## Data flow
+
+- **API client** — `web/src/lib/api.ts` is the typed fetch wrapper. It hard-codes `API_BASE = "http://localhost:8101"` and exposes `apiGet` / `apiPost` / `apiPut` / `apiPostForm` / `apiDelete` helpers plus domain types (`GameSave`, `StoryNode`, `Character`, `Relationship`, `SettingsResponse`, etc.) that mirror the FastAPI Pydantic models.
+- **WebSocket hook** — `web/src/hooks/useWebSocket.ts` connects to `/api/ws/{game_id}` and dispatches server-pushed events (`narration_delta`, `beat_committed`, `image_committed`, `image_failed`) into the store.
+- **Game store** — `web/src/stores/game-store.ts` is a Zustand store holding the active `GameSave`, the current node, and TTS / image status. Components subscribe to slices of this store; the WebSocket hook is the only writer during live play.
+- **Components** — `web/src/components/` holds the rendered scene panel, choice list, character roster, and modals.
+
+## Scripts
+
+```bash
+make web-install    # npm install
+make web-dev        # next dev (port 8100)
+make web-build      # next build (production build)
+npm run lint        # eslint (from web/)
+```
+
+## Related documentation
+
+- [Repository README](../README.md) — project overview, install, provider configuration
+- [Architecture reference](../docs/ARCHITECTURE.md) — see the "Web surface (optional API + frontend)" section
+- [AUDIT.md](../AUDIT.md) — known findings, including the API + web architecture notes
