@@ -24,6 +24,7 @@ from storygen.llm.models import (
     Tone,
 )
 from storygen.pipeline import BeatPipeline, PipelineCallbacks
+from storygen.pipeline_prefetch import _PREFETCH_CONCURRENCY  # pyright: ignore[reportPrivateUsage]
 
 # ARC-011: pacing_hint_for_depth moved to pipeline_prompts.py.
 from storygen.pipeline_prompts import (
@@ -943,12 +944,12 @@ async def test_start_prefetch_spawns_one_task_per_pending_choice(
     )
 
     pipeline.start_prefetch(save, from_node_id="root", with_images=False)
-    assert len(pipeline._prefetch_tasks) == 3  # pyright: ignore[reportPrivateUsage]
-    assert ("root", "c1") in pipeline._prefetch_tasks  # pyright: ignore[reportPrivateUsage]
-    assert ("root", "c2") in pipeline._prefetch_tasks  # pyright: ignore[reportPrivateUsage]
-    assert ("root", "c3") in pipeline._prefetch_tasks  # pyright: ignore[reportPrivateUsage]
+    assert len(pipeline._prefetch._tasks) == 3  # pyright: ignore[reportPrivateUsage]
+    assert ("root", "c1") in pipeline._prefetch._tasks  # pyright: ignore[reportPrivateUsage]
+    assert ("root", "c2") in pipeline._prefetch._tasks  # pyright: ignore[reportPrivateUsage]
+    assert ("root", "c3") in pipeline._prefetch._tasks  # pyright: ignore[reportPrivateUsage]
     # Drain so the test event loop doesn't leak tasks.
-    for k in list(pipeline._prefetch_tasks):  # pyright: ignore[reportPrivateUsage]
+    for k in list(pipeline._prefetch._tasks):  # pyright: ignore[reportPrivateUsage]
         await pipeline.await_prefetched(save, from_node_id=k[0], choice_id=k[1])
 
 
@@ -999,9 +1000,9 @@ async def test_start_prefetch_skips_already_cached_choices(
 
     pipeline.start_prefetch(save, from_node_id="root", with_images=False)
     # Only c1 and c3 should have spawned (c2 is cached).
-    assert len(pipeline._prefetch_tasks) == 2  # pyright: ignore[reportPrivateUsage]
-    assert ("root", "c2") not in pipeline._prefetch_tasks  # pyright: ignore[reportPrivateUsage]
-    for k in list(pipeline._prefetch_tasks):  # pyright: ignore[reportPrivateUsage]
+    assert len(pipeline._prefetch._tasks) == 2  # pyright: ignore[reportPrivateUsage]
+    assert ("root", "c2") not in pipeline._prefetch._tasks  # pyright: ignore[reportPrivateUsage]
+    for k in list(pipeline._prefetch._tasks):  # pyright: ignore[reportPrivateUsage]
         await pipeline.await_prefetched(save, from_node_id=k[0], choice_id=k[1])
 
 
@@ -1041,15 +1042,15 @@ async def test_start_prefetch_idempotent(monkeypatch: pytest.MonkeyPatch, tmp_pa
     )
 
     pipeline.start_prefetch(save, from_node_id="root", with_images=False)
-    first = dict(pipeline._prefetch_tasks)  # pyright: ignore[reportPrivateUsage]
+    first = dict(pipeline._prefetch._tasks)  # pyright: ignore[reportPrivateUsage]
     pipeline.start_prefetch(save, from_node_id="root", with_images=False)
-    second = dict(pipeline._prefetch_tasks)  # pyright: ignore[reportPrivateUsage]
+    second = dict(pipeline._prefetch._tasks)  # pyright: ignore[reportPrivateUsage]
     assert set(first.keys()) == set(second.keys())
     # Same Task objects — second call must NOT have replaced them.
     for k in first:
         assert first[k] is second[k]
 
-    for k in list(pipeline._prefetch_tasks):  # pyright: ignore[reportPrivateUsage]
+    for k in list(pipeline._prefetch._tasks):  # pyright: ignore[reportPrivateUsage]
         await pipeline.await_prefetched(save, from_node_id=k[0], choice_id=k[1])
 
 
@@ -1080,7 +1081,7 @@ async def test_start_prefetch_skips_ending_nodes(
     )
 
     pipeline.start_prefetch(save, from_node_id="root", with_images=False)
-    assert pipeline._prefetch_tasks == {}  # pyright: ignore[reportPrivateUsage]
+    assert pipeline._prefetch._tasks == {}  # pyright: ignore[reportPrivateUsage]
 
 
 @pytest.mark.asyncio
@@ -1172,7 +1173,7 @@ async def test_advance_falls_through_when_prefetch_failed(
     # Drain the failed task so it's no longer in-flight.
     failed_result = await pipeline.await_prefetched(save, from_node_id="root", choice_id="c1")
     assert failed_result is None
-    assert pipeline._prefetch_tasks == {}  # pyright: ignore[reportPrivateUsage]
+    assert pipeline._prefetch._tasks == {}  # pyright: ignore[reportPrivateUsage]
 
     # Now swap to a working agent and call advance: normal path runs.
     good_beat = StoryBeat(
@@ -1220,7 +1221,7 @@ async def test_prefetch_failure_is_logged_silently(
         callbacks=PipelineCallbacks(),
     )
 
-    with caplog.at_level(_logging.INFO, logger="storygen.pipeline"):
+    with caplog.at_level(_logging.INFO, logger="storygen.pipeline_prefetch"):
         pipeline.start_prefetch(save, from_node_id="root", with_images=False)
         # Awaiting should return None, not raise.
         result = await pipeline.await_prefetched(save, from_node_id="root", choice_id="c1")
@@ -1256,7 +1257,7 @@ async def test_prefetch_does_not_move_current_node(
 
     pipeline.start_prefetch(save, from_node_id="root", with_images=False)
     # Wait for the prefetch task to finish without consuming it.
-    task = pipeline._prefetch_tasks[("root", "c1")]  # pyright: ignore[reportPrivateUsage]
+    task = pipeline._prefetch._tasks[("root", "c1")]  # pyright: ignore[reportPrivateUsage]
     await task
 
     assert save.current_node_id == original_cursor  # unchanged
@@ -1313,7 +1314,7 @@ async def test_prefetch_does_not_fire_ui_callbacks(
     )
 
     pipeline.start_prefetch(save, from_node_id="root", with_images=False)
-    task = pipeline._prefetch_tasks[("root", "c1")]  # pyright: ignore[reportPrivateUsage]
+    task = pipeline._prefetch._tasks[("root", "c1")]  # pyright: ignore[reportPrivateUsage]
     await task
 
     assert committed_calls == []
@@ -1353,7 +1354,7 @@ async def test_advance_after_prefetch_completes_fires_committed_callback(
 
     pipeline.start_prefetch(save, from_node_id="root", with_images=False)
     # Let prefetch finish first (without consuming via await_prefetched).
-    task = pipeline._prefetch_tasks[("root", "c1")]  # pyright: ignore[reportPrivateUsage]
+    task = pipeline._prefetch._tasks[("root", "c1")]  # pyright: ignore[reportPrivateUsage]
     await task
     assert committed_calls == []  # no callback during prefetch
 
@@ -1464,7 +1465,7 @@ async def test_cancel_all_prefetches_cancels_in_flight_tasks(
     )
 
     pipeline.start_prefetch(save, from_node_id="root", with_images=False)
-    in_flight = list(pipeline._prefetch_tasks.values())  # pyright: ignore[reportPrivateUsage]
+    in_flight = list(pipeline._prefetch._tasks.values())  # pyright: ignore[reportPrivateUsage]
     assert len(in_flight) == 2
     # Wait until at least one task has actually entered run so cancel
     # exercises the live-task path, not just done-task cleanup.
@@ -1472,7 +1473,7 @@ async def test_cancel_all_prefetches_cancels_in_flight_tasks(
 
     await pipeline.cancel_all_prefetches()
 
-    assert pipeline._prefetch_tasks == {}  # pyright: ignore[reportPrivateUsage]
+    assert pipeline._prefetch._tasks == {}  # pyright: ignore[reportPrivateUsage]
     for task in in_flight:
         assert task.done()
         assert task.cancelled() or task.exception() is not None
@@ -1502,7 +1503,7 @@ async def test_cancel_all_prefetches_noop_when_empty(
         callbacks=PipelineCallbacks(),
     )
     await pipeline.cancel_all_prefetches()
-    assert pipeline._prefetch_tasks == {}  # pyright: ignore[reportPrivateUsage]
+    assert pipeline._prefetch._tasks == {}  # pyright: ignore[reportPrivateUsage]
 
 
 @pytest.mark.asyncio
@@ -1539,7 +1540,7 @@ async def test_prefetch_failure_log_dedupes_per_key(
         callbacks=PipelineCallbacks(),
     )
 
-    with caplog.at_level(_logging.INFO, logger="storygen.pipeline"):
+    with caplog.at_level(_logging.INFO, logger="storygen.pipeline_prefetch"):
         # First failure: should log once.
         pipeline.start_prefetch(save, from_node_id="root", with_images=False)
         await pipeline.await_prefetched(save, from_node_id="root", choice_id="c1")
@@ -1599,7 +1600,7 @@ async def test_prefetch_failure_log_re_logs_after_recovery(
         callbacks=PipelineCallbacks(),
     )
 
-    with caplog.at_level(_logging.INFO, logger="storygen.pipeline"):
+    with caplog.at_level(_logging.INFO, logger="storygen.pipeline_prefetch"):
         # Failure #1 — logs.
         pipeline.start_prefetch(save, from_node_id="root", with_images=False)
         await pipeline.await_prefetched(save, from_node_id="root", choice_id="c1")
@@ -1627,7 +1628,6 @@ async def test_prefetch_concurrency_capped(monkeypatch: pytest.MonkeyPatch, tmp_
     """The pipeline's semaphore must cap simultaneous in-flight prefetch
     LLM calls at ``_PREFETCH_CONCURRENCY`` even when more tasks are spawned.
     """
-    from storygen.pipeline import _PREFETCH_CONCURRENCY  # pyright: ignore[reportPrivateUsage]
 
     save = _bootstrap_save(tmp_path, monkeypatch)
     # Spawn more pending choices than the concurrency cap so we can observe
@@ -1680,7 +1680,7 @@ async def test_prefetch_concurrency_capped(monkeypatch: pytest.MonkeyPatch, tmp_
     pipeline.start_prefetch(save, from_node_id="root", with_images=False)
     # All N tasks are spawned (idempotency dict is dense) — the semaphore
     # only gates the inner agent.run call.
-    assert len(pipeline._prefetch_tasks) == 1 + extra_count  # pyright: ignore[reportPrivateUsage]
+    assert len(pipeline._prefetch._tasks) == 1 + extra_count  # pyright: ignore[reportPrivateUsage]
     # Pump the loop a few times so queued tasks have a chance to enter
     # run up to the semaphore cap.
     for _ in range(5):
@@ -1691,7 +1691,7 @@ async def test_prefetch_concurrency_capped(monkeypatch: pytest.MonkeyPatch, tmp_
 
     # Release everyone and drain so the test loop doesn't leak tasks.
     gate.set()
-    for k in list(pipeline._prefetch_tasks):  # pyright: ignore[reportPrivateUsage]
+    for k in list(pipeline._prefetch._tasks):  # pyright: ignore[reportPrivateUsage]
         await pipeline.await_prefetched(save, from_node_id=k[0], choice_id=k[1])
 
 
