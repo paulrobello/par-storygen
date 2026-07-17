@@ -4,11 +4,13 @@
 // hook, and component derives from one source. Re-exported here so existing
 // `import { API_BASE } from "@/lib/api"` call sites keep working.
 import { API_BASE, API_TOKEN } from "@/lib/config";
+import type { components } from "./api-types.gen";
 
 export { API_BASE, API_TOKEN };
 
 // ---------------------------------------------------------------------------
 // Domain types matching the FastAPI / Python models
+// Types are either generated from OpenAPI or hand-written where not exposed
 // ---------------------------------------------------------------------------
 
 export type NodeId = string;
@@ -18,6 +20,16 @@ export type Pacing = "slow" | "moderate" | "fast";
 export type ReaderLevel = "ages_0_5" | "ages_6_10" | "ages_11_15" | "ages_15_plus";
 export type ImageStatus = "not_planned" | "generating" | "done" | "failed";
 
+// Generated types from OpenAPI
+export type Character = components["schemas"]["Character"];
+export type CharacterOutfit = components["schemas"]["CharacterOutfit"];
+export type ChoiceOption = components["schemas"]["ChoiceOption"];
+export type GameSummary = components["schemas"]["GameSummary"];
+export type GameDetail = components["schemas"]["GameDetail"];
+export type NodeDetail = components["schemas"]["NodeDetail"];
+export type CharacterLibraryEntry = components["schemas"]["CharacterLibraryEntry"];
+
+// Hand-written types not exposed in API (internal models)
 export interface Theme {
   title: string;
   setting: string;
@@ -30,30 +42,6 @@ export interface Tone {
   custom_descriptor: string | null;
 }
 
-export interface CharacterOutfit {
-  id: string;
-  name: string;
-  description: string;
-  portrait_path: string;
-  portrait_prompt: string;
-  created_at: string;
-}
-
-export interface Character {
-  id: CharacterId;
-  name: string;
-  backstory: string;
-  backstory_summary: string | null;
-  personality: string;
-  physical_description: string;
-  portrait_path: string | null;
-  portrait_prompt: string | null;
-  introduced_at_node_id: NodeId;
-  outfits: CharacterOutfit[];
-  current_outfit_id: string | null;
-  reference_image_path: string | null;
-}
-
 export interface Relationship {
   char_a_id: CharacterId;
   char_b_id: CharacterId;
@@ -63,33 +51,18 @@ export interface Relationship {
   updated_at_node_id: NodeId;
 }
 
-export interface Choice {
-  id: string;
-  text: string;
-}
+// Client-side extensions of generated types
+export type Choice = ChoiceOption;
+export type StoredChoice = ChoiceOption; // Already has child_node_id
 
-export interface StoredChoice extends Choice {
-  child_node_id: NodeId | null;
-}
-
-export interface StoryNode {
-  id: NodeId;
-  parent_id: string | null;
-  chosen_choice_id: string | null;
-  chosen_at: string | null;
-  narration: string;
+// StoryNode extends NodeDetail with additional client-side fields
+export interface StoryNode extends Omit<NodeDetail, "choices"> {
   choices: StoredChoice[];
-  is_major: boolean;
-  is_ending: boolean;
-  image_prompt: string | null;
-  image_path: string | null;
-  image_status: ImageStatus;
-  illustration_reasoning: string | null;
-  featured_character_ids: CharacterId[];
-  summary_to_here: string | null;
-  recap_text: string | null;
-  tts_audio_path: string | null;
-  created_at: string;
+  chosen_at: string | null; // Not in NodeDetail
+  illustration_reasoning: string | null; // Not in NodeDetail
+  featured_character_ids: CharacterId[]; // Not in NodeDetail
+  recap_text: string | null; // Not in NodeDetail
+  tts_audio_path: string | null; // Not in NodeDetail
 }
 
 /**
@@ -133,6 +106,9 @@ export interface ImageProviderConfig {
   base_url: string | null;
 }
 
+// GameSave - keep hand-written version since generated GameDetail has incompatible structure
+// The generated type has `unknown` for nested objects and different field names
+// diverges from schema: API uses different field names and `unknown` for complex types
 export interface GameSave {
   version: number;
   id: string;
@@ -161,15 +137,6 @@ export interface GameSave {
   updated_at: string;
 }
 
-export interface GameSummary {
-  id: string;
-  title: string;
-  updated_at: string;
-  node_count: number;
-  is_ending: boolean;
-  has_cover: boolean;
-}
-
 export interface LibraryCharacter {
   id: string;
   name: string;
@@ -186,9 +153,6 @@ export interface LibraryCharacter {
 export interface CharacterLibraryResponse {
   characters: LibraryCharacter[];
 }
-
-// Alias for consistency with import endpoint
-export type CharacterLibraryEntry = LibraryCharacter;
 
 export interface PortraitRegenerateRequest {
   art_style?: string;

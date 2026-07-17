@@ -10,7 +10,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
-    "e2e:install": "playwright install --with-deps chromium"
+    "e2e:install": "playwright install --with-deps chromium",
+    "gen:api": "openapi-typescript openapi.json -o src/lib/api-types.gen.ts",
+    "gen:api:check": "npm run gen:api && git diff --exit-code -- src/lib/api-types.gen.ts openapi.json"
   },
   "dependencies": {
     "lucide-react": "^1.24.0",
@@ -23,6 +25,7 @@
   "devDependencies": {
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^26",
@@ -32,6 +35,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "jsdom": "^29.1.1",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4",
     "typescript": "^6",
     "vitest": "^4.1.10"
