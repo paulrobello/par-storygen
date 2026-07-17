@@ -130,7 +130,7 @@ const SETTINGS_FIXTURE: SettingsResponse = {
     characters: "",
     save_to_catalog: false,
   },
-  tts_prefs: { provider: "openai", voice: "alloy", auto_read: false, auto_read_recap: false },
+  tts_prefs: { provider: "openai", voice: "alloy", auto_read: false, auto_read_recap: false, pregenerate_prefetch_audio: false },
   art_enabled: true,
   prefetch_enabled: true,
   prefetch_images_enabled: false,

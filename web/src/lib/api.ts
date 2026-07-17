@@ -206,6 +206,7 @@ export interface SettingsResponse {
     voice: string;
     auto_read: boolean;
     auto_read_recap: boolean;
+    pregenerate_prefetch_audio: boolean;
   };
   art_enabled: boolean;
   prefetch_enabled: boolean;

@@ -210,6 +210,9 @@ async def update_settings(body: SettingsUpdateRequest) -> SettingsResponse:
             voice=_str_or_default(tp, "voice", tts.voice),
             auto_read=bool(tp.get("auto_read", tts.auto_read)),
             auto_read_recap=bool(tp.get("auto_read_recap", tts.auto_read_recap)),
+            pregenerate_prefetch_audio=bool(
+                tp.get("pregenerate_prefetch_audio", tts.pregenerate_prefetch_audio)
+            ),
         )
 
     app_state.write_all_settings(

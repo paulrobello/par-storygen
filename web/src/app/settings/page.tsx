@@ -323,6 +323,11 @@ export default function SettingsPage() {
               checked={form.tts_prefs.auto_read_recap}
               onChange={(v) => update("tts_prefs", { ...form.tts_prefs, auto_read_recap: v })}
             />
+            <Toggle
+              label="Pregenerate audio during branch prefetch (uses current voice; spends provider credits)"
+              checked={form.tts_prefs.pregenerate_prefetch_audio}
+              onChange={(v) => update("tts_prefs", { ...form.tts_prefs, pregenerate_prefetch_audio: v })}
+            />
           </section>
 
           {/* Toggles */}
