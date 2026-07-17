@@ -29,6 +29,8 @@ from urllib.parse import urlparse
 from fastapi import Depends, HTTPException, Request, status
 from starlette.requests import HTTPConnection
 
+from storygen.core.providers import IMAGE_PROVIDERS, TEXT_PROVIDERS
+
 _logger = logging.getLogger(__name__)
 
 # Env var holding the shared bearer token expected on protected routes.
@@ -221,11 +223,7 @@ def _is_private_or_link_local(host: str) -> bool:
         # to a private address.
         return False
     return (
-        ip.is_private
-        or ip.is_link_local
-        or ip.is_reserved
-        or ip.is_multicast
-        or ip.is_unspecified
+        ip.is_private or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified
     )
 
 
@@ -261,9 +259,7 @@ def validate_provider_base_url(
 
     url = urlparse(base_url.strip())
     if url.scheme not in ("http", "https"):
-        raise ProviderURLError(
-            f"base_url must use http or https (got {url.scheme!r})"
-        )
+        raise ProviderURLError(f"base_url must use http or https (got {url.scheme!r})")
     host = (url.hostname or "").lower()
     if not host:
         raise ProviderURLError("base_url is missing a host")
@@ -272,9 +268,7 @@ def validate_provider_base_url(
     if is_loopback:
         if allow_loopback:
             return
-        raise ProviderURLError(
-            "loopback base_url is not permitted for this provider"
-        )
+        raise ProviderURLError("loopback base_url is not permitted for this provider")
 
     # Reject private / link-local / reserved IP literals regardless of allowlist.
     if _is_private_or_link_local(host):
@@ -284,30 +278,35 @@ def validate_provider_base_url(
 
     if host not in _SANCTIONED_HOSTS:
         label = f" for provider {provider!r}" if provider else ""
-        raise ProviderURLError(
-            f"base_url host {host!r} is not on the sanctioned allowlist{label}"
-        )
+        raise ProviderURLError(f"base_url host {host!r} is not on the sanctioned allowlist{label}")
 
 
-# Curated mapping of provider name -> URL-validator closure, used by the
-# settings PUT handler. ``allow_loopback=True`` only for Ollama (local server).
+# Curated mapping of provider id -> URL-validator closure, used by the
+# settings PUT handler. Built from the registry so each entry's
+# ``allow_loopback`` policy lives in exactly one place — the provider
+# registry (``allows_loopback_base_url``, True only for Ollama). The SSRF
+# host allowlist (``_SANCTIONED_HOSTS`` above) STAYS here in security.py;
+# only the per-provider loopback boolean is registry-driven.
+#
+# Text and image providers share the validator map keyed by id. That's safe
+# because the loopback policy is the same for a given id across both kinds
+# (``test_ollama_loopback_policy_consistent`` pins this): ``openai`` text and
+# image both disallow loopback; ``ollama`` text and image both allow it. The
+# image-side dict entries for shared ids therefore overwrite the text-side
+# entries with the same value — no behaviour change.
+def _make_provider_validator(pid: str, allow_loopback: bool) -> Callable[[str], None]:
+    """Build a URL-validator closure bound to ``pid`` / ``allow_loopback``."""
+
+    def _validator(url: str) -> None:
+        validate_provider_base_url(url, provider=pid, allow_loopback=allow_loopback)
+
+    return _validator
+
+
 _PROVIDER_VALIDATORS: dict[str, Callable[[str], None]] = {
-    "openai": lambda url: validate_provider_base_url(
-        url, provider="openai", allow_loopback=False
-    ),
-    "openrouter": lambda url: validate_provider_base_url(
-        url, provider="openrouter", allow_loopback=False
-    ),
-    "ollama": lambda url: validate_provider_base_url(
-        url, provider="ollama", allow_loopback=True
-    ),
-    # Image providers
-    "gemini": lambda url: validate_provider_base_url(
-        url, provider="gemini", allow_loopback=False
-    ),
-    "zai": lambda url: validate_provider_base_url(
-        url, provider="zai", allow_loopback=False
-    ),
+    pid: _make_provider_validator(pid, info.allows_loopback_base_url)
+    for registry in (TEXT_PROVIDERS, IMAGE_PROVIDERS)
+    for pid, info in registry.items()
 }
 
 

@@ -52,9 +52,7 @@ class NodeDetail(BaseModel):
     """Full projection of a single story node for the client."""
 
     id: NodeId = Field(description="Node id (content-addressed).")
-    parent_id: NodeId | None = Field(
-        default=None, description="Parent node id; null for the root."
-    )
+    parent_id: NodeId | None = Field(default=None, description="Parent node id; null for the root.")
     chosen_choice_id: str | None = Field(
         default=None,
         description="Id of the choice taken from the parent to reach this node.",
@@ -64,8 +62,7 @@ class NodeDetail(BaseModel):
     is_ending: bool = Field(description="True when this node ends the story.")
     image_status: str | None = Field(
         default=None,
-        description="Scene-image lifecycle state: "
-        "not_planned | generating | done | failed.",
+        description="Scene-image lifecycle state: not_planned | generating | done | failed.",
     )
     image_path: str | None = Field(
         default=None, description="Relative path to the scene image, when present."
@@ -99,13 +96,9 @@ class GameDetail(BaseModel):
         description="Node ids of every ending the player has reached."
     )
     art_style: str = Field(description="Art-style string threaded into image prompts.")
-    total_image_cost_usd: float = Field(
-        default=0.0, description="Cumulative image spend in USD."
-    )
+    total_image_cost_usd: float = Field(default=0.0, description="Cumulative image spend in USD.")
     text_total_input_tokens: int = Field(default=0, description="Cumulative input tokens.")
-    text_total_output_tokens: int = Field(
-        default=0, description="Cumulative output tokens."
-    )
+    text_total_output_tokens: int = Field(default=0, description="Cumulative output tokens.")
     text_total_requests: int = Field(default=0, description="Cumulative LLM call count.")
     relationships: list[dict[str, object]] = []
     created_at: datetime = Field(description="Save creation time.")
@@ -368,3 +361,61 @@ class SceneEditRequest(BaseModel):
     """Body for the scene-prompt-edit endpoint."""
 
     prompt: str
+
+
+# ---------------------------------------------------------------------------
+# Providers (ENH-005)
+# ---------------------------------------------------------------------------
+
+
+class ProviderInfoOut(BaseModel):
+    """Wire shape of one ``ProviderInfo`` registry entry (ENH-005).
+
+    A pydantic mirror of the frozen ``ProviderInfo`` dataclass in
+    :mod:`storygen.core.providers`. ``kind`` is serialized as a sorted list
+    (the source is a ``frozenset``). ``key_env_var`` exposes only the env-var
+    *name* (public per ``.env.example``); actual key values never leave the
+    server.
+    """
+
+    id: str = Field(description="Stable provider id used in storage + env vars.")
+    label: str = Field(description="Human-readable label for UI selects.")
+    kind: list[str] = Field(
+        description='Kind set (e.g. ["text"] or ["image"]); sorted for stable JSON.'
+    )
+    key_env_var: str | None = Field(
+        description=(
+            "Env var holding the provider's API key (name only, never a value), "
+            "or null for no-auth providers (Ollama)."
+        )
+    )
+    default_model: str | None = Field(
+        description="Curated default model, or null when the user must pick one."
+    )
+    default_base_url: str | None = Field(
+        description=(
+            "Provider's default OpenAI-compatible base URL, or null when not "
+            "applicable (Gemini's google-genai SDK ignores OpenAI-style URLs)."
+        )
+    )
+    allows_loopback_base_url: bool = Field(
+        description=(
+            "Per-provider loopback policy mirrored by security.py's SSRF "
+            "validator (True only for Ollama). The SSRF host allowlist itself "
+            "lives in security.py."
+        )
+    )
+    supports_reference_images: bool = Field(
+        description="Image-provider ref-image capability (always False for text)."
+    )
+    suggested_models: list[str] = Field(
+        default_factory=list[str],
+        description="Curated model suggestions for the Settings screen.",
+    )
+
+
+class ProvidersResponse(BaseModel):
+    """Response envelope for `GET /api/providers` — the full registry."""
+
+    text_providers: list[ProviderInfoOut]
+    image_providers: list[ProviderInfoOut]

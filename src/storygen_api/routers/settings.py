@@ -9,6 +9,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from storygen.core.providers import IMAGE_PROVIDERS, TEXT_PROVIDERS
 from storygen.storage import app_state
 from storygen.storage.app_state import TTSPrefs
 from storygen_api.deps import get_app_config
@@ -90,8 +91,26 @@ def _str_or_default(d: dict[str, object], key: str, default: str) -> str:
     return str(val) if isinstance(val, str) else default
 
 
-def _validate_provider_field(provider: str, base_url: str) -> None:
-    """SEC-002: reject base URLs that point off-allowlist before persisting."""
+def _validate_provider_field(
+    provider: str,
+    base_url: str,
+    *,
+    allowed_ids: set[str],
+) -> None:
+    """Validate one provider field before persisting it.
+
+    ENH-005: the provider id must be in the registry (``allowed_ids`` is the
+    caller-supplied slice — text for ``text_provider``, image for
+    ``image_provider`` / ``character_image_provider``). Unknown ids are now
+    rejected with 400 instead of being accepted; previously only the base URL
+    was checked. SEC-002: the base URL is still validated against the SSRF
+    allowlist.
+    """
+    if provider not in allowed_ids:
+        raise HTTPException(
+            status_code=400,
+            detail=(f"unknown provider id {provider!r}; expected one of {sorted(allowed_ids)}"),
+        )
     try:
         validate_provider_url_for(provider, base_url)
     except ProviderURLError as exc:
@@ -99,6 +118,10 @@ def _validate_provider_field(provider: str, base_url: str) -> None:
             status_code=400,
             detail=f"rejected provider base_url: {exc}",
         ) from exc
+
+
+_TEXT_PROVIDER_IDS: set[str] = set(TEXT_PROVIDERS.keys())
+_IMAGE_PROVIDER_IDS: set[str] = set(IMAGE_PROVIDERS.keys())
 
 
 @router.put("", response_model=SettingsResponse)
@@ -119,7 +142,7 @@ async def update_settings(body: SettingsUpdateRequest) -> SettingsResponse:
         tp = body.text_provider
         provider = _str_or_default(tp, "provider", text_prefs.provider)
         base_url = _str_or_default(tp, "base_url", text_prefs.base_url)
-        _validate_provider_field(provider, base_url)
+        _validate_provider_field(provider, base_url, allowed_ids=_TEXT_PROVIDER_IDS)
         text_prefs = app_state.ProviderPrefs(
             provider=provider,
             model=_str_or_default(tp, "model", text_prefs.model),
@@ -131,7 +154,7 @@ async def update_settings(body: SettingsUpdateRequest) -> SettingsResponse:
         ip = body.image_provider
         provider = _str_or_default(ip, "provider", image_prefs.provider)
         base_url = _str_or_default(ip, "base_url", image_prefs.base_url)
-        _validate_provider_field(provider, base_url)
+        _validate_provider_field(provider, base_url, allowed_ids=_IMAGE_PROVIDER_IDS)
         image_prefs = app_state.ImageProviderPrefs(
             provider=provider,
             model=_str_or_default(ip, "model", image_prefs.model),
@@ -147,7 +170,7 @@ async def update_settings(body: SettingsUpdateRequest) -> SettingsResponse:
         cp = body.character_image_provider
         provider = _str_or_default(cp, "provider", char_image_prefs.provider)
         base_url = _str_or_default(cp, "base_url", char_image_prefs.base_url)
-        _validate_provider_field(provider, base_url)
+        _validate_provider_field(provider, base_url, allowed_ids=_IMAGE_PROVIDER_IDS)
         char_image_prefs = app_state.CharacterImageProviderPrefs(
             provider=provider,
             model=_str_or_default(cp, "model", char_image_prefs.model),

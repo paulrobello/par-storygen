@@ -13,6 +13,7 @@ from collections.abc import Callable
 from typing import Literal, get_args
 
 from storygen.core.models import ImageProviderConfig
+from storygen.core.providers import IMAGE_PROVIDERS
 from storygen.images.base import ImageProvider
 from storygen.images.gemini_provider import GeminiImageProvider
 from storygen.images.ollama_provider import OllamaImageProvider
@@ -179,13 +180,14 @@ def resolve_image_base_url(provider: str) -> str:
     ``google-genai`` SDK doesn't accept OpenAI-style base URLs); the caller
     is responsible for surfacing a user-facing "(not used by <provider>)"
     label in that case.
+
+    ENH-005: the previous local literal dict duplicated the registry's
+    ``default_base_url`` field and was flagged by the T2 implementer; the
+    registry is now the single source. ``None`` (Gemini) collapses to ``""``
+    here to preserve the historical empty-string return shape.
     """
-    return {
-        "openai": "https://api.openai.com/v1",
-        "zai": "https://api.z.ai/api/paas/v4/",
-        "ollama": "http://localhost:11434/v1/",
-        "gemini": "",
-    }.get(provider, "")
+    info = IMAGE_PROVIDERS.get(provider)
+    return info.default_base_url if info and info.default_base_url else ""
 
 
 def default_fallback_model(provider: str) -> str:

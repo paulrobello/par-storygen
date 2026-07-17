@@ -919,6 +919,120 @@
         "title": "PortraitRegenerateRequest",
         "type": "object"
       },
+      "ProviderInfoOut": {
+        "description": "Wire shape of one ``ProviderInfo`` registry entry (ENH-005).\n\nA pydantic mirror of the frozen ``ProviderInfo`` dataclass in\n:mod:`storygen.core.providers`. ``kind`` is serialized as a sorted list\n(the source is a ``frozenset``). ``key_env_var`` exposes only the env-var\n*name* (public per ``.env.example``); actual key values never leave the\nserver.",
+        "properties": {
+          "allows_loopback_base_url": {
+            "description": "Per-provider loopback policy mirrored by security.py's SSRF validator (True only for Ollama). The SSRF host allowlist itself lives in security.py.",
+            "title": "Allows Loopback Base Url",
+            "type": "boolean"
+          },
+          "default_base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Provider's default OpenAI-compatible base URL, or null when not applicable (Gemini's google-genai SDK ignores OpenAI-style URLs).",
+            "title": "Default Base Url"
+          },
+          "default_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Curated default model, or null when the user must pick one.",
+            "title": "Default Model"
+          },
+          "id": {
+            "description": "Stable provider id used in storage + env vars.",
+            "title": "Id",
+            "type": "string"
+          },
+          "key_env_var": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Env var holding the provider's API key (name only, never a value), or null for no-auth providers (Ollama).",
+            "title": "Key Env Var"
+          },
+          "kind": {
+            "description": "Kind set (e.g. [\"text\"] or [\"image\"]); sorted for stable JSON.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Kind",
+            "type": "array"
+          },
+          "label": {
+            "description": "Human-readable label for UI selects.",
+            "title": "Label",
+            "type": "string"
+          },
+          "suggested_models": {
+            "description": "Curated model suggestions for the Settings screen.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Suggested Models",
+            "type": "array"
+          },
+          "supports_reference_images": {
+            "description": "Image-provider ref-image capability (always False for text).",
+            "title": "Supports Reference Images",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "kind",
+          "key_env_var",
+          "default_model",
+          "default_base_url",
+          "allows_loopback_base_url",
+          "supports_reference_images"
+        ],
+        "title": "ProviderInfoOut",
+        "type": "object"
+      },
+      "ProvidersResponse": {
+        "description": "Response envelope for `GET /api/providers` \u2014 the full registry.",
+        "properties": {
+          "image_providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderInfoOut"
+            },
+            "title": "Image Providers",
+            "type": "array"
+          },
+          "text_providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderInfoOut"
+            },
+            "title": "Text Providers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "text_providers",
+          "image_providers"
+        ],
+        "title": "ProvidersResponse",
+        "type": "object"
+      },
       "PruneRequest": {
         "description": "Body for the prune-subtree endpoint.",
         "properties": {
@@ -3272,6 +3386,28 @@
         "summary": "List Presets",
         "tags": [
           "presets"
+        ]
+      }
+    },
+    "/api/providers": {
+      "get": {
+        "description": "Return the full provider registry (text + image).",
+        "operationId": "list_providers_api_providers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvidersResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Providers",
+        "tags": [
+          "providers"
         ]
       }
     },

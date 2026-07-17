@@ -669,6 +669,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Providers
+         * @description Return the full provider registry (text + image).
+         */
+        get: operations["list_providers_api_providers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings": {
         parameters: {
             query?: never;
@@ -1371,6 +1391,73 @@ export interface components {
              * @default children's story book
              */
             art_style: string;
+        };
+        /**
+         * ProviderInfoOut
+         * @description Wire shape of one ``ProviderInfo`` registry entry (ENH-005).
+         *
+         *     A pydantic mirror of the frozen ``ProviderInfo`` dataclass in
+         *     :mod:`storygen.core.providers`. ``kind`` is serialized as a sorted list
+         *     (the source is a ``frozenset``). ``key_env_var`` exposes only the env-var
+         *     *name* (public per ``.env.example``); actual key values never leave the
+         *     server.
+         */
+        ProviderInfoOut: {
+            /**
+             * Allows Loopback Base Url
+             * @description Per-provider loopback policy mirrored by security.py's SSRF validator (True only for Ollama). The SSRF host allowlist itself lives in security.py.
+             */
+            allows_loopback_base_url: boolean;
+            /**
+             * Default Base Url
+             * @description Provider's default OpenAI-compatible base URL, or null when not applicable (Gemini's google-genai SDK ignores OpenAI-style URLs).
+             */
+            default_base_url: string | null;
+            /**
+             * Default Model
+             * @description Curated default model, or null when the user must pick one.
+             */
+            default_model: string | null;
+            /**
+             * Id
+             * @description Stable provider id used in storage + env vars.
+             */
+            id: string;
+            /**
+             * Key Env Var
+             * @description Env var holding the provider's API key (name only, never a value), or null for no-auth providers (Ollama).
+             */
+            key_env_var: string | null;
+            /**
+             * Kind
+             * @description Kind set (e.g. ["text"] or ["image"]); sorted for stable JSON.
+             */
+            kind: string[];
+            /**
+             * Label
+             * @description Human-readable label for UI selects.
+             */
+            label: string;
+            /**
+             * Suggested Models
+             * @description Curated model suggestions for the Settings screen.
+             */
+            suggested_models?: string[];
+            /**
+             * Supports Reference Images
+             * @description Image-provider ref-image capability (always False for text).
+             */
+            supports_reference_images: boolean;
+        };
+        /**
+         * ProvidersResponse
+         * @description Response envelope for `GET /api/providers` — the full registry.
+         */
+        ProvidersResponse: {
+            /** Image Providers */
+            image_providers: components["schemas"]["ProviderInfoOut"][];
+            /** Text Providers */
+            text_providers: components["schemas"]["ProviderInfoOut"][];
         };
         /**
          * PruneRequest
@@ -2921,6 +3008,26 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    list_providers_api_providers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProvidersResponse"];
                 };
             };
         };

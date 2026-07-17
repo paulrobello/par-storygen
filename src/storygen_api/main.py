@@ -23,7 +23,16 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from storygen import __version__
 from storygen_api.deps import get_app_config, get_session_manager
-from storygen_api.routers import characters, games, images, presets, settings, tts, wizard
+from storygen_api.routers import (
+    characters,
+    games,
+    images,
+    presets,
+    providers,
+    settings,
+    tts,
+    wizard,
+)
 from storygen_api.routers import ws as ws_router
 
 _logger = logging.getLogger(__name__)
@@ -141,6 +150,7 @@ def create_app() -> FastAPI:
     app.include_router(games.router)
     app.include_router(wizard.router)
     app.include_router(settings.router)
+    app.include_router(providers.router)
     app.include_router(images.router)
     app.include_router(characters.router)
     app.include_router(presets.router)
