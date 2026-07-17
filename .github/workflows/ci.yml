@@ -74,6 +74,10 @@ jobs:
         run: npm ci
 
       # ARC-015: vitest layer for the WS event contract + config module.
+      # QA-004: lint the web surface in CI (vitest + next build cover test + tsc).
+      - name: Lint (eslint)
+        run: npm run lint
+
       - name: Run vitest
         run: npm run test
 
