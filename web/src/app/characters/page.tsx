@@ -1,14 +1,16 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import dynamic from "next/dynamic";
 import { GameLayout } from "@/components/layout/GameLayout";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Loading } from "@/components/ui/Loading";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { CharacterDetailModal } from "@/components/characters/CharacterDetailModal";
-import { CreateCharacterModal } from "@/components/characters/CreateCharacterModal";
-import { ImportFromStoryModal } from "@/components/characters/ImportFromStoryModal";
+// Dynamic modals (ENH-007)
+const CharacterDetailModal = dynamic(() => import("@/components/characters/CharacterDetailModal").then(m => ({ default: m.CharacterDetailModal })), { ssr: false });
+const CreateCharacterModal = dynamic(() => import("@/components/characters/CreateCharacterModal").then(m => ({ default: m.CreateCharacterModal })), { ssr: false });
+const ImportFromStoryModal = dynamic(() => import("@/components/characters/ImportFromStoryModal").then(m => ({ default: m.ImportFromStoryModal })), { ssr: false });
 import { useCharacterActions } from "@/hooks/useCharacterActions";
 import type { LibraryCharacter } from "@/lib/api";
 import { API_BASE } from "@/lib/config";

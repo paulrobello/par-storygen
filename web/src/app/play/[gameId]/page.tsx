@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { GameLayout } from "@/components/layout/GameLayout";
 import { StoryPanel } from "@/components/story/StoryPanel";
 import { ChoiceList } from "@/components/story/ChoiceList";
@@ -19,16 +20,16 @@ import { useGameStore } from "@/stores/game-store";
 import { apiGet } from "@/lib/api";
 import type { Character } from "@/lib/api";
 import { API_BASE as API } from "@/lib/config";
-// Extracted modals (QA-001)
-import { CharacterDetailModal } from "@/components/play/CharacterDetailModal";
-import { EditImageModal } from "@/components/play/EditImageModal";
-import { EndingsModal } from "@/components/play/EndingsModal";
-import { ExportBookModal } from "@/components/play/ExportBookModal";
-import { PortraitsModal } from "@/components/play/PortraitsModal";
-import { RecapModal } from "@/components/play/RecapModal";
-import { RelationshipsModal } from "@/components/play/RelationshipsModal";
-import { ReplayModal } from "@/components/play/ReplayModal";
-import { StoryGraphModal } from "@/components/play/StoryGraphModal";
+// Dynamic modals (ENH-007)
+const CharacterDetailModal = dynamic(() => import("@/components/play/CharacterDetailModal").then(m => ({ default: m.CharacterDetailModal })), { ssr: false });
+const EditImageModal = dynamic(() => import("@/components/play/EditImageModal").then(m => ({ default: m.EditImageModal })), { ssr: false });
+const EndingsModal = dynamic(() => import("@/components/play/EndingsModal").then(m => ({ default: m.EndingsModal })), { ssr: false });
+const ExportBookModal = dynamic(() => import("@/components/play/ExportBookModal").then(m => ({ default: m.ExportBookModal })), { ssr: false });
+const PortraitsModal = dynamic(() => import("@/components/play/PortraitsModal").then(m => ({ default: m.PortraitsModal })), { ssr: false });
+const RecapModal = dynamic(() => import("@/components/play/RecapModal").then(m => ({ default: m.RecapModal })), { ssr: false });
+const RelationshipsModal = dynamic(() => import("@/components/play/RelationshipsModal").then(m => ({ default: m.RelationshipsModal })), { ssr: false });
+const ReplayModal = dynamic(() => import("@/components/play/ReplayModal").then(m => ({ default: m.ReplayModal })), { ssr: false });
+const StoryGraphModal = dynamic(() => import("@/components/play/StoryGraphModal").then(m => ({ default: m.StoryGraphModal })), { ssr: false });
 // Extracted feature hooks (QA-001)
 import { useGameViews } from "@/hooks/useGameViews";
 import { usePlayTts } from "@/hooks/usePlayTts";
