@@ -45,6 +45,8 @@ from storygen.storage.save import GameSave, load_game, save_game
 
 
 class FakeImageProvider:
+    supports_reference_images: bool = True
+
     def __init__(self) -> None:
         self.calls: list[str] = []
         self.ref_calls: list[bytes | None] = []

@@ -26,10 +26,8 @@ from storygen.config import AppConfig
 from storygen.images.provider_factory import resolve_image_base_url
 from storygen.llm.provider_factory import Provider, api_key_env_var, resolve_base_url
 from storygen.screens._confirm_modal import ConfirmModal
-from storygen.screens.controllers.settings_image import (
-    image_model_options,
-    model_select_state,
-)
+from storygen.screens.controllers.settings_image import image_model_options
+from storygen.screens.controllers.settings_providers import ImageProviderSection
 from storygen.screens.wizard import (
     READER_LEVEL_OPTIONS,
     STYLE_OPTIONS,
@@ -240,7 +238,7 @@ class SettingsScreen(Screen[None]):
             id="image-provider-select",
         )
         self._image_model_select: Select[str] = Select(
-            self._image_model_options(app_state.DEFAULT_IMAGE_PROVIDER),
+            image_model_options(app_state.DEFAULT_IMAGE_PROVIDER, self._CUSTOM_MODEL),
             value=app_state.DEFAULT_IMAGE_MODEL,
             allow_blank=False,
             id="image-provider-model-select",
@@ -263,6 +261,16 @@ class SettingsScreen(Screen[None]):
         )
         self._image_api_key_status = Static("", id="image-provider-api-key-status")
         self._image_suggested = Static("", id="image-provider-suggested")
+        # QA-009: the four image-section refresh/sync operations are delegated
+        # to this helper (shared verbatim with the character-image section).
+        self._image_section = ImageProviderSection(
+            model_select=self._image_model_select,
+            model_input=self._image_model_input,
+            api_key_input=self._image_api_key_input,
+            api_key_status=self._image_api_key_status,
+            suggested=self._image_suggested,
+            custom_model=self._CUSTOM_MODEL,
+        )
         # Fallback Select prepends a "(none)" entry with a sentinel value.
         self._fallback_select: Select[str] = Select(
             [("(none)", self._FALLBACK_NONE), *app_state.IMAGE_PROVIDER_CHOICES],
@@ -296,7 +304,9 @@ class SettingsScreen(Screen[None]):
             id="character-image-provider-select",
         )
         self._character_image_model_select: Select[str] = Select(
-            self._character_image_model_options(app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER),
+            image_model_options(
+                app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER, self._CUSTOM_MODEL
+            ),
             value=app_state.DEFAULT_CHARACTER_IMAGE_MODEL,
             allow_blank=False,
             id="character-image-provider-model-select",
@@ -321,6 +331,14 @@ class SettingsScreen(Screen[None]):
             "", id="character-image-provider-api-key-status"
         )
         self._character_image_suggested = Static("", id="character-image-provider-suggested")
+        self._character_image_section = ImageProviderSection(
+            model_select=self._character_image_model_select,
+            model_input=self._character_image_model_input,
+            api_key_input=self._char_image_api_key_input,
+            api_key_status=self._character_image_api_key_status,
+            suggested=self._character_image_suggested,
+            custom_model=self._CUSTOM_MODEL,
+        )
 
         # --- Wizard defaults ---
         self._theme_area = TextArea(id="default-theme")
@@ -611,73 +629,6 @@ class SettingsScreen(Screen[None]):
             return
         self._suggested.update(f"Suggested: {', '.join(models)}")
 
-    def _refresh_image_api_key_status(self, provider: str) -> None:
-        env_name = app_state.IMAGE_API_KEY_ENV.get(provider)
-        if env_name is None:
-            self._image_api_key_status.update("No API key required (local)")
-            return
-        persisted = self._image_api_key_input.value.strip()
-        present = bool(os.environ.get(env_name))
-        if persisted:
-            self._image_api_key_status.update(f"API key ({env_name}): set in settings")
-        else:
-            mark = "present" if present else "missing"
-            self._image_api_key_status.update(f"API key ({env_name}): {mark}")
-
-    def _image_model_options(self, provider: str) -> list[tuple[str, str]]:
-        """Curated image-model choices for the Select widget, plus a Custom entry."""
-        return image_model_options(provider, self._CUSTOM_MODEL)
-
-    def _sync_image_model_select(self, provider: str, model: str) -> None:
-        """Rebuild the image-model Select options for ``provider`` and pick ``model``.
-
-        If ``model`` is in the curated list for ``provider``, the Select points
-        at it; otherwise the Select shows the Custom sentinel (the Input keeps
-        the real value). The Input is only shown when Custom is selected.
-        """
-        options, target_value, show_input = model_select_state(provider, model, self._CUSTOM_MODEL)
-        with self._image_model_select.prevent(Select.Changed):
-            self._image_model_select.set_options(options)
-            self._image_model_select.value = target_value
-        self._image_model_input.display = show_input
-
-    def _refresh_image_suggested(self, provider: str) -> None:
-        models = app_state.SUGGESTED_IMAGE_MODELS.get(provider, ())
-        if not models:
-            self._image_suggested.update("")
-            return
-        self._image_suggested.update(f"Suggested: {', '.join(models)}")
-
-    def _refresh_character_image_api_key_status(self, provider: str) -> None:
-        env_name = app_state.IMAGE_API_KEY_ENV.get(provider)
-        if env_name is None:
-            self._character_image_api_key_status.update("No API key required (local)")
-            return
-        persisted = self._char_image_api_key_input.value.strip()
-        present = bool(os.environ.get(env_name))
-        if persisted:
-            self._character_image_api_key_status.update(f"API key ({env_name}): set in settings")
-        else:
-            mark = "present" if present else "missing"
-            self._character_image_api_key_status.update(f"API key ({env_name}): {mark}")
-
-    def _character_image_model_options(self, provider: str) -> list[tuple[str, str]]:
-        return self._image_model_options(provider)
-
-    def _sync_character_image_model_select(self, provider: str, model: str) -> None:
-        options, target_value, show_input = model_select_state(provider, model, self._CUSTOM_MODEL)
-        with self._character_image_model_select.prevent(Select.Changed):
-            self._character_image_model_select.set_options(options)
-            self._character_image_model_select.value = target_value
-        self._character_image_model_input.display = show_input
-
-    def _refresh_character_image_suggested(self, provider: str) -> None:
-        models = app_state.SUGGESTED_IMAGE_MODELS.get(provider, ())
-        if not models:
-            self._character_image_suggested.update("")
-            return
-        self._character_image_suggested.update(f"Suggested: {', '.join(models)}")
-
     def _current_character_image_provider(self) -> str:
         return cast(str, self._character_image_provider_select.value)
 
@@ -750,9 +701,9 @@ class SettingsScreen(Screen[None]):
             self._fallback_select.value = fallback_value
             self._fallback_model_input.value = img_prefs.fallback_model
             self._fallback_model_input.disabled = not img_prefs.fallback_provider
-        self._sync_image_model_select(img_prefs.provider, img_prefs.model)
-        self._refresh_image_api_key_status(img_prefs.provider)
-        self._refresh_image_suggested(img_prefs.provider)
+        self._image_section.sync_model_select(img_prefs.provider, img_prefs.model)
+        self._image_section.refresh_api_key_status(img_prefs.provider)
+        self._image_section.refresh_suggested(img_prefs.provider)
         self._refresh_ref_warning()
         self._refresh_ollama_warning()
 
@@ -771,11 +722,11 @@ class SettingsScreen(Screen[None]):
                 character_img_prefs.provider
             )
             self._char_image_api_key_input.value = character_img_prefs.api_key
-        self._sync_character_image_model_select(
+        self._character_image_section.sync_model_select(
             character_img_prefs.provider, character_img_prefs.model
         )
-        self._refresh_character_image_api_key_status(character_img_prefs.provider)
-        self._refresh_character_image_suggested(character_img_prefs.provider)
+        self._character_image_section.refresh_api_key_status(character_img_prefs.provider)
+        self._character_image_section.refresh_suggested(character_img_prefs.provider)
 
         # Wizard defaults
         defaults = app_state.read_wizard_defaults()
@@ -901,9 +852,9 @@ class SettingsScreen(Screen[None]):
             self._image_base_url_input.value = ""
             self._image_base_url_input.placeholder = _image_base_url_placeholder(provider)
             self._image_api_key_input.value = ""
-        self._sync_image_model_select(provider, first_model)
-        self._refresh_image_api_key_status(provider)
-        self._refresh_image_suggested(provider)
+        self._image_section.sync_model_select(provider, first_model)
+        self._image_section.refresh_api_key_status(provider)
+        self._image_section.refresh_suggested(provider)
         self._refresh_ref_warning()
         self._refresh_ollama_warning()
 
@@ -933,7 +884,7 @@ class SettingsScreen(Screen[None]):
         if self._suppress_image_provider_handler:
             return
         provider = self._current_primary_image_provider()
-        self._sync_image_model_select(provider, event.value.strip())
+        self._image_section.sync_model_select(provider, event.value.strip())
 
     @on(Select.Changed, "#character-image-provider-select")
     def _on_character_image_provider_changed(self, event: Select.Changed) -> None:
@@ -955,9 +906,9 @@ class SettingsScreen(Screen[None]):
             self._character_image_base_url_input.value = ""
             self._character_image_base_url_input.placeholder = _image_base_url_placeholder(provider)
             self._char_image_api_key_input.value = ""
-        self._sync_character_image_model_select(provider, first_model)
-        self._refresh_character_image_api_key_status(provider)
-        self._refresh_character_image_suggested(provider)
+        self._character_image_section.sync_model_select(provider, first_model)
+        self._character_image_section.refresh_api_key_status(provider)
+        self._character_image_section.refresh_suggested(provider)
 
     @on(Select.Changed, "#character-image-provider-model-select")
     def _on_character_image_model_selected(self, event: Select.Changed) -> None:
@@ -978,7 +929,7 @@ class SettingsScreen(Screen[None]):
         if self._suppress_image_provider_handler:
             return
         provider = self._current_character_image_provider()
-        self._sync_character_image_model_select(provider, event.value.strip())
+        self._character_image_section.sync_model_select(provider, event.value.strip())
 
     @on(Select.Changed, "#image-fallback-select")
     def _on_image_fallback_changed(self, event: Select.Changed) -> None:
@@ -1459,14 +1410,14 @@ class SettingsScreen(Screen[None]):
             self._tts_auto_read_recap_switch.value = False
         self._refresh_api_key_status(app_state.DEFAULT_TEXT_PROVIDER)
         self._refresh_suggested(app_state.DEFAULT_TEXT_PROVIDER)
-        self._refresh_image_api_key_status(app_state.DEFAULT_IMAGE_PROVIDER)
-        self._refresh_image_suggested(app_state.DEFAULT_IMAGE_PROVIDER)
-        self._sync_image_model_select(
+        self._image_section.refresh_api_key_status(app_state.DEFAULT_IMAGE_PROVIDER)
+        self._image_section.refresh_suggested(app_state.DEFAULT_IMAGE_PROVIDER)
+        self._image_section.sync_model_select(
             app_state.DEFAULT_IMAGE_PROVIDER, app_state.DEFAULT_IMAGE_MODEL
         )
-        self._refresh_character_image_api_key_status(app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER)
-        self._refresh_character_image_suggested(app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER)
-        self._sync_character_image_model_select(
+        self._character_image_section.refresh_api_key_status(app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER)
+        self._character_image_section.refresh_suggested(app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER)
+        self._character_image_section.sync_model_select(
             app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER, app_state.DEFAULT_CHARACTER_IMAGE_MODEL
         )
         self._ref_warning.display = False

@@ -16,6 +16,7 @@ from storygen.images.split_provider import SplitImageProvider
 from storygen.llm import agents as agent_mod
 from storygen.llm.provider_factory import build_text_model
 from storygen.storage import app_state
+from storygen.storage import paths as save_paths
 from storygen.storage.library import (
     PLACEHOLDER_PNG,
     LibraryCharacter,
@@ -97,6 +98,21 @@ def _image_to_png_bytes(image_bytes: bytes) -> bytes:
         buf = io.BytesIO()
         im.save(buf, format="PNG")
         return buf.getvalue()
+
+
+def _read_save_asset(save_id: str, rel_path: str) -> bytes | None:
+    """Read a save-relative asset (portrait/reference) safely.
+
+    Performs ``safe_join`` containment + read; returns ``None`` when the path
+    is invalid or unreadable so callers can fall back to the placeholder.
+    """
+    try:
+        abs_path = save_paths.safe_join(save_paths.game_dir(save_id), rel_path)
+        if abs_path.exists():
+            return abs_path.read_bytes()
+    except (ValueError, OSError) as exc:
+        _logger.debug("asset copy skipped for %s/%s: %s", save_id, rel_path, exc)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -460,31 +476,17 @@ async def import_from_story(
         if char is None:
             continue
 
-        # Copy portrait bytes
+        # Copy portrait bytes (fall back to placeholder when missing/unreadable)
         portrait_bytes: bytes = PLACEHOLDER_PNG
         if char.portrait_path:
-            try:
-                from storygen.storage import paths as save_paths
-
-                abs_path = save_paths.safe_join(save_paths.game_dir(save_id), char.portrait_path)
-                if abs_path.exists():
-                    portrait_bytes = abs_path.read_bytes()
-            except (ValueError, OSError):
-                pass
+            read = _read_save_asset(save_id, char.portrait_path)
+            if read is not None:
+                portrait_bytes = read
 
         # Copy reference image bytes if present
         ref_bytes: bytes | None = None
         if char.reference_image_path:
-            try:
-                from storygen.storage import paths as save_paths
-
-                ref_abs = save_paths.safe_join(
-                    save_paths.game_dir(save_id), char.reference_image_path
-                )
-                if ref_abs.exists():
-                    ref_bytes = ref_abs.read_bytes()
-            except (ValueError, OSError):
-                pass
+            ref_bytes = _read_save_asset(save_id, char.reference_image_path)
 
         lib_char = LibraryCharacter(
             id=uuid4().hex,

@@ -49,3 +49,29 @@ def test_load_all_includes_curated() -> None:
     all_presets = load_all_presets()
     # Curated presets won't exist yet (Task 2 creates them), so just verify no crash
     assert isinstance(all_presets, list)
+
+
+def test_save_custom_preset_sanitizes_traversal_name(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """SEC-105: a preset named ``../evil`` saves inside the presets dir with a
+    sanitized filename — the user-supplied name is display text only and must
+    never flow into the on-disk path as a traversal.
+    """
+    from storygen.core import presets
+    from storygen.storage import paths
+
+    monkeypatch.setattr(paths, "presets_dir", lambda: tmp_path)
+
+    p = StoryPreset(name="../evil", description="Desc", theme="T")
+    path = presets.save_custom_preset(p)
+    # The file must live INSIDE the configured presets dir, not escape it.
+    assert path.parent == tmp_path
+    assert ".." not in path.name
+    assert "/" not in path.name
+    # Round-trip: load_custom_presets reads the TOML back. The display ``name``
+    # is preserved verbatim; only the filename was sanitized.
+    loaded = presets.load_custom_presets()
+    assert len(loaded) == 1
+    assert loaded[0].name == "../evil"
+    assert loaded[0].theme == "T"

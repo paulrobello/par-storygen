@@ -8,15 +8,13 @@ import os
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
-from storygen.config import AppConfig
 from storygen.images.constants import PORTRAIT_QUALITY, PORTRAIT_SIZE
 from storygen.images.pricing import image_cost
+from storygen.runtime.adapters import build_split_provider_for_save
 from storygen.storage import paths
 from storygen.storage.save import save_game
 from storygen_api.deps import (
     build_pipeline,
-    build_split_image_provider,
-    get_app_config,
     get_session_manager,
 )
 from storygen_api.rate_limit import enforce_rate_limit
@@ -69,7 +67,6 @@ async def retry_scene(
     game_id: str,
     node_id: str,
     mgr: PipelineSessionManager = Depends(get_session_manager),
-    config: AppConfig = Depends(get_app_config),
 ) -> dict[str, str]:
     """Retry scene image generation for a node."""
     # ARC-101: obtain the owned save so mutations land on the single live object.
@@ -81,7 +78,7 @@ async def retry_scene(
     pipeline = mgr.get_pipeline(game_id)
     if pipeline is None:
         callbacks = ws_manager.make_callbacks(game_id)
-        pipeline, _img = build_pipeline(save, config, callbacks=callbacks)
+        pipeline, _img = build_pipeline(save, callbacks=callbacks)
         mgr.get_or_create(game_id, save, pipeline)
 
     callbacks = ws_manager.make_callbacks(game_id)
@@ -103,7 +100,6 @@ async def edit_scene(
     node_id: str,
     body: SceneEditRequest,
     mgr: PipelineSessionManager = Depends(get_session_manager),
-    config: AppConfig = Depends(get_app_config),
 ) -> dict[str, str]:
     """Edit scene prompt and regenerate."""
     try:
@@ -114,7 +110,7 @@ async def edit_scene(
     pipeline = mgr.get_pipeline(game_id)
     if pipeline is None:
         callbacks = ws_manager.make_callbacks(game_id)
-        pipeline, _img = build_pipeline(save, config, callbacks=callbacks)
+        pipeline, _img = build_pipeline(save, callbacks=callbacks)
         mgr.get_or_create(game_id, save, pipeline)
 
     callbacks = ws_manager.make_callbacks(game_id)
@@ -139,7 +135,6 @@ async def edit_scene(
 async def retry_portrait(
     game_id: str,
     char_id: str,
-    config: AppConfig = Depends(get_app_config),
     mgr: PipelineSessionManager = Depends(get_session_manager),
 ) -> dict[str, str]:
     """Retry (regenerate) a character portrait using the stored portrait_prompt."""
@@ -153,7 +148,7 @@ async def retry_portrait(
         raise HTTPException(status_code=404, detail="Character not found")
     char = save.characters[char_idx]
 
-    image_provider = build_split_image_provider(save, config)
+    image_provider = build_split_provider_for_save(save)
     prompt = char.portrait_prompt or char.physical_description
 
     # Read reference image if available
@@ -207,7 +202,6 @@ async def edit_portrait(
     game_id: str,
     char_id: str,
     body: PortraitEditRequest,
-    config: AppConfig = Depends(get_app_config),
     mgr: PipelineSessionManager = Depends(get_session_manager),
 ) -> dict[str, str]:
     """Edit a character portrait prompt and regenerate."""
@@ -221,7 +215,7 @@ async def edit_portrait(
         raise HTTPException(status_code=404, detail="Character not found")
     char = save.characters[char_idx]
 
-    image_provider = build_split_image_provider(save, config)
+    image_provider = build_split_provider_for_save(save)
 
     # Build prompt based on mode
     if body.mode == "edit":
@@ -290,7 +284,6 @@ async def edit_portrait(
 async def regenerate_cover(
     game_id: str,
     mgr: PipelineSessionManager = Depends(get_session_manager),
-    config: AppConfig = Depends(get_app_config),
 ) -> dict[str, str]:
     """Regenerate the cover art (root node scene image)."""
     try:
@@ -305,7 +298,7 @@ async def regenerate_cover(
     pipeline = mgr.get_pipeline(game_id)
     if pipeline is None:
         callbacks = ws_manager.make_callbacks(game_id)
-        pipeline, _img = build_pipeline(save, config, callbacks=callbacks)
+        pipeline, _img = build_pipeline(save, callbacks=callbacks)
         mgr.get_or_create(game_id, save, pipeline)
 
     callbacks = ws_manager.make_callbacks(game_id)
@@ -331,7 +324,6 @@ async def add_outfit(
     game_id: str,
     char_id: str,
     body: OutfitRequest,
-    config: AppConfig = Depends(get_app_config),
     mgr: PipelineSessionManager = Depends(get_session_manager),
 ) -> dict[str, str]:
     """Create a new outfit for a character and generate its portrait."""
@@ -352,7 +344,7 @@ async def add_outfit(
 
     outfit_id = uuid4().hex
     prompt = f"{char.physical_description}. Outfit: {body.description}"
-    image_provider = build_split_image_provider(save, config)
+    image_provider = build_split_provider_for_save(save)
 
     ref_bytes: bytes | None = None
     if char.reference_image_path:

@@ -59,6 +59,11 @@ def _env_or_none(key: str) -> str | None:
 class OpenAIImageProvider:
     """Implements the `ImageProvider` protocol against OpenAI `gpt-image-2`."""
 
+    # ARC-115: OpenAI supports reference images via ``images.edit`` (both
+    # portraits and scenes). This is a static capability flag; consult it
+    # instead of hard-coding provider names at call sites.
+    supports_reference_images: bool = True
+
     def __init__(
         self,
         model: str = "gpt-image-2",

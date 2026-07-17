@@ -252,6 +252,8 @@ async def test_start_game_uses_save_text_config_not_app_model(
 
 
 class _FakeStartImageProvider:
+    supports_reference_images: bool = True
+
     async def generate_portrait(
         self,
         description: str,

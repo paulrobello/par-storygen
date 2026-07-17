@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 import pytest
@@ -370,3 +370,154 @@ def test_error_event_broadcast_validates_against_contract() -> None:
     ErrorPayload.model_validate({"type": "error", "message": "internal error"})
     with pytest.raises(ValidationError):
         ErrorPayload.model_validate({"type": "error", "error": "internal error"})
+
+
+# ---------------------------------------------------------------------------
+# SEC-103: per-frame rate limit on the WS advance path
+# ---------------------------------------------------------------------------
+
+
+def test_ws_advance_frame_is_rate_limited(
+    xdg_tmp: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """SEC-103: the Nth advance frame gets a ``rate_limited`` error frame and
+    the socket stays open. Ping frames are never counted.
+
+    Drives a real WS handshake against a persisted save with a stub pipeline
+    injected (no LLM/image work). With a 1/minute cap, the first advance
+    consumes the budget; the second is rejected at the rate-limit gate before
+    the advance lock or ``pipeline.advance`` is touched.
+    """
+    from storygen.core.models import (
+        ImageProviderConfig,
+        StoredChoice,
+        StoryNode,
+        TextProviderConfig,
+        Theme,
+        Tone,
+    )
+    from storygen.storage.save import GameSave, save_game
+    from storygen_api import deps
+    from storygen_api.rate_limit import (
+        configure_rate_limit,
+        reset_rate_limiter,
+    )
+    from storygen_api.routers import ws as ws_router
+
+    # Build a minimal save on disk so the handshake's get_or_load_save finds it.
+    root = StoryNode(
+        id="root",
+        parent_id=None,
+        chosen_choice_id=None,
+        chosen_at=None,
+        narration="A fork in the road.",
+        choices=[
+            StoredChoice(id="c1", text="left"),
+            StoredChoice(id="c2", text="right"),
+        ],
+        is_major=True,
+        is_ending=False,
+        image_prompt=None,
+        image_path=None,
+        image_status="not_planned",
+        illustration_reasoning=None,
+        featured_character_ids=[],
+        summary_to_here=None,
+        created_at=datetime.now(UTC),
+    )
+    save = GameSave(
+        version=4,
+        id=uuid4(),
+        theme=Theme(title="T", setting="S", premise="P", keywords=[]),
+        tone=Tone(preset="serious", custom_descriptor=None),
+        narration_style="third_person",
+        text_config=TextProviderConfig(provider="openai", model="gpt-4o-mini"),
+        image_config=ImageProviderConfig(provider="openai", model="gpt-image-2"),
+        character_image_config=ImageProviderConfig(provider="openai", model="gpt-image-2"),
+        characters=[],
+        nodes={"root": root},
+        root_node_id="root",
+        current_node_id="root",
+        endings_reached=[],
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+    save_game(save)
+    game_id = str(save.id)
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("STORYGEN_API_TOKEN", "ws-rate-token")
+    reset_token_cache()
+    deps.get_app_config.cache_clear()
+
+    # Tight 1/minute cap: frame 1 passes, frame 2 is throttled.
+    configure_rate_limit("1/minute")
+    reset_rate_limiter()
+
+    # Inject a no-op pipeline so advance returns instantly (no callbacks fire,
+    # so no broadcast frames precede the rate-limited error on frame 2).
+    class _SilentPipeline:
+        async def advance(
+            self,
+            save: Any,
+            *,
+            from_node_id: str,
+            choice_id: str,
+            skip_image: bool = False,
+            suppress_side_effects: bool = False,
+            callbacks: Any = None,
+        ) -> Any:
+            del save, from_node_id, choice_id, skip_image, suppress_side_effects, callbacks
+            return root
+
+        async def cancel_all_prefetches(self) -> None:
+            return None
+
+    def _fake_build_pipeline(save: Any, *, callbacks: Any = None) -> tuple[Any, None]:
+        del save, callbacks
+        return (_SilentPipeline(), None)
+
+    monkeypatch.setattr(  # type: ignore[arg-type]
+        ws_router, "build_pipeline", _fake_build_pipeline
+    )
+
+    app = create_app()
+    headers = {"sec-websocket-protocol": "bearer.ws-rate-token"}
+    try:
+        with TestClient(app) as client, client.websocket_connect(
+            f"/api/ws/{game_id}", headers=headers
+        ) as ws:
+            # Frame 1: consumes the single allowed advance (stub runs silently).
+            ws.send_json(
+                {"type": "advance", "from_node_id": "root", "choice_id": "c1"}
+            )
+            # Frame 2: over budget → rate_limited error, socket stays open.
+            ws.send_json(
+                {"type": "advance", "from_node_id": "root", "choice_id": "c2"}
+            )
+            # The stub fires no callbacks, so the first inbound frame is the
+            # rate_limited error. Drain a couple of slots defensively.
+            rate_limited: dict[str, Any] | None = None
+            for _ in range(5):
+                raw: Any = ws.receive_json()
+                if isinstance(raw, dict):
+                    frame = cast(dict[str, Any], raw)
+                    if (
+                        frame.get("type") == "error"
+                        and frame.get("code") == "rate_limited"
+                    ):
+                        rate_limited = frame
+                        break
+            assert rate_limited is not None, "expected a rate_limited error frame"
+            assert rate_limited.get("message")
+            # Socket is still usable: a ping still pongs (connection not closed).
+            ws.send_json({"type": "ping"})
+            pong = ws.receive_json()
+            assert pong == {"type": "pong"}
+    finally:
+        # Restore the limiter spec so a leaked tight cap doesn't poison later
+        # tests (the autouse conftest fixture clears counters but not the spec).
+        configure_rate_limit("30/minute")
+        reset_rate_limiter()
+        reset_token_cache()
+        deps.get_app_config.cache_clear()

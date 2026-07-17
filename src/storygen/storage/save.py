@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import shutil
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
@@ -31,17 +33,39 @@ from storygen.storage.app_state import DEFAULT_ART_STYLE, DEFAULT_TARGET_MAJOR_B
 
 SAVE_VERSION: int = 4
 
+_logger = logging.getLogger(__name__)
+
 __all__ = [
     "GameSave",
+    "GameSummaryData",
     "NarrationStyle",
     "ReaderLevel",
     "StoryCreationPrompts",
     "delete_game",
     "list_existing_story_titles",
+    "list_game_summaries",
     "load_game",
+    "load_game_summary",
     "prune_subtree",
     "save_game",
 ]
+
+
+@dataclass
+class GameSummaryData:
+    """Lightweight summary of a save — the fields list views need.
+
+    This is a plain dataclass (NOT a pydantic API schema) so the storage
+    layer can return it without depending on ``storygen_api.schemas``.
+    Callers (router, TUI) map it to whatever view schema they need.
+    """
+
+    id: str
+    title: str
+    updated_at: datetime
+    node_count: int
+    is_ending: bool
+    has_cover: bool
 
 
 class StoryCreationPrompts(BaseModel):
@@ -318,3 +342,68 @@ def load_game(game_id: str) -> GameSave:
     if _backfill_creation_prompts_from_debug_cache(save):
         save_game(save)
     return save
+
+
+# --- Game listing (ARC-109) -------------------------------------------------
+# Single source of schema knowledge for game-list views. Full ``load_game``
+# is used so migrations are always applied and the summary is never stale
+# vs. the actual save state. Partial JSON parsing is a permitted future
+# optimization if listing becomes hot (see ENH-003).
+
+
+def _summary_from_save(game_id: str, save: GameSave) -> GameSummaryData:
+    """Extract the summary fields callers need from a fully-loaded save."""
+    current_node = save.nodes.get(save.current_node_id)
+    is_ending = current_node.is_ending if current_node is not None else False
+    root_node = save.nodes.get(save.root_node_id)
+    has_cover = (
+        root_node is not None and root_node.image_status == "done"
+    )
+    return GameSummaryData(
+        id=game_id,
+        title=save.theme.title,
+        updated_at=save.updated_at,
+        node_count=len(save.nodes),
+        is_ending=is_ending,
+        has_cover=has_cover,
+    )
+
+
+def load_game_summary(game_id: str) -> GameSummaryData | None:
+    """Load a single save and extract its summary fields.
+
+    Returns ``None`` if the save is missing or unparseable (corrupt JSON,
+    schema mismatch). Uses full :func:`load_game` so migrations are applied
+    — the summary is always consistent with the actual save state.
+    """
+    try:
+        save = load_game(game_id)
+    except (FileNotFoundError, ValueError):
+        return None
+    return _summary_from_save(game_id, save)
+
+
+def list_game_summaries() -> list[GameSummaryData]:
+    """List all valid saves newest-first, skipping unparseable ones.
+
+    Unparseable saves are logged at ``WARNING`` level (not silently skipped)
+    so operators can diagnose corruption. One bad save does not fail the
+    entire listing.
+    """
+    root = paths.games_root()
+    if not root.exists():
+        return []
+    summaries: list[GameSummaryData] = []
+    for directory in root.iterdir():
+        if not directory.is_dir():
+            continue
+        if not (directory / "game.json").exists():
+            continue
+        game_id = directory.name
+        summary = load_game_summary(game_id)
+        if summary is None:
+            _logger.warning("Skipping unparseable save at %s", directory)
+            continue
+        summaries.append(summary)
+    summaries.sort(key=lambda s: s.updated_at, reverse=True)
+    return summaries

@@ -12,10 +12,11 @@ import json
 import logging
 from typing import Any, cast
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
-from storygen_api.deps import build_pipeline, get_app_config, get_session_manager
+from storygen_api.deps import build_pipeline, get_session_manager
+from storygen_api.rate_limit import check_rate_limit
 from storygen_api.security import ws_authorize, ws_check_origin
 from storygen_api.ws import ws_manager
 
@@ -91,9 +92,8 @@ async def websocket_endpoint(
 
         existing = mgr.get_pipeline(game_id)
         if existing is None:
-            config = get_app_config()
             callbacks = ws_manager.make_callbacks(game_id)
-            pipeline, _img = build_pipeline(save, config, callbacks=callbacks)
+            pipeline, _img = build_pipeline(save, callbacks=callbacks)
             mgr.get_or_create(game_id, save, pipeline)
 
         while True:
@@ -130,6 +130,25 @@ async def websocket_endpoint(
             if msg_type == "ping":
                 await ws.send_json({"type": "pong"})
             elif msg_type == "advance":
+                # SEC-103: rate-limit advance frames keyed by the direct peer
+                # host. Checked per advance frame (ping frames are never
+                # counted). The HTTP dependency path cannot apply to a
+                # WebSocket, so we call the plain check function and translate
+                # the 429 into an in-band error frame — the socket stays open
+                # so the client may resume once the window slides.
+                client_host = ws.client.host if ws.client else "unknown"
+                try:
+                    check_rate_limit(client_host)
+                except HTTPException:
+                    await ws.send_json(
+                        {
+                            "type": "error",
+                            "code": "rate_limited",
+                            "message": "rate limit exceeded",
+                        }
+                    )
+                    continue
+
                 choice_id = msg.get("choice_id", "")
                 from_node_id = msg.get("from_node_id", "")
                 if not choice_id or not from_node_id:

@@ -2,8 +2,9 @@
 
 Covers the public surface that routers depend on:
 
-- :func:`build_split_image_provider_for_wizard` / :func:`build_split_image_provider`
-  return :class:`SplitImageProvider` instances.
+- :func:`build_split_image_provider_for_wizard` returns a
+  :class:`SplitImageProvider` instance; :func:`build_split_provider_for_save`
+  (the save-pinned builder in :mod:`storygen.runtime.adapters`) likewise.
 - :func:`build_pipeline` wires the shared adapters (:mod:`storygen.runtime.adapters`)
   into a :class:`BeatPipeline`.
 - :func:`get_app_config` caches the loaded :class:`AppConfig`.
@@ -280,10 +281,10 @@ def test_build_split_image_provider_returns_split(
     """Save-pinned provider builder returns a SplitImageProvider without raising."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     from storygen.images.split_provider import SplitImageProvider
+    from storygen.runtime.adapters import build_split_provider_for_save
 
     save = _make_save(xdg_tmp)
-    cfg = deps.get_app_config()
-    provider = deps.build_split_image_provider(save, cfg)
+    provider = build_split_provider_for_save(save)
     assert isinstance(provider, SplitImageProvider)
 
 
@@ -298,9 +299,8 @@ async def test_build_pipeline_wires_shared_adapters(
     """
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     save = _make_save(xdg_tmp)
-    cfg = deps.get_app_config()
 
-    pipeline, image_provider = deps.build_pipeline(save, cfg)
+    pipeline, image_provider = deps.build_pipeline(save)
 
     assert isinstance(pipeline._beat, BeatAgentAdapter)  # pyright: ignore[reportPrivateUsage]
     assert isinstance(pipeline._illustration, IllustrationAdapter)  # pyright: ignore[reportPrivateUsage]

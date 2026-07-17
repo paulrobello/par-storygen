@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 
 from storygen.storage import app_state, paths
+from storygen.storage.app_state import TTSPrefs
 from storygen.tts.player import TTSPlayer
 from storygen_api.deps import get_session_manager
 from storygen_api.security import verify_token
@@ -18,18 +19,19 @@ router = APIRouter(
     dependencies=[Depends(verify_token)],
 )
 
-# Module-level TTS player (configured from app state on each request).
-_player = TTSPlayer()
 
+def _build_player(prefs: TTSPrefs) -> TTSPlayer:
+    """Build a freshly-configured per-request TTS player (ARC-107).
 
-def _configure_player() -> None:
-    """Re-read TTS prefs and configure the player."""
-    prefs = app_state.read_tts_prefs()
-    _player.configure(
-        prefs.provider,
-        api_key=prefs.api_key,
-        voice=prefs.voice,
-    )
+    TTSPlayer construction is cheap (attribute init only; the provider is
+    built lazily inside ``configure``). Audio cache is on disk keyed by
+    ``(node_id, provider, voice)``, so per-request instances don't lose it.
+    Per-request players eliminate the race class where two concurrent
+    generate calls interleave configure→generate on a shared instance.
+    """
+    player = TTSPlayer()
+    player.configure(prefs.provider, api_key=prefs.api_key, voice=prefs.voice)
+    return player
 
 
 @router.post("/{game_id}/{node_id}/generate")
@@ -39,7 +41,8 @@ async def generate_tts(
     mgr: PipelineSessionManager = Depends(get_session_manager),
 ) -> JSONResponse:
     """Generate TTS audio for a node's narration and return the audio URL."""
-    _configure_player()
+    prefs = app_state.read_tts_prefs()
+    player = _build_player(prefs)
     try:
         save = mgr.get_or_load_save(game_id)
     except FileNotFoundError as exc:
@@ -52,7 +55,6 @@ async def generate_tts(
     if not node.narration:
         raise HTTPException(status_code=400, detail="Node has no narration")
 
-    prefs = app_state.read_tts_prefs()
     audio_path = paths.tts_audio_path(
         game_id,
         node_id,
@@ -60,7 +62,7 @@ async def generate_tts(
         voice=prefs.voice,
     )
 
-    success = await _player.generate(node.narration, audio_path)
+    success = await player.generate(node.narration, audio_path)
     if not success:
         raise HTTPException(status_code=500, detail="TTS generation failed")
 

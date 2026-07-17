@@ -53,6 +53,11 @@ class RoutedImageProvider:
         self._primary_label = primary_label
         self._fallback_label = fallback_label
         self._on_fallback = on_fallback
+        # ARC-115: snapshot the primary provider's reference-image capability.
+        # Capability is static (a class attribute on concrete providers), so a
+        # construction-time snapshot matches the ImageProvider protocol's
+        # plain-bool shape and stays correct for the router's lifetime.
+        self.supports_reference_images: bool = primary.supports_reference_images
 
     async def generate_portrait(
         self,

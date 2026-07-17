@@ -37,7 +37,6 @@ from storygen_api.session import PipelineSessionManager
 
 def build_pipeline(
     save: GameSave,
-    config: AppConfig,
     *,
     callbacks: PipelineCallbacks | None = None,
 ) -> tuple[BeatPipeline, SplitImageProvider]:
@@ -47,7 +46,6 @@ def build_pipeline(
     helpers come from the shared :mod:`storygen.runtime.adapters` module
     (ARC-003) so the TUI and API surfaces can't diverge again.
     """
-    _ = config  # kept for back-compat with existing call sites; not used here
     model_name = save.text_config.model
     text_model = build_text_model(save.text_config)
 
@@ -99,18 +97,6 @@ def build_split_image_provider_for_wizard(config: AppConfig) -> SplitImageProvid
         art_config=config.image_config,
         character_config=config.character_image_config,
     )
-
-
-# Public alias so existing router imports keep resolving (back-compat).
-# ``routers/images.py`` imports ``build_split_image_provider`` for save-pinned
-# provider construction; the signature mirrors the historical one
-# ``(save, config)`` even though ``config`` is no longer needed.
-def build_split_image_provider(
-    save: GameSave,
-    config: AppConfig,  # kept for back-compat with router call sites (was unused pre-ARC-003 too)
-) -> SplitImageProvider:
-    """Build a save-pinned split image provider."""
-    return build_split_provider_for_save(save)
 
 
 # ---------------------------------------------------------------------------

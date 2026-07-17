@@ -13,6 +13,8 @@ from storygen.images.routed_provider import RoutedImageProvider
 class _FakeProvider:
     """Minimal ImageProvider stub with scripted outcomes."""
 
+    supports_reference_images: bool = True
+
     def __init__(
         self,
         *,
@@ -159,6 +161,8 @@ async def test_generate_scene_forwards_reference_portraits() -> None:
     captured: list[list[ReferencePortrait]] = []
 
     class _Capture:
+        supports_reference_images: bool = True
+
         async def generate_portrait(
             self,
             description: str,

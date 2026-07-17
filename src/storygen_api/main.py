@@ -126,7 +126,12 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,
-        allow_credentials=True,
+        # SEC-107: auth rides the Authorization header / WS subprotocol, not
+        # cookies, so credentialed CORS is unnecessary. Disabling it narrows
+        # the cross-origin surface (no ``Set-Cookie`` / cookie echo on
+        # preflight). ``Authorization`` stays in ``allow_headers`` so token-
+        # bearing requests still pass preflight after SEC-102.
+        allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
         allow_headers=["Authorization", "Content-Type"],
     )

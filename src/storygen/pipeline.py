@@ -37,6 +37,7 @@ from storygen.images.constants import (
 )
 from storygen.images.pricing import image_cost
 from storygen.pipeline_prefetch import PrefetchCoordinator
+from storygen.pipeline_prompts import build_beat_prompt as _build_beat_prompt
 from storygen.storage import app_state, paths
 from storygen.storage.llm_cache import dump_llm_exchange
 from storygen.storage.save import GameSave, save_game
@@ -294,19 +295,7 @@ class BeatPipeline:
         # child link. The link is the pipeline's bookkeeping; only we set it.
         stored_choices = [StoredChoice(id=c.id, text=c.text) for c in beat.choices]
 
-        new_characters_ids: list[str] = []
-        for new_char in beat.new_characters:
-            new_char_with_id = new_char.model_copy(update={"introduced_at_node_id": "pending"})
-            save.characters.append(new_char_with_id)
-            new_characters_ids.append(new_char_with_id.id)
-
-        for idx, c in enumerate(save.characters):
-            if c.id in new_characters_ids and c.introduced_at_node_id == "pending":
-                save.characters[idx] = c.model_copy(update={"introduced_at_node_id": new_node_id})
-
-        # Merge relationship updates from the beat.
-        if beat.relationship_updates:
-            _merge_relationships(save, beat.relationship_updates, new_node_id)
+        self._merge_new_characters(save, beat, new_node_id)
 
         new_node = StoryNode(
             id=new_node_id,
@@ -345,7 +334,8 @@ class BeatPipeline:
             # the cast" toast. Their portraits will land asynchronously via
             # _run_stage_2_and_3 below.
             if beat.new_characters:
-                added = [c for c in save.characters if c.id in new_characters_ids]
+                new_char_ids = {c.id for c in beat.new_characters}
+                added = [c for c in save.characters if c.id in new_char_ids]
                 await cb.on_new_characters(added)
 
         # --- Stage 2 + 3: illustration planning + background scene ---
@@ -354,43 +344,79 @@ class BeatPipeline:
         )
 
         # --- Summary (optional) ---
-        if beat.is_major and self._summary is not None:
-            prev_summary, segment = segment_since_last_summary(save, new_node_id)
-            parts: list[str] = []
-            if prev_summary:
-                parts.append("PREVIOUS SUMMARY:\n" + prev_summary)
-            if segment:
-                beat_texts = "\n\n".join(
-                    f"--- Beat {i + 1} ---\n{narration}"
-                    for i, narration in enumerate(
-                        n.narration for n in segment if n.id != new_node_id
-                    )
-                    if narration
-                )
-                if beat_texts:
-                    parts.append("BEATS SINCE LAST SUMMARY:\n" + beat_texts)
-            parts.append("CURRENT BEAT:\n" + beat.narration)
-            summary_input = "\n\n".join(parts)
-            try:
-                summary = await self._summary.run(
-                    summary_input,
-                    raw_sink=self._maybe_build_raw_sink(str(save.id), new_node_id, "summary"),
-                )
-            except Exception:
-                logging.getLogger(__name__).warning(
-                    "Summary generation failed for node %s; continuing without recap anchor",
-                    new_node_id,
-                    exc_info=True,
-                )
-            else:
-                updated = save.nodes[new_node_id].model_copy(
-                    update={"summary_to_here": summary.text}
-                )
-                save.nodes[new_node_id] = updated
-                save.updated_at = datetime.now(UTC)
-                save_game(save)
+        await self._maybe_generate_summary(save, beat, new_node_id)
 
         return save.nodes[new_node_id]
+
+    def _merge_new_characters(
+        self, save: GameSave, beat: StoryBeat, new_node_id: str
+    ) -> None:
+        """Introduce new characters from the beat and merge relationship updates.
+
+        New characters are appended with a ``"pending"`` placeholder for
+        ``introduced_at_node_id`` (set before the LLM call so the raw-exchange
+        sink can reference the id), then patched to the real ``new_node_id``.
+        Relationship deltas from the beat are merged in via
+        :func:`_merge_relationships`.
+        """
+        new_char_ids = [c.id for c in beat.new_characters]
+        for new_char in beat.new_characters:
+            new_char_with_id = new_char.model_copy(update={"introduced_at_node_id": "pending"})
+            save.characters.append(new_char_with_id)
+
+        for idx, c in enumerate(save.characters):
+            if c.id in new_char_ids and c.introduced_at_node_id == "pending":
+                save.characters[idx] = c.model_copy(update={"introduced_at_node_id": new_node_id})
+
+        if beat.relationship_updates:
+            _merge_relationships(save, beat.relationship_updates, new_node_id)
+
+    async def _maybe_generate_summary(
+        self, save: GameSave, beat: StoryBeat, new_node_id: str
+    ) -> None:
+        """Generate a recap summary if this is a major beat and a summary agent exists.
+
+        Assembles the previous summary (if any) + beat narrations since the
+        last summary + the current beat narration, asks the summary agent for
+        a recap, and stores it on the node. Failures are logged and swallowed
+        — the story continues without a recap anchor rather than crashing.
+        """
+        if not beat.is_major or self._summary is None:
+            return
+        prev_summary, segment = segment_since_last_summary(save, new_node_id)
+        parts: list[str] = []
+        if prev_summary:
+            parts.append("PREVIOUS SUMMARY:\n" + prev_summary)
+        if segment:
+            beat_texts = "\n\n".join(
+                f"--- Beat {i + 1} ---\n{narration}"
+                for i, narration in enumerate(
+                    n.narration for n in segment if n.id != new_node_id
+                )
+                if narration
+            )
+            if beat_texts:
+                parts.append("BEATS SINCE LAST SUMMARY:\n" + beat_texts)
+        parts.append("CURRENT BEAT:\n" + beat.narration)
+        summary_input = "\n\n".join(parts)
+        try:
+            summary = await self._summary.run(
+                summary_input,
+                raw_sink=self._maybe_build_raw_sink(str(save.id), new_node_id, "summary"),
+            )
+        except Exception:
+            _logger.warning(
+                "Summary generation failed for node %s; continuing without recap anchor",
+                new_node_id,
+                exc_info=True,
+            )
+        else:
+            updated = save.nodes[new_node_id].model_copy(
+                update={"summary_to_here": summary.text}
+            )
+            save.nodes[new_node_id] = updated
+            save.updated_at = datetime.now(UTC)
+            save_game(save)
 
     def start_prefetch(
         self,
@@ -747,8 +773,12 @@ class BeatPipeline:
                             refs.append(
                                 ReferencePortrait("current scene artwork", cur_path.read_bytes())
                             )
-                    except ValueError:
-                        pass
+                    except ValueError as exc:
+                        _logger.debug(
+                            "skipping current-scene reference for node %s: %s",
+                            node_id,
+                            exc,
+                        )
             # Reserve slots for character portraits (OpenAI images.edit allows ≤16).
             max_char_refs = 16 - len(refs)
             for cid in featured_character_ids[:max_char_refs]:
@@ -757,8 +787,13 @@ class BeatPipeline:
                         try:
                             ref_path = paths.safe_join(paths.game_dir(save_id), c.portrait_path)
                             refs.append(ReferencePortrait(c.name, ref_path.read_bytes()))
-                        except ValueError:
-                            pass
+                        except ValueError as exc:
+                            _logger.debug(
+                                "skipping character reference %s for node %s: %s",
+                                c.name,
+                                node_id,
+                                exc,
+                            )
             scene_bytes = await self._image.generate_scene(
                 image_prompt,
                 reference_portraits=refs,
@@ -849,13 +884,3 @@ def _merge_relationships(save: GameSave, updates: list[Relationship], node_id: s
         if existing is not None:
             save.relationships.remove(existing)
         save.relationships.append(update.model_copy(update={"updated_at_node_id": node_id}))
-
-
-# ARC-011: the three pure prompt-construction helpers live in
-# ``pipeline_prompts.py`` now. Only ``_build_beat_prompt`` is still called
-# from this module (inside ``BeatPipeline.advance``); the other two
-# (``pacing_hint_for_depth``, ``resolve_chosen_text``) are called only from
-# within ``build_beat_prompt`` itself, so they need not be imported here.
-from storygen.pipeline_prompts import (  # noqa: E402 - imported after stdlib/storygen imports above
-    build_beat_prompt as _build_beat_prompt,
-)

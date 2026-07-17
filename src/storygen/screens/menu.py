@@ -62,7 +62,7 @@ class MenuScreen(Screen[None]):
         return gid is not None and game_dir(gid).exists()
 
     def _refresh_resume_button(self) -> None:
-        self.query_one("#btn-resume", Button).disabled = not self._resume_available()  # pyright: ignore[reportUnknownMemberType]
+        self.query_one("#btn-resume", Button).disabled = not self._resume_available()
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         if action == "resume_story":
@@ -77,17 +77,17 @@ class MenuScreen(Screen[None]):
             return
         game_id = last_story_id()
         if game_id is None:
-            self.notify("No previous story to resume.", severity="warning", timeout=5)  # pyright: ignore[reportUnknownMemberType]
+            self.notify("No previous story to resume.", severity="warning", timeout=5)
             return
         if not game_dir(game_id).exists():
             self._refresh_resume_button()
-            self.notify("Last story was deleted.", severity="warning", timeout=5)  # pyright: ignore[reportUnknownMemberType]
+            self.notify("Last story was deleted.", severity="warning", timeout=5)
             return
         try:
             save = load_game(game_id)
         except FileNotFoundError:
             self._refresh_resume_button()
-            self.notify("Last story no longer exists.", severity="warning", timeout=5)  # pyright: ignore[reportUnknownMemberType]
+            self.notify("Last story no longer exists.", severity="warning", timeout=5)
             return
         self.run_worker(app._start_game(save), name="resume-from-menu")  # pyright: ignore[reportPrivateUsage]
 
@@ -96,9 +96,9 @@ class MenuScreen(Screen[None]):
 
         app = self.app  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
         if isinstance(app, StoryGenApp):
-            app.push_screen(app._make_wizard())  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType]
+            app.push_screen(app._make_wizard())  # pyright: ignore[reportPrivateUsage]
         else:
-            app.push_screen("wizard")  # pyright: ignore[reportUnknownMemberType]
+            app.push_screen("wizard")
 
     def action_quick_start(self) -> None:
         from storygen.core.presets import load_all_presets

@@ -8,8 +8,8 @@ import {
   type NodeId,
   apiGet,
   apiPost,
+  sceneImageUrl,
 } from "@/lib/api";
-import { API_BASE } from "@/lib/config";
 
 interface GraphEdge {
   parent_id: string;
@@ -49,7 +49,7 @@ interface GameState {
   setLoading: (loading: boolean) => void;
   appendNarration: (text: string) => void;
   setBeatCommitted: (node: StoryNode) => void;
-  setImageStatus: (status: string) => void;
+  markImageFailed: (nodeId: NodeId) => void;
   setCurrentImageUrl: (url: string | null) => void;
   addCharacters: (chars: Character[]) => void;
   updateCharacter: (characterId: string, updates: Partial<Pick<Character, "name" | "personality" | "physical_description" | "backstory">>) => void;
@@ -76,10 +76,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     try {
       const game = await apiGet<GameSave>(`/api/games/${gameId}`);
       const currentNode = game.nodes[game.current_node_id] ?? null;
-      const imageUrl =
-        currentNode?.image_status === "done"
-          ? `${API_BASE}/api/images/${gameId}/scene/${game.current_node_id}`
-          : null;
+      const imageUrl = currentNode ? sceneImageUrl(gameId, currentNode) : null;
       set({
         currentGame: game,
         currentNode,
@@ -105,10 +102,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         `/api/games/${game.id}/advance`,
         { choice_id: choiceId }
       );
-      const imageUrl =
-        result.node.image_status === "done"
-          ? `${API_BASE}/api/images/${game.id}/scene/${result.node.id}`
-          : null;
+      const imageUrl = sceneImageUrl(game.id, result.node);
 
       const updatedNodes = { ...game.nodes, [result.node.id]: result.node };
       set((state) => ({
@@ -137,10 +131,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!game) return;
     const node = game.nodes[nodeId];
     if (!node) return;
-    const imageUrl =
-      node.image_status === "done"
-        ? `${API_BASE}/api/images/${game.id}/scene/${node.id}`
-        : null;
+    const imageUrl = sceneImageUrl(game.id, node);
     set({
       currentNode: node,
       narrationDelta: node.narration,
@@ -166,9 +157,25 @@ export const useGameStore = create<GameState>((set, get) => ({
       isLoading: false,
     }));
   },
-  setImageStatus: (_status: string) => {
-    /* Used by WebSocket handler */
-  },
+  markImageFailed: (nodeId: NodeId) =>
+    set((state) => {
+      const game = state.currentGame;
+      if (!game) return state;
+      const failed = game.nodes[nodeId];
+      if (!failed) return state;
+      // QA-007: flip the node's image_status to "failed" so ImagePanel shows a
+      // failure state instead of an infinite spinner. Also update currentNode
+      // when it matches, since ImagePanel reads from currentNode.
+      const updatedNode = { ...failed, image_status: "failed" as const };
+      return {
+        currentGame: {
+          ...game,
+          nodes: { ...game.nodes, [nodeId]: updatedNode },
+        },
+        currentNode:
+          state.currentNode?.id === nodeId ? updatedNode : state.currentNode,
+      };
+    }),
   setCurrentImageUrl: (url: string | null) => set({ currentImageUrl: url }),
   addCharacters: (chars: Character[]) =>
     set((state) => {
@@ -227,10 +234,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         `/api/games/${gameId}/regenerate-node`,
         {}
       );
-      const imageUrl =
-        result.node.image_status === "done"
-          ? `${API_BASE}/api/images/${gameId}/scene/${result.node.id}`
-          : null;
+      const imageUrl = sceneImageUrl(gameId, result.node);
       const game = get().currentGame;
       const updatedNodes = { ...game?.nodes, [result.node.id]: result.node };
       set((state) => ({
@@ -272,10 +276,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       const game = await apiGet<GameSave>(`/api/games/${gameId}`);
       const nodeId = game.current_node_id;
       const currentNode = game.nodes[nodeId] ?? null;
-      const imageUrl =
-        currentNode?.image_status === "done"
-          ? `${API_BASE}/api/images/${gameId}/scene/${nodeId}`
-          : null;
+      const imageUrl = currentNode ? sceneImageUrl(gameId, currentNode) : null;
       set((state) => ({
         currentGame: game,
         currentNode: currentNode ?? state.currentNode,

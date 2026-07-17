@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 from starlette.requests import HTTPConnection, Request
+from starlette.testclient import TestClient
 
 from storygen_api import security
 from storygen_api.security import (
@@ -326,3 +327,63 @@ def test_is_valid_token_format_rejects_weak_tokens() -> None:
     assert not is_valid_token_format("has space")
     assert not is_valid_token_format("has/slash")
     assert not is_valid_token_format("a" * 513)  # > 512 chars
+
+
+# ---------------------------------------------------------------------------
+# SEC-104: presets router is gated by verify_token (route-level integration)
+# ---------------------------------------------------------------------------
+
+
+def test_presets_router_rejects_without_valid_token(
+    xdg_tmp: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """SEC-104: GET /api/presets is behind ``verify_token``; missing/bad token → 401/403."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("STORYGEN_API_TOKEN", "presets-token")
+    reset_token_cache()
+
+    from storygen_api.main import create_app
+
+    app = create_app()
+    with TestClient(app) as client:
+        # No auth header → 401.
+        r = client.get("/api/presets")
+        assert r.status_code == 401
+        # Wrong token → 403.
+        r2 = client.get(
+            "/api/presets", headers={"Authorization": "Bearer wrong-token"}
+        )
+        assert r2.status_code == 403
+        # Correct token → 200 (presets dir is empty under xdg_tmp, but the
+        # handler tolerates a missing dir and returns empty lists).
+        r3 = client.get(
+            "/api/presets", headers={"Authorization": "Bearer presets-token"}
+        )
+        assert r3.status_code == 200
+
+    reset_token_cache()
+
+
+def test_presets_router_fails_closed_when_token_unset_and_off_box(
+    xdg_tmp: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """SEC-104: with no token configured, a non-loopback peer is rejected (503).
+
+    Starlette's ``TestClient`` presents a ``"testclient"`` peer (not a loopback
+    IP), so it models an off-box client. ``verify_token`` fails closed for such
+    peers when ``STORYGEN_API_TOKEN`` is unset, so the presets route returns 503.
+    The loopback-trust path itself is covered by the dependency-level tests
+    above (``test_verify_token_allows_loopback_when_token_unset``).
+    """
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.delenv("STORYGEN_API_TOKEN", raising=False)
+    reset_token_cache()
+
+    from storygen_api.main import create_app
+
+    app = create_app()
+    with TestClient(app) as client:
+        r = client.get("/api/presets")
+        assert r.status_code == 503
+
+    reset_token_cache()

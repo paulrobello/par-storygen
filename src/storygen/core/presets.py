@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import tomllib
 from importlib.resources import files as pkg_files
 from pathlib import Path
@@ -9,6 +10,11 @@ from pydantic import BaseModel
 
 from storygen.core.models import NarrationStyle, Pacing, ReaderLevel
 from storygen.storage import paths
+
+# SEC-105: keep only filesystem-safe characters in a preset filename slug.
+# Anything outside [a-z0-9_.-] is replaced with ``_`` so a user-facing name
+# like ``../evil`` cannot escape the presets directory via path traversal.
+_SLUG_INVALID = re.compile(r"[^a-z0-9_.-]")
 
 
 class StoryPreset(BaseModel):
@@ -68,10 +74,24 @@ def load_all_presets() -> list[StoryPreset]:
     return load_curated_presets() + load_custom_presets()
 
 
+def _sanitize_slug(name: str) -> str:
+    """Reduce ``name`` to a filesystem-safe slug for the preset filename.
+
+    SEC-105: the preset name is user-facing display text and can contain any
+    character. The on-disk filename must stay inside the presets directory, so
+    we keep only ``[a-z0-9_.-]`` (matching the convention in
+    :mod:`storygen.storage.paths`), strip leading ``-``/``.`` (CLI-flag / glob
+    hygiene), and fall back to ``"preset"`` if nothing safe remains.
+    """
+    slug = _SLUG_INVALID.sub("_", name.lower().replace(" ", "_"))[:48]
+    slug = slug.lstrip("-.")
+    return slug or "preset"
+
+
 def save_custom_preset(preset: StoryPreset) -> Path:
     """Write a preset as TOML to the custom presets directory."""
     d = paths.presets_dir()
-    slug = preset.name.lower().replace(" ", "_")[:48]
+    slug = _sanitize_slug(preset.name)
     path = d / f"{slug}.toml"
     data: dict[str, Any] = preset.model_dump()
     lines: list[str] = []

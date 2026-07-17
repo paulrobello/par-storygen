@@ -6,21 +6,22 @@ Cost-incurring routes (advance, regenerate) depend on the bearer-token guard
 
 from __future__ import annotations
 
-import json
 import logging
-from datetime import datetime
-from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
-from storygen.config import AppConfig
 from storygen.core.models import NodeId, StoryNode
 from storygen.export.book import export_book, sanitize_title
-from storygen.storage import paths
-from storygen.storage.save import delete_game, load_game, prune_subtree, save_game
+from storygen.storage.save import (
+    delete_game,
+    list_game_summaries,
+    load_game,
+    prune_subtree,
+    save_game,
+)
 from storygen.storage.tree import path_from_root
-from storygen_api.deps import build_pipeline, get_app_config, get_session_manager
+from storygen_api.deps import build_pipeline, get_session_manager
 from storygen_api.rate_limit import enforce_rate_limit
 from storygen_api.schemas import (
     AdvanceRequest,
@@ -72,75 +73,25 @@ def _node_to_detail(node: StoryNode) -> NodeDetail:
 
 @router.get("", response_model=GameListResponse)
 async def list_games() -> GameListResponse:
-    """List all saved games with summary metadata."""
-    root = paths.games_root()
-    if not root.exists():
-        return GameListResponse(games=[])
-    summaries: list[GameSummary] = []
-    for directory in root.iterdir():
-        if not directory.is_dir():
-            continue
-        game_file = directory / "game.json"
-        if not game_file.exists():
-            continue
-        try:
-            raw: object = json.loads(game_file.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if not isinstance(raw, dict):
-            continue
-        data = cast(dict[str, object], raw)
-        theme_obj = data.get("theme")
-        if not isinstance(theme_obj, dict):
-            continue
-        theme_data = cast(dict[str, object], theme_obj)
-        title = theme_data.get("title")
-        if not isinstance(title, str):
-            continue
-        game_id = directory.name
-        updated_at_raw = data.get("updated_at", "")
-        updated_at = (
-            datetime.fromisoformat(updated_at_raw)
-            if isinstance(updated_at_raw, str) and updated_at_raw
-            else datetime.min
-        )
-        nodes_obj = data.get("nodes")
-        node_count: int = 0
-        current_node: dict[str, object] | None = None
-        if isinstance(nodes_obj, dict):
-            typed_nodes = cast(dict[str, object], nodes_obj)
-            node_count = len(typed_nodes)
-            current_id = data.get("current_node_id")
-            if isinstance(current_id, str):
-                candidate = typed_nodes.get(current_id)
-                if isinstance(candidate, dict):
-                    current_node = cast(dict[str, object], candidate)
-        is_ending = False
-        if current_node is not None:
-            is_ending = bool(current_node.get("is_ending", False))
-        # Check if root node has cover art
-        has_cover = False
-        if isinstance(nodes_obj, dict):
-            typed_nodes = cast(dict[str, object], nodes_obj)
-            root_id = data.get("root_node_id")
-            if isinstance(root_id, str):
-                root_node_raw = typed_nodes.get(root_id)
-                if isinstance(root_node_raw, dict):
-                    root_node_data = cast(dict[str, object], root_node_raw)
-                    img_status = root_node_data.get("image_status")
-                    has_cover = img_status == "done"
-        summaries.append(
+    """List all saved games with summary metadata.
+
+    Delegates to :func:`storygen.storage.save.list_game_summaries` so the
+    schema-extraction logic lives in the storage layer (migration-aware,
+    single source of truth) rather than hand-parsing JSON in the router.
+    """
+    return GameListResponse(
+        games=[
             GameSummary(
-                id=game_id,
-                title=title,
-                updated_at=updated_at,
-                node_count=node_count,
-                is_ending=is_ending,
-                has_cover=has_cover,
+                id=s.id,
+                title=s.title,
+                updated_at=s.updated_at,
+                node_count=s.node_count,
+                is_ending=s.is_ending,
+                has_cover=s.has_cover,
             )
-        )
-    summaries.sort(key=lambda s: s.updated_at, reverse=True)
-    return GameListResponse(games=summaries)
+            for s in list_game_summaries()
+        ]
+    )
 
 
 @router.get("/{game_id}", response_model=GameDetail)
@@ -181,7 +132,6 @@ async def advance_game(
     game_id: str,
     body: AdvanceRequest,
     mgr: PipelineSessionManager = Depends(get_session_manager),
-    config: AppConfig = Depends(get_app_config),
 ) -> AdvanceResponse:
     """Pick a choice and advance the story."""
     # ARC-101: the manager owns the single live GameSave. ``get_or_load_save``
@@ -198,7 +148,7 @@ async def advance_game(
         pipeline = mgr.get_pipeline(game_id)
         if pipeline is None:
             callbacks = ws_manager.make_callbacks(game_id)
-            pipeline, _img = build_pipeline(save, config, callbacks=callbacks)
+            pipeline, _img = build_pipeline(save, callbacks=callbacks)
             mgr.get_or_create(game_id, save, pipeline)
 
         callbacks = ws_manager.make_callbacks(game_id)
@@ -318,7 +268,6 @@ async def regenerate_node(
     game_id: str,
     body: RegenerateNodeRequest,
     mgr: PipelineSessionManager = Depends(get_session_manager),
-    config: AppConfig = Depends(get_app_config),
 ) -> AdvanceResponse:
     """Regenerate the current node by pruning it and re-advending from parent."""
     # ARC-101/102: same single-owner + per-game-lock discipline as advance_game.
@@ -348,7 +297,7 @@ async def regenerate_node(
         pipeline = mgr.get_pipeline(game_id)
         if pipeline is None:
             callbacks = ws_manager.make_callbacks(game_id)
-            pipeline, _img = build_pipeline(save, config, callbacks=callbacks)
+            pipeline, _img = build_pipeline(save, callbacks=callbacks)
             mgr.get_or_create(game_id, save, pipeline)
 
         callbacks = ws_manager.make_callbacks(game_id)

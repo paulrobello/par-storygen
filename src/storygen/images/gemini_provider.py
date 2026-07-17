@@ -51,6 +51,10 @@ _MAX_REFERENCE_IMAGES = 14
 class GeminiImageProvider:
     """Implements :class:`storygen.images.base.ImageProvider` against Gemini."""
 
+    # ARC-115: Gemini supports reference images via inline
+    # ``Part.from_bytes`` entries in the ``contents`` list (up to 14 per call).
+    supports_reference_images: bool = True
+
     def __init__(
         self,
         *,

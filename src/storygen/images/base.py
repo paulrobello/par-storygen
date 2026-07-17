@@ -23,6 +23,13 @@ class ReferencePortrait(NamedTuple):
 class ImageProvider(Protocol):
     """Uniform surface for text-to-image backends."""
 
+    # ARC-115: static capability declaration. ``True`` means the provider
+    # accepts reference portraits/images (OpenAI ``images.edit``, Gemini
+    # inline ``Part.from_bytes``). ``False`` means references are silently
+    # dropped — the ``on_ref_loss`` toast still fires at runtime so users
+    # know the effective provider changed.
+    supports_reference_images: bool
+
     async def generate_portrait(
         self,
         description: str,

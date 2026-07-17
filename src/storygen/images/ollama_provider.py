@@ -21,11 +21,10 @@ from __future__ import annotations
 import base64
 from collections.abc import Awaitable, Callable
 
-import httpx
-import openai
-from openai import AsyncOpenAI, NotFoundError
+from openai import AsyncOpenAI
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
+from storygen.images._retry import is_retryable as _is_retryable
 from storygen.images.base import ReferencePortrait
 from storygen.images.prompts import build_portrait_prompt, build_scene_prompt
 
@@ -41,19 +40,6 @@ IMAGE_SIZE = "1024x1024"
 # non-empty string. Using the documented sentinel.
 _SENTINEL_API_KEY = "ollama"
 
-_RETRYABLE_EXCEPTIONS = (openai.APIError, httpx.TransportError)
-
-
-def _is_retryable(exc: BaseException) -> bool:
-    """Return True if ``exc`` should trigger a tenacity retry.
-
-    Excludes :class:`openai.NotFoundError` — a 404 from Ollama means the
-    model is not pulled locally, which is permanent until the user acts.
-    """
-    if isinstance(exc, NotFoundError):
-        return False
-    return isinstance(exc, _RETRYABLE_EXCEPTIONS)
-
 
 class OllamaImageProvider:
     """Implements :class:`storygen.images.base.ImageProvider` against Ollama.
@@ -61,6 +47,10 @@ class OllamaImageProvider:
     Requires Ollama ≥0.13.3 running locally on the same machine with an
     image-capable model pulled (e.g. ``ollama pull x/z-image-turbo``).
     """
+
+    # ARC-115: Ollama has no reference-image support. Scenes with refs fire
+    # ``on_ref_loss`` and are generated from the prompt alone.
+    supports_reference_images: bool = False
 
     def __init__(
         self,

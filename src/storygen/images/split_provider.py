@@ -13,6 +13,12 @@ class SplitImageProvider:
     def __init__(self, *, character_provider: ImageProvider, art_provider: ImageProvider) -> None:
         self._character_provider = character_provider
         self._art_provider = art_provider
+        # ARC-115: snapshot the art provider's capability. Scenes are the only
+        # call site that consumes reference portraits, so this split provider
+        # supports refs iff the art backend does. Capability is static (a class
+        # attribute on concrete providers), so a construction-time snapshot is
+        # correct and matches the ImageProvider protocol's plain-bool shape.
+        self.supports_reference_images: bool = art_provider.supports_reference_images
 
     async def generate_portrait(
         self,

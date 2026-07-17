@@ -22,6 +22,15 @@ when clicking through briskly. A bad loop or a leaked token would exceed it
 within seconds, capping cost exposure. Image regen is the most expensive
 single call (~$0.04 each for gpt-image-2 at default quality); 30/min bounds a
 runaway regen loop to ~$72 before an operator notices.
+
+SEC-106: the limiter keys on the **direct TCP peer** address
+(``request.client.host``) and deliberately ignores ``X-Forwarded-For`` /
+``Forwarded``, which are trivially spoofable by any client. Behind a reverse
+proxy (nginx, Caddy, Cloudflare) every upstream request appears to come from
+the proxy's address, so all clients share a single bucket — bind the server
+directly on loopback, or accept that the configured limit becomes a global
+ceiling across all proxied clients. Safe trusted-proxy parsing is out of
+scope for this single-process, single-worker deployment model.
 """
 
 from __future__ import annotations
@@ -159,6 +168,20 @@ def configure_rate_limit(spec: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+def check_rate_limit(key: str) -> None:
+    """Check and record a cost-incurring attempt for ``key``; raise 429 if over.
+
+    HTTP-dependency-free entry point. The :func:`enforce_rate_limit` FastAPI
+    dependency wraps this for HTTP routes; WebSocket handlers — which cannot
+    propagate an :class:`HTTPException` to the client — call this directly and
+    translate the 429 into an application-level error frame (SEC-103).
+
+    A rejected attempt is not recorded, so a client that keeps sending while
+    over quota does not extend its own window.
+    """
+    _limiter.check(key)
+
+
 def _client_ip(request: Request) -> str:
     """Return the requesting client's IP, or ``"unknown"`` if unavailable."""
     client = request.client
@@ -175,7 +198,7 @@ async def enforce_rate_limit(request: Request) -> None:
     per-IP matches the abuse vector (a single attacker host scripting calls).
     Auth (``verify_token``) runs alongside and prevents cross-user tampering.
     """
-    _limiter.check(_client_ip(request))
+    check_rate_limit(_client_ip(request))
 
 
 # Reusable alias so protected routes stay readable.

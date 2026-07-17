@@ -60,6 +60,25 @@ from storygen.widgets.image_util import pixels_from_image
 _logger = logging.getLogger(__name__)
 
 
+def _mount_terminal_image(widget: _PortraitThumb | _OutfitThumb, path: Path) -> None:
+    """Mount a TerminalImage onto a thumbnail widget.
+
+    Shared by :class:`_PortraitThumb` and :class:`_OutfitThumb`. Reads the
+    configured graphics protocol, force-selects it when not ``"auto"``, and
+    points the embedded :class:`TerminalImage` at ``path``. Failures are
+    debug-logged (never re-raised) so a thumbnail that can't render simply
+    stays blank instead of breaking the portraits grid.
+    """
+    try:
+        term = widget.query_one(TerminalImage)
+        mode = app_state.read_graphics_mode()
+        if mode != "auto":
+            term.force_protocol(mode)  # type: ignore[arg-type]
+        term.image = path
+    except Exception:
+        _logger.debug("terminal image mount failed for %s", path, exc_info=True)
+
+
 def _resize_contain(im: Image.Image, width: int, height: int) -> Image.Image:
     """Resize image to fit inside *width* x *height* without cropping."""
     thumb = im.convert("RGBA")
@@ -170,14 +189,7 @@ class _OutfitThumb(Grid):
         yield TerminalImage()
 
     def on_mount(self) -> None:
-        try:
-            term = self.query_one(TerminalImage)
-            mode = app_state.read_graphics_mode()
-            if mode != "auto":
-                term.force_protocol(mode)  # type: ignore[arg-type]
-            term.image = self._image_path
-        except Exception:
-            pass
+        _mount_terminal_image(self, self._image_path)
 
 
 class _PortraitThumb(Grid):
@@ -202,14 +214,7 @@ class _PortraitThumb(Grid):
         yield TerminalImage()
 
     def on_mount(self) -> None:
-        try:
-            term = self.query_one(TerminalImage)
-            mode = app_state.read_graphics_mode()
-            if mode != "auto":
-                term.force_protocol(mode)  # type: ignore[arg-type]
-            term.image = self._image_path
-        except Exception:
-            pass
+        _mount_terminal_image(self, self._image_path)
 
     def on_click(self) -> None:
         open_in_system_viewer(self._image_path)

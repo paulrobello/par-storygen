@@ -30,10 +30,10 @@ import os
 from collections.abc import Awaitable, Callable
 
 import httpx
-import openai
-from openai import AsyncOpenAI, NotFoundError
+from openai import AsyncOpenAI
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
+from storygen.images._retry import is_retryable as _is_retryable
 from storygen.images.base import ReferencePortrait
 from storygen.images.prompts import build_portrait_prompt, build_scene_prompt
 
@@ -50,23 +50,6 @@ IMAGE_SIZE = "1280x1280"
 # instead of letting the user see a misleading 401 referencing "zai-missing".
 _MISSING_KEY_SENTINEL = "zai-missing"
 
-# Retries target transient API + network faults. We deliberately do NOT retry
-# on ``httpx.HTTPStatusError`` — a 4xx from the image URL fetch is almost
-# always permanent (expired URL, 404 on delayed generation). Nor do we retry
-# ``openai.NotFoundError`` (subclass of ``APIError``): that means the model id
-# is wrong, which will not fix itself on retry.
-_RETRYABLE_EXCEPTIONS = (openai.APIError, httpx.TransportError)
-
-
-def _is_retryable(exc: BaseException) -> bool:
-    """Return True if ``exc`` should trigger a tenacity retry.
-
-    Excludes :class:`openai.NotFoundError` — permanent misconfiguration.
-    """
-    if isinstance(exc, NotFoundError):
-        return False
-    return isinstance(exc, _RETRYABLE_EXCEPTIONS)
-
 
 class ZaiImageProvider:
     """Implements :class:`storygen.images.base.ImageProvider` against Z.AI GLM-image.
@@ -76,6 +59,10 @@ class ZaiImageProvider:
     least once per provider instance; may fire more than once under rare
     concurrent-call races) and the scene is generated without them.
     """
+
+    # ARC-115: Z.AI has no reference-image support. Scenes with refs fire
+    # ``on_ref_loss`` and are generated from the prompt alone.
+    supports_reference_images: bool = False
 
     def __init__(
         self,

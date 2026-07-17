@@ -1,0 +1,3534 @@
+{
+  "components": {
+    "schemas": {
+      "AdvanceRequest": {
+        "properties": {
+          "choice_id": {
+            "title": "Choice Id",
+            "type": "string"
+          },
+          "from_node_id": {
+            "title": "From Node Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "choice_id",
+          "from_node_id"
+        ],
+        "title": "AdvanceRequest",
+        "type": "object"
+      },
+      "AdvanceResponse": {
+        "properties": {
+          "image_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Status"
+          },
+          "new_characters": {
+            "items": {
+              "$ref": "#/components/schemas/Character"
+            },
+            "title": "New Characters",
+            "type": "array"
+          },
+          "node": {
+            "$ref": "#/components/schemas/NodeDetail"
+          }
+        },
+        "required": [
+          "node",
+          "new_characters"
+        ],
+        "title": "AdvanceResponse",
+        "type": "object"
+      },
+      "Body_upload_reference_image_api_characters__library_id__reference_image_post": {
+        "properties": {
+          "image": {
+            "contentMediaType": "application/octet-stream",
+            "title": "Image",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image"
+        ],
+        "title": "Body_upload_reference_image_api_characters__library_id__reference_image_post",
+        "type": "object"
+      },
+      "Character": {
+        "description": "A character who appears in the story.",
+        "properties": {
+          "backstory": {
+            "title": "Backstory",
+            "type": "string"
+          },
+          "backstory_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backstory Summary"
+          },
+          "current_outfit_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Outfit Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "introduced_at_node_id": {
+            "title": "Introduced At Node Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "outfits": {
+            "items": {
+              "$ref": "#/components/schemas/CharacterOutfit"
+            },
+            "title": "Outfits",
+            "type": "array"
+          },
+          "personality": {
+            "title": "Personality",
+            "type": "string"
+          },
+          "physical_description": {
+            "title": "Physical Description",
+            "type": "string"
+          },
+          "portrait_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portrait Path"
+          },
+          "portrait_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portrait Prompt"
+          },
+          "reference_image_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Image Path"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "backstory",
+          "personality",
+          "physical_description",
+          "introduced_at_node_id"
+        ],
+        "title": "Character",
+        "type": "object"
+      },
+      "CharacterCreateRequest": {
+        "properties": {
+          "concept": {
+            "title": "Concept",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "concept"
+        ],
+        "title": "CharacterCreateRequest",
+        "type": "object"
+      },
+      "CharacterExportRequest": {
+        "properties": {
+          "backstory": {
+            "title": "Backstory",
+            "type": "string"
+          },
+          "character_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Character Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "personality": {
+            "title": "Personality",
+            "type": "string"
+          },
+          "physical_description": {
+            "title": "Physical Description",
+            "type": "string"
+          },
+          "portrait_prompt": {
+            "default": "",
+            "title": "Portrait Prompt",
+            "type": "string"
+          },
+          "save_id": {
+            "default": "",
+            "title": "Save Id",
+            "type": "string"
+          },
+          "save_title": {
+            "default": "",
+            "title": "Save Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "backstory",
+          "personality",
+          "physical_description"
+        ],
+        "title": "CharacterExportRequest",
+        "type": "object"
+      },
+      "CharacterLibraryEntry": {
+        "properties": {
+          "backstory": {
+            "title": "Backstory",
+            "type": "string"
+          },
+          "exported_at": {
+            "format": "date-time",
+            "title": "Exported At",
+            "type": "string"
+          },
+          "has_portrait": {
+            "default": false,
+            "title": "Has Portrait",
+            "type": "boolean"
+          },
+          "has_reference_image": {
+            "default": false,
+            "title": "Has Reference Image",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "personality": {
+            "title": "Personality",
+            "type": "string"
+          },
+          "physical_description": {
+            "title": "Physical Description",
+            "type": "string"
+          },
+          "portrait_prompt": {
+            "title": "Portrait Prompt",
+            "type": "string"
+          },
+          "reference_image_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Image Path"
+          },
+          "source": {
+            "default": "export",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "backstory",
+          "personality",
+          "physical_description",
+          "portrait_prompt",
+          "exported_at"
+        ],
+        "title": "CharacterLibraryEntry",
+        "type": "object"
+      },
+      "CharacterLibraryResponse": {
+        "properties": {
+          "characters": {
+            "items": {
+              "$ref": "#/components/schemas/CharacterLibraryEntry"
+            },
+            "title": "Characters",
+            "type": "array"
+          }
+        },
+        "required": [
+          "characters"
+        ],
+        "title": "CharacterLibraryResponse",
+        "type": "object"
+      },
+      "CharacterOutfit": {
+        "description": "A named outfit variant for a character — its own portrait + prompt.\n\nOutfits are sidecar references stored on ``Character.outfits``. Setting one\nas current copies its ``portrait_path`` / ``portrait_prompt`` into the\ncharacter's main fields, so scene-generation code (which reads\n``Character.portrait_path``) picks the active outfit up automatically.\n\nAttributes:\n    id: Stable identifier (uuid4 hex, 32 lowercase chars).\n    name: Human-readable label (e.g. ``\"casual\"``, ``\"ballroom gown\"``).\n    description: Prompt addition describing the outfit (e.g. ``\"wearing a\n        red gown with gold trim\"``).\n    portrait_path: Outfit portrait path, relative to the save directory\n        (mirrors ``Character.portrait_path`` storage convention).\n    portrait_prompt: Full prompt used to generate the portrait, retained so\n        the outfit can be regenerated later with identical wording.\n    created_at: When the outfit was added. Required — caller passes\n        ``datetime.now(UTC)`` at creation time.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "portrait_path": {
+            "title": "Portrait Path",
+            "type": "string"
+          },
+          "portrait_prompt": {
+            "title": "Portrait Prompt",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "portrait_path",
+          "portrait_prompt",
+          "created_at"
+        ],
+        "title": "CharacterOutfit",
+        "type": "object"
+      },
+      "CharacterUpdateRequest": {
+        "properties": {
+          "backstory": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backstory"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "personality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Personality"
+          },
+          "physical_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Physical Description"
+          },
+          "portrait_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portrait Prompt"
+          }
+        },
+        "title": "CharacterUpdateRequest",
+        "type": "object"
+      },
+      "ChoiceOption": {
+        "properties": {
+          "child_node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Child Node Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text"
+        ],
+        "title": "ChoiceOption",
+        "type": "object"
+      },
+      "GameDetail": {
+        "properties": {
+          "art_style": {
+            "title": "Art Style",
+            "type": "string"
+          },
+          "characters": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Characters",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_node_id": {
+            "title": "Current Node Id",
+            "type": "string"
+          },
+          "endings_reached": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Endings Reached",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "nodes": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/NodeDetail"
+            },
+            "title": "Nodes",
+            "type": "object"
+          },
+          "relationships": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Relationships",
+            "type": "array"
+          },
+          "root_node_id": {
+            "title": "Root Node Id",
+            "type": "string"
+          },
+          "text_total_input_tokens": {
+            "default": 0,
+            "title": "Text Total Input Tokens",
+            "type": "integer"
+          },
+          "text_total_output_tokens": {
+            "default": 0,
+            "title": "Text Total Output Tokens",
+            "type": "integer"
+          },
+          "text_total_requests": {
+            "default": 0,
+            "title": "Text Total Requests",
+            "type": "integer"
+          },
+          "theme": {
+            "additionalProperties": true,
+            "title": "Theme",
+            "type": "object"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tone": {
+            "additionalProperties": true,
+            "title": "Tone",
+            "type": "object"
+          },
+          "total_image_cost_usd": {
+            "default": 0.0,
+            "title": "Total Image Cost Usd",
+            "type": "number"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "theme",
+          "tone",
+          "characters",
+          "current_node_id",
+          "root_node_id",
+          "nodes",
+          "endings_reached",
+          "art_style",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "GameDetail",
+        "type": "object"
+      },
+      "GameListResponse": {
+        "properties": {
+          "games": {
+            "items": {
+              "$ref": "#/components/schemas/GameSummary"
+            },
+            "title": "Games",
+            "type": "array"
+          }
+        },
+        "required": [
+          "games"
+        ],
+        "title": "GameListResponse",
+        "type": "object"
+      },
+      "GameSummary": {
+        "properties": {
+          "has_cover": {
+            "default": false,
+            "title": "Has Cover",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "is_ending": {
+            "title": "Is Ending",
+            "type": "boolean"
+          },
+          "node_count": {
+            "title": "Node Count",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "updated_at",
+          "node_count",
+          "is_ending"
+        ],
+        "title": "GameSummary",
+        "type": "object"
+      },
+      "GraphEdge": {
+        "properties": {
+          "child_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Child Id"
+          },
+          "choice_text": {
+            "title": "Choice Text",
+            "type": "string"
+          },
+          "parent_id": {
+            "title": "Parent Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "parent_id",
+          "choice_text"
+        ],
+        "title": "GraphEdge",
+        "type": "object"
+      },
+      "GraphResponse": {
+        "properties": {
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/GraphEdge"
+            },
+            "title": "Edges",
+            "type": "array"
+          }
+        },
+        "required": [
+          "edges"
+        ],
+        "title": "GraphResponse",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "JumpRequest": {
+        "properties": {
+          "target_node_id": {
+            "title": "Target Node Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_node_id"
+        ],
+        "title": "JumpRequest",
+        "type": "object"
+      },
+      "NodeDetail": {
+        "properties": {
+          "choices": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ChoiceOption"
+            },
+            "title": "Choices",
+            "type": "array"
+          },
+          "chosen_choice_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chosen Choice Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "image_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Path"
+          },
+          "image_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Prompt"
+          },
+          "image_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Status"
+          },
+          "is_ending": {
+            "title": "Is Ending",
+            "type": "boolean"
+          },
+          "is_major": {
+            "title": "Is Major",
+            "type": "boolean"
+          },
+          "narration": {
+            "title": "Narration",
+            "type": "string"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "summary_to_here": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary To Here"
+          }
+        },
+        "required": [
+          "id",
+          "narration",
+          "is_major",
+          "is_ending",
+          "created_at"
+        ],
+        "title": "NodeDetail",
+        "type": "object"
+      },
+      "OutfitRequest": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "description"
+        ],
+        "title": "OutfitRequest",
+        "type": "object"
+      },
+      "PortraitEditRequest": {
+        "properties": {
+          "art_style": {
+            "default": "children's story book",
+            "title": "Art Style",
+            "type": "string"
+          },
+          "mode": {
+            "default": "edit",
+            "title": "Mode",
+            "type": "string"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "use_current_as_ref": {
+            "default": false,
+            "title": "Use Current As Ref",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "title": "PortraitEditRequest",
+        "type": "object"
+      },
+      "PortraitRegenerateRequest": {
+        "properties": {
+          "art_style": {
+            "default": "children's story book",
+            "title": "Art Style",
+            "type": "string"
+          }
+        },
+        "title": "PortraitRegenerateRequest",
+        "type": "object"
+      },
+      "PruneRequest": {
+        "properties": {
+          "node_id": {
+            "title": "Node Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id"
+        ],
+        "title": "PruneRequest",
+        "type": "object"
+      },
+      "RegenerateNodeRequest": {
+        "description": "Re-roll the current node by pruning it and re-advancing from the parent.",
+        "properties": {},
+        "title": "RegenerateNodeRequest",
+        "type": "object"
+      },
+      "SceneEditRequest": {
+        "properties": {
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "title": "SceneEditRequest",
+        "type": "object"
+      },
+      "SettingsResponse": {
+        "properties": {
+          "art_enabled": {
+            "default": true,
+            "title": "Art Enabled",
+            "type": "boolean"
+          },
+          "auto_open_art_enabled": {
+            "default": false,
+            "title": "Auto Open Art Enabled",
+            "type": "boolean"
+          },
+          "auto_recap_enabled": {
+            "default": false,
+            "title": "Auto Recap Enabled",
+            "type": "boolean"
+          },
+          "auto_select_enabled": {
+            "default": false,
+            "title": "Auto Select Enabled",
+            "type": "boolean"
+          },
+          "character_image_provider": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Character Image Provider",
+            "type": "object"
+          },
+          "graphics_mode": {
+            "default": "halfblock",
+            "title": "Graphics Mode",
+            "type": "string"
+          },
+          "image_provider": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Image Provider",
+            "type": "object"
+          },
+          "image_streaming_enabled": {
+            "default": false,
+            "title": "Image Streaming Enabled",
+            "type": "boolean"
+          },
+          "llm_cache_enabled": {
+            "default": false,
+            "title": "Llm Cache Enabled",
+            "type": "boolean"
+          },
+          "prefetch_enabled": {
+            "default": false,
+            "title": "Prefetch Enabled",
+            "type": "boolean"
+          },
+          "prefetch_images_enabled": {
+            "default": false,
+            "title": "Prefetch Images Enabled",
+            "type": "boolean"
+          },
+          "recap_interval": {
+            "default": 3,
+            "title": "Recap Interval",
+            "type": "integer"
+          },
+          "resume_recap_enabled": {
+            "default": true,
+            "title": "Resume Recap Enabled",
+            "type": "boolean"
+          },
+          "text_provider": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Text Provider",
+            "type": "object"
+          },
+          "tts_prefs": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Tts Prefs",
+            "type": "object"
+          },
+          "wizard_defaults": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Wizard Defaults",
+            "type": "object"
+          }
+        },
+        "title": "SettingsResponse",
+        "type": "object"
+      },
+      "SettingsUpdateRequest": {
+        "properties": {
+          "art_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Art Enabled"
+          },
+          "auto_open_art_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Open Art Enabled"
+          },
+          "auto_recap_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Recap Enabled"
+          },
+          "auto_select_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Select Enabled"
+          },
+          "character_image_provider": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Character Image Provider"
+          },
+          "graphics_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graphics Mode"
+          },
+          "image_provider": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Provider"
+          },
+          "image_streaming_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Streaming Enabled"
+          },
+          "llm_cache_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Cache Enabled"
+          },
+          "prefetch_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prefetch Enabled"
+          },
+          "prefetch_images_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prefetch Images Enabled"
+          },
+          "recap_interval": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recap Interval"
+          },
+          "resume_recap_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Recap Enabled"
+          },
+          "text_provider": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Provider"
+          },
+          "tts_prefs": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tts Prefs"
+          },
+          "wizard_defaults": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wizard Defaults"
+          }
+        },
+        "title": "SettingsUpdateRequest",
+        "type": "object"
+      },
+      "StoryImportRequest": {
+        "properties": {
+          "character_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Character Ids",
+            "type": "array"
+          },
+          "save_id": {
+            "title": "Save Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "save_id",
+          "character_ids"
+        ],
+        "title": "StoryImportRequest",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "WizardCharactersRequest": {
+        "properties": {
+          "imported_characters": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Imported Characters",
+            "type": "array"
+          },
+          "prompt": {
+            "default": "",
+            "title": "Prompt",
+            "type": "string"
+          },
+          "theme": {
+            "additionalProperties": true,
+            "title": "Theme",
+            "type": "object"
+          }
+        },
+        "required": [
+          "theme"
+        ],
+        "title": "WizardCharactersRequest",
+        "type": "object"
+      },
+      "WizardCharactersResponse": {
+        "properties": {
+          "characters": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Characters",
+            "type": "array"
+          }
+        },
+        "required": [
+          "characters"
+        ],
+        "title": "WizardCharactersResponse",
+        "type": "object"
+      },
+      "WizardConfirmRequest": {
+        "properties": {
+          "art_style": {
+            "default": "children's story book",
+            "title": "Art Style",
+            "type": "string"
+          },
+          "character_prompt": {
+            "default": "",
+            "title": "Character Prompt",
+            "type": "string"
+          },
+          "characters": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Characters",
+            "type": "array"
+          },
+          "narration_style": {
+            "default": "third_person",
+            "title": "Narration Style",
+            "type": "string"
+          },
+          "pacing": {
+            "default": "moderate",
+            "title": "Pacing",
+            "type": "string"
+          },
+          "reader_level": {
+            "default": "ages_11_15",
+            "title": "Reader Level",
+            "type": "string"
+          },
+          "target_major_beats": {
+            "default": 5,
+            "title": "Target Major Beats",
+            "type": "integer"
+          },
+          "theme": {
+            "additionalProperties": true,
+            "title": "Theme",
+            "type": "object"
+          },
+          "theme_prompt": {
+            "default": "",
+            "title": "Theme Prompt",
+            "type": "string"
+          },
+          "tone": {
+            "additionalProperties": true,
+            "title": "Tone",
+            "type": "object"
+          }
+        },
+        "required": [
+          "theme",
+          "tone",
+          "characters"
+        ],
+        "title": "WizardConfirmRequest",
+        "type": "object"
+      },
+      "WizardConfirmResponse": {
+        "properties": {
+          "game_id": {
+            "title": "Game Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "game_id",
+          "title"
+        ],
+        "title": "WizardConfirmResponse",
+        "type": "object"
+      },
+      "WizardThemeRequest": {
+        "properties": {
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "title": "WizardThemeRequest",
+        "type": "object"
+      },
+      "WizardThemeResponse": {
+        "properties": {
+          "theme": {
+            "additionalProperties": true,
+            "title": "Theme",
+            "type": "object"
+          }
+        },
+        "required": [
+          "theme"
+        ],
+        "title": "WizardThemeResponse",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "par-storygen API"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/characters": {
+      "get": {
+        "description": "List all library characters.",
+        "operationId": "list_characters_api_characters_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterLibraryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Characters",
+        "tags": [
+          "characters"
+        ]
+      },
+      "post": {
+        "description": "Export a character to the library.",
+        "operationId": "export_character_api_characters_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CharacterExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterLibraryEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Character",
+        "tags": [
+          "characters"
+        ]
+      }
+    },
+    "/api/characters/create": {
+      "post": {
+        "description": "Create a new library character via LLM from a concept description.",
+        "operationId": "create_character_api_characters_create_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CharacterCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterLibraryEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Character",
+        "tags": [
+          "characters"
+        ]
+      }
+    },
+    "/api/characters/import-from-story": {
+      "post": {
+        "description": "Import characters from a saved game into the library.",
+        "operationId": "import_from_story_api_characters_import_from_story_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoryImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CharacterLibraryEntry"
+                  },
+                  "title": "Response Import From Story Api Characters Import From Story Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import From Story",
+        "tags": [
+          "characters"
+        ]
+      }
+    },
+    "/api/characters/{library_id}": {
+      "delete": {
+        "description": "Remove a character from the library.",
+        "operationId": "delete_character_api_characters__library_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "library_id",
+            "required": true,
+            "schema": {
+              "title": "Library Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Character",
+        "tags": [
+          "characters"
+        ]
+      },
+      "get": {
+        "description": "Get a single library character.",
+        "operationId": "get_character_api_characters__library_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "library_id",
+            "required": true,
+            "schema": {
+              "title": "Library Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterLibraryEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Character",
+        "tags": [
+          "characters"
+        ]
+      },
+      "put": {
+        "description": "Edit character fields.",
+        "operationId": "update_character_api_characters__library_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "library_id",
+            "required": true,
+            "schema": {
+              "title": "Library Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CharacterUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterLibraryEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Character",
+        "tags": [
+          "characters"
+        ]
+      }
+    },
+    "/api/characters/{library_id}/edit-portrait": {
+      "post": {
+        "description": "Edit portrait prompt and regenerate.",
+        "operationId": "edit_portrait_api_characters__library_id__edit_portrait_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "library_id",
+            "required": true,
+            "schema": {
+              "title": "Library Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortraitEditRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterLibraryEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Portrait",
+        "tags": [
+          "characters"
+        ]
+      }
+    },
+    "/api/characters/{library_id}/portrait": {
+      "get": {
+        "description": "Serve a library character's portrait PNG.",
+        "operationId": "get_character_portrait_api_characters__library_id__portrait_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "library_id",
+            "required": true,
+            "schema": {
+              "title": "Library Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Character Portrait",
+        "tags": [
+          "characters"
+        ]
+      }
+    },
+    "/api/characters/{library_id}/reference-image": {
+      "delete": {
+        "description": "Remove a character's reference image.",
+        "operationId": "delete_reference_image_api_characters__library_id__reference_image_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "library_id",
+            "required": true,
+            "schema": {
+              "title": "Library Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterLibraryEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Reference Image",
+        "tags": [
+          "characters"
+        ]
+      },
+      "get": {
+        "description": "Serve a library character's reference image PNG.",
+        "operationId": "get_reference_image_api_characters__library_id__reference_image_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "library_id",
+            "required": true,
+            "schema": {
+              "title": "Library Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Reference Image",
+        "tags": [
+          "characters"
+        ]
+      },
+      "post": {
+        "description": "Upload a reference image for a library character.\n\nAccepts multipart form with ``image`` file and ``mode`` field\n(``\"use_as_is\"`` or ``\"style_transfer\"``).",
+        "operationId": "upload_reference_image_api_characters__library_id__reference_image_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "library_id",
+            "required": true,
+            "schema": {
+              "title": "Library Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "style_transfer",
+              "title": "Mode",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_reference_image_api_characters__library_id__reference_image_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterLibraryEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Reference Image",
+        "tags": [
+          "characters"
+        ]
+      }
+    },
+    "/api/characters/{library_id}/regenerate-portrait": {
+      "post": {
+        "description": "Regenerate a library character's portrait using their stored portrait_prompt.",
+        "operationId": "regenerate_portrait_api_characters__library_id__regenerate_portrait_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "library_id",
+            "required": true,
+            "schema": {
+              "title": "Library Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortraitRegenerateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterLibraryEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Regenerate Portrait",
+        "tags": [
+          "characters"
+        ]
+      }
+    },
+    "/api/games": {
+      "get": {
+        "description": "List all saved games with summary metadata.\n\nDelegates to :func:`storygen.storage.save.list_game_summaries` so the\nschema-extraction logic lives in the storage layer (migration-aware,\nsingle source of truth) rather than hand-parsing JSON in the router.",
+        "operationId": "list_games_api_games_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Games",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/games/{game_id}": {
+      "delete": {
+        "description": "Delete a game save.",
+        "operationId": "delete_game_endpoint_api_games__game_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Game Endpoint",
+        "tags": [
+          "games"
+        ]
+      },
+      "get": {
+        "description": "Return full game state.",
+        "operationId": "get_game_api_games__game_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Game",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/games/{game_id}/advance": {
+      "post": {
+        "description": "Pick a choice and advance the story.",
+        "operationId": "advance_game_api_games__game_id__advance_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdvanceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdvanceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Advance Game",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/games/{game_id}/endings": {
+      "get": {
+        "description": "List reached ending node IDs.",
+        "operationId": "list_endings_api_games__game_id__endings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response List Endings Api Games  Game Id  Endings Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Endings",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/games/{game_id}/export-book": {
+      "post": {
+        "description": "Export the current ending path as an HTML book.",
+        "operationId": "export_book_endpoint_api_games__game_id__export_book_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Export Book Endpoint Api Games  Game Id  Export Book Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Book Endpoint",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/games/{game_id}/export-book/download": {
+      "get": {
+        "description": "Download the exported HTML book as a file.",
+        "operationId": "download_book_api_games__game_id__export_book_download_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download Book",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/games/{game_id}/graph": {
+      "get": {
+        "description": "Return all choice edges for the story graph (visited + unvisited).",
+        "operationId": "get_graph_api_games__game_id__graph_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Graph",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/games/{game_id}/jump": {
+      "post": {
+        "description": "Set the current node to a target node.",
+        "operationId": "jump_to_node_api_games__game_id__jump_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JumpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Jump To Node",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/games/{game_id}/path": {
+      "get": {
+        "description": "Return the path from root to target node.",
+        "operationId": "get_path_api_games__game_id__path_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "target_node_id",
+            "required": true,
+            "schema": {
+              "title": "Target Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NodeDetail"
+                  },
+                  "title": "Response Get Path Api Games  Game Id  Path Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Path",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/games/{game_id}/prune": {
+      "post": {
+        "description": "Prune a subtree starting at the given node.",
+        "operationId": "prune_subtree_endpoint_api_games__game_id__prune_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PruneRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Prune Subtree Endpoint Api Games  Game Id  Prune Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Prune Subtree Endpoint",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/games/{game_id}/regenerate-node": {
+      "post": {
+        "description": "Regenerate the current node by pruning it and re-advending from parent.",
+        "operationId": "regenerate_node_api_games__game_id__regenerate_node_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegenerateNodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdvanceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Regenerate Node",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/health": {
+      "get": {
+        "operationId": "_health_api_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response  Health Api Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": " Health"
+      }
+    },
+    "/api/images/{game_id}/cover/regenerate": {
+      "post": {
+        "description": "Regenerate the cover art (root node scene image).",
+        "operationId": "regenerate_cover_api_images__game_id__cover_regenerate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Regenerate Cover Api Images  Game Id  Cover Regenerate Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Regenerate Cover",
+        "tags": [
+          "images"
+        ]
+      }
+    },
+    "/api/images/{game_id}/portrait/{char_id}": {
+      "get": {
+        "description": "Serve the latest character portrait PNG.",
+        "operationId": "get_portrait_image_api_images__game_id__portrait__char_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "char_id",
+            "required": true,
+            "schema": {
+              "title": "Char Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Portrait Image",
+        "tags": [
+          "images"
+        ]
+      }
+    },
+    "/api/images/{game_id}/portrait/{char_id}/edit": {
+      "post": {
+        "description": "Edit a character portrait prompt and regenerate.",
+        "operationId": "edit_portrait_api_images__game_id__portrait__char_id__edit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "char_id",
+            "required": true,
+            "schema": {
+              "title": "Char Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortraitEditRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Edit Portrait Api Images  Game Id  Portrait  Char Id  Edit Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Portrait",
+        "tags": [
+          "images"
+        ]
+      }
+    },
+    "/api/images/{game_id}/portrait/{char_id}/outfit": {
+      "post": {
+        "description": "Create a new outfit for a character and generate its portrait.",
+        "operationId": "add_outfit_api_images__game_id__portrait__char_id__outfit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "char_id",
+            "required": true,
+            "schema": {
+              "title": "Char Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OutfitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Add Outfit Api Images  Game Id  Portrait  Char Id  Outfit Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Outfit",
+        "tags": [
+          "images"
+        ]
+      }
+    },
+    "/api/images/{game_id}/portrait/{char_id}/outfit/revert": {
+      "post": {
+        "description": "Revert to the base portrait (unset current outfit).",
+        "operationId": "revert_outfit_api_images__game_id__portrait__char_id__outfit_revert_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "char_id",
+            "required": true,
+            "schema": {
+              "title": "Char Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Revert Outfit Api Images  Game Id  Portrait  Char Id  Outfit Revert Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revert Outfit",
+        "tags": [
+          "images"
+        ]
+      }
+    },
+    "/api/images/{game_id}/portrait/{char_id}/outfit/{outfit_id}": {
+      "delete": {
+        "description": "Delete an outfit.",
+        "operationId": "delete_outfit_api_images__game_id__portrait__char_id__outfit__outfit_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "char_id",
+            "required": true,
+            "schema": {
+              "title": "Char Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "outfit_id",
+            "required": true,
+            "schema": {
+              "title": "Outfit Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Delete Outfit Api Images  Game Id  Portrait  Char Id  Outfit  Outfit Id  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Outfit",
+        "tags": [
+          "images"
+        ]
+      }
+    },
+    "/api/images/{game_id}/portrait/{char_id}/outfit/{outfit_id}/set": {
+      "post": {
+        "description": "Set an outfit as the current active outfit.",
+        "operationId": "set_outfit_api_images__game_id__portrait__char_id__outfit__outfit_id__set_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "char_id",
+            "required": true,
+            "schema": {
+              "title": "Char Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "outfit_id",
+            "required": true,
+            "schema": {
+              "title": "Outfit Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Set Outfit Api Images  Game Id  Portrait  Char Id  Outfit  Outfit Id  Set Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Outfit",
+        "tags": [
+          "images"
+        ]
+      }
+    },
+    "/api/images/{game_id}/portrait/{char_id}/retry": {
+      "post": {
+        "description": "Retry (regenerate) a character portrait using the stored portrait_prompt.",
+        "operationId": "retry_portrait_api_images__game_id__portrait__char_id__retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "char_id",
+            "required": true,
+            "schema": {
+              "title": "Char Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Retry Portrait Api Images  Game Id  Portrait  Char Id  Retry Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retry Portrait",
+        "tags": [
+          "images"
+        ]
+      }
+    },
+    "/api/images/{game_id}/scene/{node_id}": {
+      "get": {
+        "description": "Serve a scene PNG for a story node.",
+        "operationId": "get_scene_image_api_images__game_id__scene__node_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Scene Image",
+        "tags": [
+          "images"
+        ]
+      }
+    },
+    "/api/images/{game_id}/scene/{node_id}/edit": {
+      "post": {
+        "description": "Edit scene prompt and regenerate.",
+        "operationId": "edit_scene_api_images__game_id__scene__node_id__edit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SceneEditRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Edit Scene Api Images  Game Id  Scene  Node Id  Edit Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Scene",
+        "tags": [
+          "images"
+        ]
+      }
+    },
+    "/api/images/{game_id}/scene/{node_id}/retry": {
+      "post": {
+        "description": "Retry scene image generation for a node.",
+        "operationId": "retry_scene_api_images__game_id__scene__node_id__retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Retry Scene Api Images  Game Id  Scene  Node Id  Retry Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retry Scene",
+        "tags": [
+          "images"
+        ]
+      }
+    },
+    "/api/presets": {
+      "get": {
+        "operationId": "list_presets_api_presets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Presets Api Presets Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Presets",
+        "tags": [
+          "presets"
+        ]
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "description": "Return the full application state.",
+        "operationId": "get_settings_api_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Settings",
+        "tags": [
+          "settings"
+        ]
+      },
+      "put": {
+        "description": "Write settings and return the updated state.\n\nSEC-002: provider ``base_url`` values are validated against a curated\nallowlist (and private/link-local IP ranges are rejected) before being\npersisted, so the next outbound LLM/image request cannot leak the user's\nAPI key to an attacker-controlled host.",
+        "operationId": "update_settings_api_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Settings",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/tts/{game_id}/{node_id}/audio": {
+      "get": {
+        "description": "Serve cached TTS audio for a node.",
+        "operationId": "get_tts_audio_api_tts__game_id___node_id__audio_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Tts Audio",
+        "tags": [
+          "tts"
+        ]
+      }
+    },
+    "/api/tts/{game_id}/{node_id}/generate": {
+      "post": {
+        "description": "Generate TTS audio for a node's narration and return the audio URL.",
+        "operationId": "generate_tts_api_tts__game_id___node_id__generate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Generate Tts",
+        "tags": [
+          "tts"
+        ]
+      }
+    },
+    "/api/tts/{game_id}/{node_id}/status": {
+      "get": {
+        "description": "Check if TTS audio exists for a node.",
+        "operationId": "tts_status_api_tts__game_id___node_id__status_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tts Status",
+        "tags": [
+          "tts"
+        ]
+      }
+    },
+    "/api/wizard/characters": {
+      "post": {
+        "description": "Generate characters for a theme.",
+        "operationId": "wizard_characters_api_wizard_characters_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WizardCharactersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WizardCharactersResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Wizard Characters",
+        "tags": [
+          "wizard"
+        ]
+      }
+    },
+    "/api/wizard/confirm": {
+      "post": {
+        "description": "Build the initial save and generate portraits.",
+        "operationId": "wizard_confirm_api_wizard_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WizardConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WizardConfirmResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Wizard Confirm",
+        "tags": [
+          "wizard"
+        ]
+      }
+    },
+    "/api/wizard/theme": {
+      "post": {
+        "description": "Generate a story theme from a prompt.",
+        "operationId": "wizard_theme_api_wizard_theme_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WizardThemeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WizardThemeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Wizard Theme",
+        "tags": [
+          "wizard"
+        ]
+      }
+    }
+  }
+}

@@ -11,6 +11,8 @@ from storygen.images.split_provider import SplitImageProvider
 
 
 class _FakeProvider:
+    supports_reference_images: bool = True
+
     def __init__(self, *, portrait_bytes: bytes, scene_bytes: bytes) -> None:
         self._portrait_bytes = portrait_bytes
         self._scene_bytes = scene_bytes

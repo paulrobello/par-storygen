@@ -615,7 +615,7 @@ class PlayScreen(Screen[None]):
                     )
                     save_game(self._save)
                 self._image.show_generating()
-                self.notify("Regenerating scene image…", timeout=60)  # pyright: ignore[reportUnknownMemberType]
+                self.notify("Regenerating scene image…", timeout=60)
                 self.run_worker(self.action_retry_image(), name="regen-retry")
             elif action == "edit_regen_image":
                 self.run_worker(self.action_edit_regen_image(), name="regen-edit")

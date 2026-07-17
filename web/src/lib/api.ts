@@ -92,6 +92,35 @@ export interface StoryNode {
   created_at: string;
 }
 
+/**
+ * Field defaults for a {@link StoryNode} (QA-014).
+ *
+ * Used as the base layer in a defaults-spread merge so that fields the server
+ * adds in the future pass through via the existing-node spread, instead of
+ * being silently dropped by an explicit field-by-field reconstruction. The
+ * dynamic default (``created_at``) is still applied at the call site because a
+ * module-level const would freeze the timestamp at import time.
+ */
+export const NODE_DEFAULTS: StoryNode = {
+  id: "",
+  parent_id: null,
+  chosen_choice_id: null,
+  chosen_at: null,
+  narration: "",
+  choices: [],
+  is_major: false,
+  is_ending: false,
+  image_prompt: null,
+  image_path: null,
+  image_status: "not_planned",
+  illustration_reasoning: null,
+  featured_character_ids: [],
+  summary_to_here: null,
+  recap_text: null,
+  tts_audio_path: null,
+  created_at: "",
+};
+
 export interface TextProviderConfig {
   provider: string;
   model: string;
@@ -266,8 +295,26 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { headers: { ...authHeaders() } });
-  return handleResponse<T>(res);
+  // QA-018: read-only GETs fail fast (15 s) instead of hanging forever. The
+  // cost-incurring POSTs (advance/wizard/image-generation, 60-120 s legitimate)
+  // keep their default timeout. Map the timeout/abort back to the wrapper's
+  // Error shape with a clear message; non-timeout errors (including
+  // handleResponse's `API <status>: <text>`) propagate unchanged.
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers: { ...authHeaders() },
+      signal: AbortSignal.timeout(15_000),
+    });
+    return handleResponse<T>(res);
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      (err.name === "TimeoutError" || err.name === "AbortError")
+    ) {
+      throw new Error(`API request timed out after 15s: GET ${path}`);
+    }
+    throw err;
+  }
 }
 
 export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
@@ -324,4 +371,19 @@ export function imageUrl(gameId: string, imagePath: string): string {
 
 export function characterPortraitUrl(libraryId: string, portraitPath: string): string {
   return `${API_BASE}/api/library/${libraryId}/${portraitPath}`;
+}
+
+/**
+ * Build the scene-image URL for a node, but only when its image is ready
+ * (QA-013). Returns ``null`` when ``image_status !== "done"`` so callers
+ * render a placeholder/spinner instead of fetching a 404. Centralized here so
+ * the ``/api/images/<game>/scene/<node>`` route shape lives in one place —
+ * previously duplicated across five store sites and the WS hook.
+ */
+export function sceneImageUrl(
+  gameId: string,
+  node: Pick<StoryNode, "id" | "image_status">,
+): string | null {
+  if (node.image_status !== "done") return null;
+  return `${API_BASE}/api/images/${gameId}/scene/${node.id}`;
 }
