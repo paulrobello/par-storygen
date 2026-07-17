@@ -1,4 +1,4 @@
-.PHONY: build setup test lint fmt typecheck checkall web-check precommit run resume clean package deploy api-dev web-install web-dev web-build
+.PHONY: build setup test lint fmt typecheck checkall web-check web-gen-api precommit run resume clean package deploy api-dev web-install web-dev web-build
 
 # ── Web (Next.js) ──
 web-install:         ## Install Next.js frontend dependencies
@@ -42,16 +42,32 @@ typecheck:
 # authoritative green gate. Run `make fmt` explicitly to format.
 checkall: lint typecheck test web-check
 
+# ENH-001: regenerate the web API types from the current FastAPI OpenAPI
+# schema. Run this (then commit the two generated files) whenever a Pydantic
+# model in src/storygen_api/schemas.py or src/storygen/core/models.py changes.
+# Requires the [api] extra (make build installs it).
+web-gen-api:
+	uv run python scripts/export_openapi.py
+	cd web && npm run gen:api
+
 # QA-004: the web gate (eslint + vitest + tsc). Tolerates an absent
 # web/node_modules with a clear notice instead of failing, so `make checkall`
 # stays runnable in environments that carry only the Python toolchain (notably
 # CI's python-gate job, where the web surface is covered by the separate
 # web-build / web-e2e jobs). Locally, run `make web-install` once to enable it.
+#
+# ENH-001: the gate first re-exports the OpenAPI schema and regenerates the
+# TS types, then asserts a clean git diff — so a Pydantic change that wasn't
+# followed by `make web-gen-api` fails the gate here instead of drifting
+# silently. The export runs from the repo root (scripts/ lives there) before
+# `cd web` for the npm steps.
 web-check:
 	@if [ ! -d web/node_modules ]; then \
 		echo "web-check: web/node_modules absent - skipping (run 'make web-install' to enable; CI covers web in the web-build/web-e2e jobs)"; \
 	else \
-		cd web && npm run lint && npm run test && npx tsc --noEmit; \
+		uv run python scripts/export_openapi.py \
+			&& cd web && npm run gen:api:check \
+			&& npm run lint && npm run test && npx tsc --noEmit; \
 	fi
 
 run:
