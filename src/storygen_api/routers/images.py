@@ -12,7 +12,7 @@ from storygen.config import AppConfig
 from storygen.images.constants import PORTRAIT_QUALITY, PORTRAIT_SIZE
 from storygen.images.pricing import image_cost
 from storygen.storage import paths
-from storygen.storage.save import load_game, save_game
+from storygen.storage.save import save_game
 from storygen_api.deps import (
     build_pipeline,
     build_split_image_provider,
@@ -72,8 +72,9 @@ async def retry_scene(
     config: AppConfig = Depends(get_app_config),
 ) -> dict[str, str]:
     """Retry scene image generation for a node."""
+    # ARC-101: obtain the owned save so mutations land on the single live object.
     try:
-        save = load_game(game_id)
+        save = mgr.get_or_load_save(game_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Game not found") from exc
 
@@ -83,7 +84,6 @@ async def retry_scene(
         pipeline, _img = build_pipeline(save, config, callbacks=callbacks)
         mgr.get_or_create(game_id, save, pipeline)
 
-    mgr.update_save(game_id, save)
     callbacks = ws_manager.make_callbacks(game_id)
 
     try:
@@ -91,7 +91,6 @@ async def retry_scene(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    mgr.update_save(game_id, save)
     return {"status": node.image_status}
 
 
@@ -108,7 +107,7 @@ async def edit_scene(
 ) -> dict[str, str]:
     """Edit scene prompt and regenerate."""
     try:
-        save = load_game(game_id)
+        save = mgr.get_or_load_save(game_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Game not found") from exc
 
@@ -118,7 +117,6 @@ async def edit_scene(
         pipeline, _img = build_pipeline(save, config, callbacks=callbacks)
         mgr.get_or_create(game_id, save, pipeline)
 
-    mgr.update_save(game_id, save)
     callbacks = ws_manager.make_callbacks(game_id)
 
     try:
@@ -131,7 +129,6 @@ async def edit_scene(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    mgr.update_save(game_id, save)
     return {"status": node.image_status}
 
 
@@ -143,10 +140,11 @@ async def retry_portrait(
     game_id: str,
     char_id: str,
     config: AppConfig = Depends(get_app_config),
+    mgr: PipelineSessionManager = Depends(get_session_manager),
 ) -> dict[str, str]:
     """Retry (regenerate) a character portrait using the stored portrait_prompt."""
     try:
-        save = load_game(game_id)
+        save = mgr.get_or_load_save(game_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Game not found") from exc
 
@@ -210,10 +208,11 @@ async def edit_portrait(
     char_id: str,
     body: PortraitEditRequest,
     config: AppConfig = Depends(get_app_config),
+    mgr: PipelineSessionManager = Depends(get_session_manager),
 ) -> dict[str, str]:
     """Edit a character portrait prompt and regenerate."""
     try:
-        save = load_game(game_id)
+        save = mgr.get_or_load_save(game_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Game not found") from exc
 
@@ -295,7 +294,7 @@ async def regenerate_cover(
 ) -> dict[str, str]:
     """Regenerate the cover art (root node scene image)."""
     try:
-        save = load_game(game_id)
+        save = mgr.get_or_load_save(game_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Game not found") from exc
 
@@ -309,7 +308,6 @@ async def regenerate_cover(
         pipeline, _img = build_pipeline(save, config, callbacks=callbacks)
         mgr.get_or_create(game_id, save, pipeline)
 
-    mgr.update_save(game_id, save)
     callbacks = ws_manager.make_callbacks(game_id)
 
     try:
@@ -317,7 +315,6 @@ async def regenerate_cover(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    mgr.update_save(game_id, save)
     return {"status": node.image_status}
 
 
@@ -335,6 +332,7 @@ async def add_outfit(
     char_id: str,
     body: OutfitRequest,
     config: AppConfig = Depends(get_app_config),
+    mgr: PipelineSessionManager = Depends(get_session_manager),
 ) -> dict[str, str]:
     """Create a new outfit for a character and generate its portrait."""
     from datetime import UTC, datetime
@@ -343,7 +341,7 @@ async def add_outfit(
     from storygen.core.models import CharacterOutfit
 
     try:
-        save = load_game(game_id)
+        save = mgr.get_or_load_save(game_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Game not found") from exc
 
@@ -398,10 +396,15 @@ async def add_outfit(
 
 
 @router.post("/{game_id}/portrait/{char_id}/outfit/{outfit_id}/set")
-async def set_outfit(game_id: str, char_id: str, outfit_id: str) -> dict[str, str]:
+async def set_outfit(
+    game_id: str,
+    char_id: str,
+    outfit_id: str,
+    mgr: PipelineSessionManager = Depends(get_session_manager),
+) -> dict[str, str]:
     """Set an outfit as the current active outfit."""
     try:
-        save = load_game(game_id)
+        save = mgr.get_or_load_save(game_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Game not found") from exc
 
@@ -426,10 +429,15 @@ async def set_outfit(game_id: str, char_id: str, outfit_id: str) -> dict[str, st
 
 
 @router.delete("/{game_id}/portrait/{char_id}/outfit/{outfit_id}")
-async def delete_outfit(game_id: str, char_id: str, outfit_id: str) -> dict[str, str]:
+async def delete_outfit(
+    game_id: str,
+    char_id: str,
+    outfit_id: str,
+    mgr: PipelineSessionManager = Depends(get_session_manager),
+) -> dict[str, str]:
     """Delete an outfit."""
     try:
-        save = load_game(game_id)
+        save = mgr.get_or_load_save(game_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Game not found") from exc
 
@@ -463,10 +471,14 @@ async def delete_outfit(game_id: str, char_id: str, outfit_id: str) -> dict[str,
 
 
 @router.post("/{game_id}/portrait/{char_id}/outfit/revert")
-async def revert_outfit(game_id: str, char_id: str) -> dict[str, str]:
+async def revert_outfit(
+    game_id: str,
+    char_id: str,
+    mgr: PipelineSessionManager = Depends(get_session_manager),
+) -> dict[str, str]:
     """Revert to the base portrait (unset current outfit)."""
     try:
-        save = load_game(game_id)
+        save = mgr.get_or_load_save(game_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Game not found") from exc
 

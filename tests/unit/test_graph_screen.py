@@ -12,7 +12,7 @@ from textual.app import App, ComposeResult
 from textual.widgets import Tree
 from textual.widgets.tree import TreeNode
 
-from storygen.llm.models import (
+from storygen.core.models import (
     ImageProviderConfig,
     StoredChoice,
     StoryNode,

@@ -9,10 +9,11 @@ save-data directory (SEC-101: a ``StaticFiles`` mount there bypassed
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 import typer
 import uvicorn
@@ -69,6 +70,26 @@ def _enforce_single_worker() -> None:
     )
 
 
+_EVICTION_INTERVAL_SECONDS = 300.0  # 5 minutes
+
+
+async def _eviction_loop() -> None:
+    """Background task that evicts idle pipeline sessions (ARC-106).
+
+    Runs every :data:`_EVICTION_INTERVAL_SECONDS`. ``evict_idle`` skips games
+    whose advance lock is held, so a mid-advance game is never disturbed.
+    """
+    while True:
+        await asyncio.sleep(_EVICTION_INTERVAL_SECONDS)
+        try:
+            mgr = get_session_manager()
+            await mgr.evict_idle()
+        except Exception:
+            # The loop must survive transient errors so eviction continues
+            # across the process lifetime; log and carry on.
+            _logger.exception("eviction loop iteration failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Startup: load config, assert single-worker. Shutdown: cleanup pipelines."""
@@ -76,8 +97,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     _enforce_single_worker()
     # Pre-load config at startup
     get_app_config()
+    # ARC-106: background eviction of idle pipeline sessions.
+    eviction_task = asyncio.create_task(_eviction_loop())
     yield
-    # Cleanup all active pipeline sessions
+    # Shutdown: stop the eviction loop and cleanup all active sessions.
+    eviction_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await eviction_task
     mgr = get_session_manager()
     await mgr.cleanup_all()
 

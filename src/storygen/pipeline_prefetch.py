@@ -19,7 +19,7 @@ import contextlib
 import logging
 from collections.abc import Awaitable, Callable
 
-from storygen.llm.models import StoryNode
+from storygen.core.models import StoryNode
 from storygen.storage.save import GameSave
 
 _logger = logging.getLogger(__name__)

@@ -136,7 +136,7 @@ def _sample_node(
     choices: list[dict[str, Any]] | None = None,
 ) -> Any:
     """Build a minimal StoryNode-like object for callback invocation."""
-    from storygen.llm.models import StoredChoice, StoryNode
+    from storygen.core.models import StoredChoice, StoryNode
 
     return StoryNode(
         id="node-1",
@@ -250,7 +250,7 @@ async def test_image_failed_broadcast_uses_error_field() -> None:
 @pytest.mark.asyncio
 async def test_new_characters_broadcast_includes_full_character_fields() -> None:
     """``on_new_characters`` emits per-character fields the hook's Character type expects."""
-    from storygen.llm.models import Character
+    from storygen.core.models import Character
 
     mgr = _CapturingManager()
     cb = mgr.make_callbacks("game-123")

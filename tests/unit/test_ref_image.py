@@ -9,8 +9,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from storygen.core.models import Character
 from storygen.images.openai_provider import OpenAIImageProvider
-from storygen.llm.models import Character
 from storygen.screens._ref_image_modals import ReferenceImageResult
 from storygen.storage import paths
 from storygen.storage.library import (

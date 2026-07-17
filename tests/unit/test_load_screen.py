@@ -11,8 +11,7 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Button, Static
 
-from storygen.images.base import ReferencePortrait
-from storygen.llm.models import (
+from storygen.core.models import (
     ImageProviderConfig,
     StoredChoice,
     StoryNode,
@@ -20,6 +19,7 @@ from storygen.llm.models import (
     Theme,
     Tone,
 )
+from storygen.images.base import ReferencePortrait
 from storygen.screens._confirm_modal import ConfirmModal
 from storygen.screens.load import LoadGameScreen, StorySetupDetailsModal
 from storygen.storage import paths

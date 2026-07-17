@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from storygen.llm.models import (
+from storygen.core.models import (
     ImageProviderConfig,
     StoredChoice,
     StoryNode,

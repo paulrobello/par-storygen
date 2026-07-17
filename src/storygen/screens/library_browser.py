@@ -12,7 +12,7 @@ The screen dismisses with a :class:`LibraryPick` on Import (carrying the
 ``mode`` literal the wizard uses to decide whether to run the backstory-adapter
 LLM call) or ``None`` on Escape/Cancel. It owns no save state — the wizard is
 responsible for turning the returned library character into a save-local
-:class:`storygen.llm.models.Character` at append time.
+:class:`storygen.core.models.Character` at append time.
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ from textual.containers import Center, Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 
-from storygen.llm.models import Character
+from storygen.core.models import Character
 from storygen.screens._confirm_modal import ConfirmModal
 from storygen.screens._create_char_modal import CreateCharRequest
 from storygen.screens._library_edit_modal import LibraryEditModal, LibraryEditResult

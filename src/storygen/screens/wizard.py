@@ -37,13 +37,13 @@ from textual.widgets import (
     TextArea,
 )
 
-from storygen.core.presets import StoryPreset
-from storygen.llm.models import (
+from storygen.core.models import (
     Character,
     TextProviderConfig,
     Theme,
     Tone,
 )
+from storygen.core.presets import StoryPreset
 from storygen.runtime.wizard_flow import WizardFlow  # re-exported below
 from storygen.screens._ref_image_modals import ReferenceImageModal, ReferenceImageResult
 from storygen.screens.controllers.wizard_summary import build_confirm_summary

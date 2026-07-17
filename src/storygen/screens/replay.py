@@ -27,7 +27,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Footer, Header, Static
 
-from storygen.llm.models import NodeId, StoryNode
+from storygen.core.models import NodeId, StoryNode
 from storygen.storage import paths
 from storygen.storage.save import GameSave
 from storygen.storage.tree import path_from_root

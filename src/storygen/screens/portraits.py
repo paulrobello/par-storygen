@@ -21,13 +21,13 @@ from textual.events import Click
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 
+from storygen.core.models import Character, CharacterOutfit
 from storygen.images.base import ImageProvider
 from storygen.images.constants import (
     PORTRAIT_QUALITY,
     PORTRAIT_SIZE,
 )
 from storygen.images.pricing import image_cost
-from storygen.llm.models import Character, CharacterOutfit
 from storygen.screens._art_edit_modal import ArtEditModal, ArtEditMode, ArtEditResult
 from storygen.screens._character_edit_modal import (
     CharacterEditModal,

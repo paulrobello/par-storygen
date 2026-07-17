@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pytest
 
+from storygen.core.models import Character, ImageProviderConfig, TextProviderConfig, Theme
 from storygen.images.base import ReferencePortrait
 from storygen.images.constants import PORTRAIT_QUALITY, PORTRAIT_SIZE, SCENE_QUALITY, SCENE_SIZE
 from storygen.images.pricing import image_cost
-from storygen.llm.models import Character, ImageProviderConfig, TextProviderConfig, Theme
 from storygen.runtime.wizard_flow import WizardFlow
 from storygen.screens.wizard import WizardStep
 
@@ -172,7 +172,7 @@ async def test_wizard_flow_generates_characters(
 async def test_wizard_flow_builds_initial_save(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from storygen.llm.models import Tone
+    from storygen.core.models import Tone
 
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     flow = WizardFlow(
@@ -207,7 +207,7 @@ async def test_wizard_flow_builds_initial_save(
 async def test_build_initial_save_records_creation_prompts(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from storygen.llm.models import Tone
+    from storygen.core.models import Tone
 
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     flow = WizardFlow(
@@ -237,7 +237,7 @@ async def test_build_initial_save_records_creation_prompts(
 async def test_wizard_flow_uses_character_config_for_portraits_and_art_config_for_cover(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from storygen.llm.models import Tone
+    from storygen.core.models import Tone
 
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     flow = WizardFlow(
@@ -311,7 +311,7 @@ async def test_wizard_flow_runs_blurb_agent(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """build_initial_save invokes the blurb agent factory and uses its output."""
-    from storygen.llm.models import Tone
+    from storygen.core.models import Tone
 
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     captured: dict[str, object] = {}
@@ -356,7 +356,7 @@ async def test_wizard_flow_accumulates_token_usage_into_save(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """Per-call usage from the three LLM agents lands on the freshly built save."""
-    from storygen.llm.models import Tone
+    from storygen.core.models import Tone
 
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
 
@@ -432,7 +432,7 @@ async def test_wizard_flow_accumulates_token_usage_into_save(
 async def test_wizard_flow_passes_art_style_to_save_and_portraits(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from storygen.llm.models import Tone
+    from storygen.core.models import Tone
 
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     provider = FakeImageProvider()
@@ -463,7 +463,7 @@ async def test_wizard_flow_passes_art_style_to_save_and_portraits(
 async def test_wizard_flow_skips_portraits_when_art_disabled(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from storygen.llm.models import Tone
+    from storygen.core.models import Tone
     from storygen.storage import app_state
 
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
@@ -514,7 +514,7 @@ async def test_build_initial_save_copies_library_portrait_without_generating(
     from datetime import UTC, datetime
     from uuid import uuid4
 
-    from storygen.llm.models import Tone
+    from storygen.core.models import Tone
     from storygen.storage import paths as _paths
     from storygen.storage.library import (
         LibraryCharacter,
@@ -624,7 +624,7 @@ async def test_build_initial_save_library_import_does_not_call_provider_that_rai
     from datetime import UTC, datetime
     from uuid import uuid4
 
-    from storygen.llm.models import Tone
+    from storygen.core.models import Tone
     from storygen.storage import app_state
     from storygen.storage.library import (
         LibraryCharacter,
@@ -710,7 +710,7 @@ async def test_adapt_library_character_rewrites_only_backstory(
     from datetime import UTC, datetime
     from uuid import uuid4
 
-    from storygen.llm.models import AdaptedBackstory
+    from storygen.core.models import AdaptedBackstory
     from storygen.storage.library import LibraryCharacter, LibrarySource
 
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
@@ -791,7 +791,7 @@ async def test_adapt_library_character_rejects_empty_backstory(
     from datetime import UTC, datetime
     from uuid import uuid4
 
-    from storygen.llm.models import AdaptedBackstory
+    from storygen.core.models import AdaptedBackstory
     from storygen.storage.library import LibraryCharacter, LibrarySource
 
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
@@ -869,7 +869,7 @@ async def test_wizard_flow_persists_target_major_beats(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """build_initial_save records the target_major_beats kwarg on the save."""
-    from storygen.llm.models import Tone
+    from storygen.core.models import Tone
 
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     flow = WizardFlow(
@@ -907,7 +907,7 @@ async def test_build_initial_save_pending_ref_writes(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """pending_ref_writes path: ref and portrait bytes are written to disk correctly."""
-    from storygen.llm.models import Tone
+    from storygen.core.models import Tone
     from storygen.storage import paths as _paths
 
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
@@ -975,7 +975,7 @@ async def test_build_initial_save_pending_ref_writes_counts_generated_portrait_c
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """Generated ref-image portraits are billed using the character image config."""
-    from storygen.llm.models import Tone
+    from storygen.core.models import Tone
     from storygen.storage import paths as _paths
 
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
@@ -1038,7 +1038,7 @@ async def test_build_initial_save_pending_ref_writes_use_as_is(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """pending_ref_writes with portrait_png=None: reference bytes are used as portrait."""
-    from storygen.llm.models import Tone
+    from storygen.core.models import Tone
     from storygen.storage import paths as _paths
 
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))

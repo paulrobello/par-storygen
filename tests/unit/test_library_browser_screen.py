@@ -579,7 +579,7 @@ async def test_create_character_with_ref_image_passes_to_portrait_gen(
 
     class _FakeAgent:
         async def run(self, prompt: str) -> object:
-            from storygen.llm.models import Character as Char
+            from storygen.core.models import Character as Char
 
             return type(
                 "_R",

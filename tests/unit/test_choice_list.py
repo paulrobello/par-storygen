@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from storygen.llm.models import Choice, StoredChoice
+from storygen.core.models import Choice, StoredChoice
 from storygen.widgets.choice_list import ChoiceList, format_choice_line
 
 

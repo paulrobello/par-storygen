@@ -9,6 +9,7 @@ from typing import cast
 
 from dotenv import find_dotenv, load_dotenv
 
+from storygen.core.models import ImageProviderConfig, TextProviderConfig
 from storygen.images.provider_factory import (
     ALLOWED_IMAGE_PROVIDERS as _ALLOWED_IMAGE_PROVIDERS,
 )
@@ -16,7 +17,6 @@ from storygen.images.provider_factory import (
     ImageProviderName,
     validate_image_config,
 )
-from storygen.llm.models import ImageProviderConfig, TextProviderConfig
 from storygen.llm.provider_factory import (
     ALLOWED_PROVIDERS as _ALLOWED_PROVIDERS,
 )

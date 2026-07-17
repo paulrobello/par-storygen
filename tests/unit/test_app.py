@@ -9,8 +9,7 @@ from uuid import uuid4
 import pytest
 
 from storygen.app import StoryGenApp
-from storygen.images.split_provider import SplitImageProvider
-from storygen.llm.models import (
+from storygen.core.models import (
     Character,
     ImageProviderConfig,
     StoredChoice,
@@ -19,6 +18,7 @@ from storygen.llm.models import (
     Theme,
     Tone,
 )
+from storygen.images.split_provider import SplitImageProvider
 from storygen.llm.provider_factory import build_text_model
 from storygen.screens.intro import IntroScreen
 from storygen.screens.settings import ImageProviderChanged, TextProviderChanged

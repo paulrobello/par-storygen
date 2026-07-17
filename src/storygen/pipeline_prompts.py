@@ -14,8 +14,8 @@ coordinator (the audit explicitly endorses this boundary).
 
 from __future__ import annotations
 
+from storygen.core.models import StoryNode
 from storygen.core.models import one_sentence as _one_sentence
-from storygen.llm.models import StoryNode
 from storygen.storage.save import GameSave
 from storygen.storage.tree import path_from_root, segment_since_last_summary
 

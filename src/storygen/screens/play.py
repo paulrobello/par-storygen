@@ -19,9 +19,8 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Footer, Header
 
-from storygen.core.models import Recap
+from storygen.core.models import NodeId, Recap, StoryNode
 from storygen.export.book import export_book
-from storygen.llm.models import NodeId, StoryNode
 from storygen.pipeline import BeatPipeline, PipelineCallbacks
 from storygen.screens._art_edit_modal import ArtEditModal, ArtEditMode, ArtEditResult
 from storygen.screens._confirm_modal import ConfirmModal
@@ -544,7 +543,7 @@ class PlayScreen(Screen[None]):
         self._render_current()
 
     async def _on_image_committed(self, node: object) -> None:
-        from storygen.llm.models import StoryNode
+        from storygen.core.models import StoryNode
 
         if isinstance(node, StoryNode) and node.id == self._save.current_node_id:
             self._image_regen_active = False
@@ -561,7 +560,7 @@ class PlayScreen(Screen[None]):
         self._apply_header()
 
     async def _on_image_failed(self, node: object) -> None:
-        from storygen.llm.models import StoryNode
+        from storygen.core.models import StoryNode
 
         if isinstance(node, StoryNode) and node.id == self._save.current_node_id:
             self._image_regen_active = False

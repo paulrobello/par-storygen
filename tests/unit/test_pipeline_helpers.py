@@ -5,8 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from storygen.core.models import one_sentence as _one_sentence
-from storygen.llm.models import (
+from storygen.core.models import (
     ImageProviderConfig,
     StoredChoice,
     StoryNode,
@@ -14,6 +13,7 @@ from storygen.llm.models import (
     Theme,
     Tone,
 )
+from storygen.core.models import one_sentence as _one_sentence
 from storygen.pipeline_prompts import (
     build_beat_prompt as _build_beat_prompt,
 )

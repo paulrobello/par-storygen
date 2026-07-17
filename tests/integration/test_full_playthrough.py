@@ -9,8 +9,7 @@ from uuid import uuid4
 import pytest
 from pytest import MonkeyPatch
 
-from storygen.images.base import ReferencePortrait
-from storygen.llm.models import (
+from storygen.core.models import (
     IllustrationPlan,
     ImageProviderConfig,
     StoredChoice,
@@ -20,6 +19,7 @@ from storygen.llm.models import (
     Theme,
     Tone,
 )
+from storygen.images.base import ReferencePortrait
 from storygen.pipeline import BeatPipeline, PipelineCallbacks
 from storygen.storage.save import GameSave, load_game, save_game
 

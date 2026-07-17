@@ -9,7 +9,7 @@ from textual.app import App, ComposeResult
 from textual.widgets import Button, Input, Select, Static, Switch
 
 from storygen.config import AppConfig
-from storygen.llm.models import ImageProviderConfig, TextProviderConfig
+from storygen.core.models import ImageProviderConfig, TextProviderConfig
 from storygen.screens._confirm_modal import ConfirmModal
 from storygen.screens.settings import (
     ImageProviderChanged,

@@ -6,6 +6,15 @@ import pytest
 from pydantic_ai import Agent
 from pydantic_ai.models.test import TestModel
 
+from storygen.core.models import (
+    AdaptedBackstory,
+    Character,
+    IllustrationPlan,
+    StoryBeat,
+    TextProviderConfig,
+    Theme,
+    Tone,
+)
 from storygen.llm.agents import (
     build_adapt_backstory_agent,
     build_beat_agent,
@@ -14,15 +23,6 @@ from storygen.llm.agents import (
     build_illustration_agent,
     build_summary_agent,
     build_theme_agent,
-)
-from storygen.llm.models import (
-    AdaptedBackstory,
-    Character,
-    IllustrationPlan,
-    StoryBeat,
-    TextProviderConfig,
-    Theme,
-    Tone,
 )
 from storygen.llm.provider_factory import build_text_model
 

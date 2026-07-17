@@ -24,6 +24,7 @@ import contextlib
 from collections.abc import Callable
 from typing import cast
 
+from storygen.core.models import ImageProviderConfig
 from storygen.images.provider_factory import (
     ImageProviderName,
     build_routed_image_provider,
@@ -31,7 +32,6 @@ from storygen.images.provider_factory import (
 )
 from storygen.images.routed_provider import RoutedImageProvider
 from storygen.images.split_provider import SplitImageProvider
-from storygen.llm.models import ImageProviderConfig
 from storygen.storage import app_state
 from storygen.storage.save import GameSave
 

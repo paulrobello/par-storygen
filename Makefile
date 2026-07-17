@@ -18,10 +18,10 @@ api-prod:            ## Start FastAPI production server on :8101
 	uv run uvicorn storygen_api.main:app --port 8101 --workers 1
 
 build:
-	uv sync
+	uv sync --extra api --dev
 
 setup:
-	uv sync
+	uv sync --extra api --dev
 
 test:
 	uv run python -m pytest

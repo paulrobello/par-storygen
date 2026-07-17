@@ -15,7 +15,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from storygen.llm.models import StoredChoice, StoryNode
+from storygen.core.models import StoredChoice, StoryNode
 from storygen.pipeline import PipelineCallbacks
 
 

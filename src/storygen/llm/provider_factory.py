@@ -8,7 +8,7 @@ from typing import Literal, get_args
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
-from storygen.llm.models import TextProviderConfig
+from storygen.core.models import TextProviderConfig
 
 _DEFAULT_BASE_URLS: dict[str, str] = {
     "openai": "https://api.openai.com/v1",

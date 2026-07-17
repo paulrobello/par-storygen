@@ -15,15 +15,7 @@ from datetime import UTC, datetime
 from typing import Protocol, cast
 from uuid import UUID, uuid4
 
-from storygen.images.constants import (
-    PORTRAIT_QUALITY,
-    PORTRAIT_SIZE,
-    SCENE_QUALITY,
-    SCENE_SIZE,
-)
-from storygen.images.pricing import image_cost
-from storygen.images.prompts import build_cover_prompt
-from storygen.llm.models import (
+from storygen.core.models import (
     Character,
     ImageProviderConfig,
     StoredChoice,
@@ -32,6 +24,14 @@ from storygen.llm.models import (
     Theme,
     Tone,
 )
+from storygen.images.constants import (
+    PORTRAIT_QUALITY,
+    PORTRAIT_SIZE,
+    SCENE_QUALITY,
+    SCENE_SIZE,
+)
+from storygen.images.pricing import image_cost
+from storygen.images.prompts import build_cover_prompt
 from storygen.llm.usage import UsageTotals
 from storygen.storage import app_state, paths
 from storygen.storage.library import LibraryCharacter, library_portrait_path, load_library_character

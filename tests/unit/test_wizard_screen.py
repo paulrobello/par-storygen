@@ -11,7 +11,7 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Input, Select, Static, TextArea
 
-from storygen.llm.models import Character, TextProviderConfig, Theme
+from storygen.core.models import Character, TextProviderConfig, Theme
 from storygen.screens.library_browser import LibraryPick
 from storygen.screens.wizard import WizardFlow, WizardScreen, WizardStep
 from storygen.storage import app_state

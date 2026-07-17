@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from storygen.core.models import ImageProviderConfig
 from storygen.images.base import ImageProvider, ReferencePortrait
 from storygen.images.gemini_provider import GeminiImageProvider
 from storygen.images.ollama_provider import OllamaImageProvider
@@ -15,7 +16,6 @@ from storygen.images.provider_factory import (
 )
 from storygen.images.routed_provider import RoutedImageProvider
 from storygen.images.zai_provider import ZaiImageProvider
-from storygen.llm.models import ImageProviderConfig
 
 
 def test_factory_returns_openai_provider(monkeypatch: pytest.MonkeyPatch) -> None:

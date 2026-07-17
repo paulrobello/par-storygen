@@ -7,8 +7,7 @@ is covered by ``test_wizard_screen.py``.
 
 from __future__ import annotations
 
-from storygen.core.models import Character
-from storygen.llm.models import Theme, Tone
+from storygen.core.models import Character, Theme, Tone
 from storygen.screens.controllers.wizard_summary import build_confirm_summary
 
 

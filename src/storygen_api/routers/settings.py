@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from storygen.storage import app_state
 from storygen.storage.app_state import TTSPrefs
+from storygen_api.deps import get_app_config
 from storygen_api.schemas import SettingsResponse, SettingsUpdateRequest
 from storygen_api.security import ProviderURLError, validate_provider_url_for, verify_token
 
@@ -228,5 +229,9 @@ async def update_settings(body: SettingsUpdateRequest) -> SettingsResponse:
         if body.graphics_mode is not None
         else app_state.read_graphics_mode(),
     )
+
+    # ARC-103: invalidate the lru_cache so the next request picks up the new
+    # config instead of serving the pre-update snapshot.
+    get_app_config.cache_clear()
 
     return await get_settings()

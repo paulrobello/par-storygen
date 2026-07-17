@@ -12,9 +12,9 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.content import Content
 
-from storygen.core.models import Recap
-from storygen.llm.models import (
+from storygen.core.models import (
     ImageProviderConfig,
+    Recap,
     StoredChoice,
     StoryNode,
     TextProviderConfig,
@@ -704,7 +704,7 @@ async def test_regenerate_check_action_for_leaf_with_parent() -> None:
     """A non-root node whose choices have no children allows regenerate."""
     from datetime import UTC, datetime
 
-    from storygen.llm.models import StoryNode
+    from storygen.core.models import StoryNode
 
     app = _Harness()
     async with app.run_test() as pilot:

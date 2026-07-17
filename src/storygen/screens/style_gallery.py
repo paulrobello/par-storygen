@@ -83,8 +83,8 @@ class StyleGalleryScreen(Screen[None]):
         self.app.pop_screen()  # pyright: ignore[reportUnknownMemberType]
 
     async def _generate(self) -> None:
+        from storygen.core.models import ImageProviderConfig
         from storygen.images.provider_factory import build_image_provider
-        from storygen.llm.models import ImageProviderConfig
 
         desc = self.query_one("#gallery-char-desc", Input).value.strip()
         if not desc:

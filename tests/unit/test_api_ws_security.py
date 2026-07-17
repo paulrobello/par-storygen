@@ -99,7 +99,7 @@ def test_ws_oversized_message_closes_with_1009(
     # Create a save so the WS handshake passes the game-id check.
     from datetime import UTC, datetime
 
-    from storygen.llm.models import (
+    from storygen.core.models import (
         Character,
         ImageProviderConfig,
         StoredChoice,

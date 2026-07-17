@@ -11,9 +11,9 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from PIL import Image
 
+from storygen.core.models import Character
 from storygen.images.split_provider import SplitImageProvider
 from storygen.llm import agents as agent_mod
-from storygen.llm.models import Character
 from storygen.llm.provider_factory import build_text_model
 from storygen.storage import app_state
 from storygen.storage.library import (
@@ -27,8 +27,7 @@ from storygen.storage.library import (
     load_library_character,
     save_library_character,
 )
-from storygen.storage.save import load_game
-from storygen_api.deps import get_app_config, get_wizard_image_provider
+from storygen_api.deps import get_app_config, get_session_manager, get_wizard_image_provider
 from storygen_api.rate_limit import enforce_rate_limit
 from storygen_api.schemas import (
     CharacterCreateRequest,
@@ -41,6 +40,7 @@ from storygen_api.schemas import (
     StoryImportRequest,
 )
 from storygen_api.security import verify_token
+from storygen_api.session import PipelineSessionManager
 
 router = APIRouter(
     prefix="/api/characters",
@@ -441,10 +441,12 @@ async def create_character(
 @router.post("/import-from-story", response_model=list[CharacterLibraryEntry], status_code=201)
 async def import_from_story(
     body: StoryImportRequest,
+    mgr: PipelineSessionManager = Depends(get_session_manager),
 ) -> list[CharacterLibraryEntry]:
     """Import characters from a saved game into the library."""
+    # ARC-101: use the owned save for consistency with the session contract.
     try:
-        save = load_game(body.save_id)
+        save = mgr.get_or_load_save(body.save_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Save not found") from exc
     except Exception as exc:

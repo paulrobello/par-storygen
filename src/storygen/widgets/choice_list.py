@@ -8,7 +8,7 @@ from rich.console import RenderableType
 from rich.text import Text
 from textual.widgets import Static
 
-from storygen.llm.models import Choice
+from storygen.core.models import Choice
 
 
 def format_choice_line(n: int, choice: Choice, *, highlighted: bool = False) -> Text:

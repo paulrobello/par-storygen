@@ -21,7 +21,7 @@ from textual.strip import Strip
 from textual.widgets import Footer, Header, Static, Tree
 from textual.widgets.tree import TreeNode
 
-from storygen.llm.models import NodeId, StoryNode
+from storygen.core.models import NodeId, StoryNode
 from storygen.screens._confirm_modal import ConfirmModal
 from storygen.screens.replay import ReplayScreen
 from storygen.storage.save import GameSave, prune_subtree

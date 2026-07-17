@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic_ai.models.openai import OpenAIChatModel
 
-from storygen.llm.models import TextProviderConfig
+from storygen.core.models import TextProviderConfig
 from storygen.llm.provider_factory import build_text_model, resolve_base_url, validate_config
 
 

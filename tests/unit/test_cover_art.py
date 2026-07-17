@@ -9,8 +9,7 @@ from uuid import uuid4
 
 import pytest
 
-from storygen.images.prompts import build_cover_prompt
-from storygen.llm.models import (
+from storygen.core.models import (
     Character,
     ImageProviderConfig,
     ImageStatus,
@@ -20,6 +19,7 @@ from storygen.llm.models import (
     Theme,
     Tone,
 )
+from storygen.images.prompts import build_cover_prompt
 from storygen.runtime.wizard_flow import WizardFlow
 from storygen.storage import app_state, paths
 from storygen.storage.save import GameSave, save_game

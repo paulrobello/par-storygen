@@ -10,7 +10,7 @@ from uuid import uuid4
 
 import pytest
 
-from storygen.llm.models import (
+from storygen.core.models import (
     Character,
     ImageProviderConfig,
     StoredChoice,

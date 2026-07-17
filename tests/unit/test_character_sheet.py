@@ -6,7 +6,7 @@ import io
 
 from rich.console import Console
 
-from storygen.llm.models import Character
+from storygen.core.models import Character
 from storygen.widgets.character_sheet import CharacterSheet, format_character_entry
 
 

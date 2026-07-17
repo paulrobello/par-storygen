@@ -6,9 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 
 from storygen.storage import app_state, paths
-from storygen.storage.save import load_game
 from storygen.tts.player import TTSPlayer
+from storygen_api.deps import get_session_manager
 from storygen_api.security import verify_token
+from storygen_api.session import PipelineSessionManager
 
 router = APIRouter(
     prefix="/api/tts",
@@ -32,11 +33,15 @@ def _configure_player() -> None:
 
 
 @router.post("/{game_id}/{node_id}/generate")
-async def generate_tts(game_id: str, node_id: str) -> JSONResponse:
+async def generate_tts(
+    game_id: str,
+    node_id: str,
+    mgr: PipelineSessionManager = Depends(get_session_manager),
+) -> JSONResponse:
     """Generate TTS audio for a node's narration and return the audio URL."""
     _configure_player()
     try:
-        save = load_game(game_id)
+        save = mgr.get_or_load_save(game_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Game not found") from exc
 

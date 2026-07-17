@@ -10,8 +10,9 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from storygen.core.models import Character, CharacterOutfit
-from storygen.llm.models import (
+from storygen.core.models import (
+    Character,
+    CharacterOutfit,
     ImageProviderConfig,
     StoredChoice,
     StoryNode,

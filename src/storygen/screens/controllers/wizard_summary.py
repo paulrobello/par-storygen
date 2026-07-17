@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from storygen.llm.models import Character, Theme, Tone
+from storygen.core.models import Character, Theme, Tone
 
 
 def _format_tone(tone: Tone | None) -> str:

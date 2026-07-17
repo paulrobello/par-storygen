@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from storygen.llm.models import NodeId, StoryNode
+from storygen.core.models import NodeId, StoryNode
 from storygen.storage.save import GameSave
 
 

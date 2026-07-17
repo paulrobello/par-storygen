@@ -9,7 +9,7 @@ from rich.console import Group, RenderableType
 from rich.text import Text
 from textual.widgets import Static
 
-from storygen.llm.models import Character
+from storygen.core.models import Character
 from storygen.widgets.image_util import pixels_from_image
 
 

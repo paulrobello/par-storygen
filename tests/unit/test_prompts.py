@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from storygen.llm.models import Character, Theme, Tone
+from storygen.core.models import Character, Theme, Tone
 from storygen.llm.prompts import (
     adapt_backstory_system_prompt,
     beat_system_prompt,

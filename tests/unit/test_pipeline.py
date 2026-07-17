@@ -9,8 +9,7 @@ from typing import Any
 
 import pytest
 
-from storygen.images.base import ReferencePortrait
-from storygen.llm.models import (
+from storygen.core.models import (
     Character,
     Choice,
     IllustrationPlan,
@@ -23,6 +22,7 @@ from storygen.llm.models import (
     Theme,
     Tone,
 )
+from storygen.images.base import ReferencePortrait
 from storygen.pipeline import BeatPipeline, PipelineCallbacks
 from storygen.pipeline_prefetch import _PREFETCH_CONCURRENCY  # pyright: ignore[reportPrivateUsage]
 

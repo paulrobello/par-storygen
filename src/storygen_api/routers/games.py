@@ -184,40 +184,41 @@ async def advance_game(
     config: AppConfig = Depends(get_app_config),
 ) -> AdvanceResponse:
     """Pick a choice and advance the story."""
+    # ARC-101: the manager owns the single live GameSave. ``get_or_load_save``
+    # returns the cached instance so the pipeline's ``_on_usage`` closure
+    # (captured at construction) records usage on the object ``advance``
+    # mutates. ARC-102: the per-game asyncio.Lock serializes load→advance→
+    # persist so two concurrent advances cannot lose a child node.
     try:
-        save = load_game(game_id)
+        save = mgr.get_or_load_save(game_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Game not found") from exc
 
-    pipeline = mgr.get_pipeline(game_id)
-    if pipeline is None:
+    async with mgr.advance_lock(game_id):
+        pipeline = mgr.get_pipeline(game_id)
+        if pipeline is None:
+            callbacks = ws_manager.make_callbacks(game_id)
+            pipeline, _img = build_pipeline(save, config, callbacks=callbacks)
+            mgr.get_or_create(game_id, save, pipeline)
+
         callbacks = ws_manager.make_callbacks(game_id)
-        pipeline, _img = build_pipeline(save, config, callbacks=callbacks)
-        mgr.get_or_create(game_id, save, pipeline)
+        try:
+            node = await pipeline.advance(
+                save,
+                from_node_id=body.from_node_id,
+                choice_id=body.choice_id,
+                callbacks=callbacks,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except Exception as exc:
+            # SEC-004: do not leak the provider/pipeline exception string.
+            _logger.exception("advance_game failed for game %s", game_id)
+            raise HTTPException(status_code=500, detail="internal error") from exc
 
-    # Refresh the save reference in the session manager
-    mgr.update_save(game_id, save)
-
-    callbacks = ws_manager.make_callbacks(game_id)
-    try:
-        node = await pipeline.advance(
-            save,
-            from_node_id=body.from_node_id,
-            choice_id=body.choice_id,
-            callbacks=callbacks,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        # SEC-004: do not leak the provider/pipeline exception string.
-        _logger.exception("advance_game failed for game %s", game_id)
-        raise HTTPException(status_code=500, detail="internal error") from exc
-
-    mgr.update_save(game_id, save)
-
-    # Reload save to pick up the latest mutations
-    save = load_game(game_id)
-    new_char_ids = [c for c in save.characters if c.introduced_at_node_id == node.id]
+        # ARC-101: no post-advance reload — the pipeline mutated and persisted
+        # the owned save in place, so the new characters are visible on it.
+        new_char_ids = [c for c in save.characters if c.introduced_at_node_id == node.id]
 
     return AdvanceResponse(
         node=_node_to_detail(node),
@@ -240,16 +241,21 @@ async def delete_game_endpoint(
 
 
 @router.post("/{game_id}/jump", response_model=GameDetail)
-async def jump_to_node(game_id: str, body: JumpRequest) -> GameDetail:
+async def jump_to_node(
+    game_id: str,
+    body: JumpRequest,
+    mgr: PipelineSessionManager = Depends(get_session_manager),
+) -> GameDetail:
     """Set the current node to a target node."""
     try:
-        save = load_game(game_id)
+        save = mgr.get_or_load_save(game_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Game not found") from exc
-    if body.target_node_id not in save.nodes:
-        raise HTTPException(status_code=404, detail="Node not found")
-    save.current_node_id = body.target_node_id
-    save_game(save)
+    async with mgr.advance_lock(game_id):
+        if body.target_node_id not in save.nodes:
+            raise HTTPException(status_code=404, detail="Node not found")
+        save.current_node_id = body.target_node_id
+        save_game(save)
     return await get_game(game_id)
 
 
@@ -288,16 +294,18 @@ async def list_endings(game_id: str) -> list[NodeId]:
 async def prune_subtree_endpoint(
     game_id: str,
     body: PruneRequest,
+    mgr: PipelineSessionManager = Depends(get_session_manager),
 ) -> dict[str, int]:
     """Prune a subtree starting at the given node."""
     try:
-        save = load_game(game_id)
+        save = mgr.get_or_load_save(game_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Game not found") from exc
-    try:
-        count = prune_subtree(save, node_id=body.node_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    async with mgr.advance_lock(game_id):
+        try:
+            count = prune_subtree(save, node_id=body.node_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"removed_count": count}
 
 
@@ -313,49 +321,54 @@ async def regenerate_node(
     config: AppConfig = Depends(get_app_config),
 ) -> AdvanceResponse:
     """Regenerate the current node by pruning it and re-advending from parent."""
+    # ARC-101/102: same single-owner + per-game-lock discipline as advance_game.
     try:
-        save = load_game(game_id)
+        save = mgr.get_or_load_save(game_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Game not found") from exc
 
-    node = save.nodes.get(save.current_node_id)
-    if node is None:
-        raise HTTPException(status_code=400, detail="No current node")
-    if node.parent_id is None or node.chosen_choice_id is None:
-        raise HTTPException(status_code=400, detail="Cannot regenerate root node")
-    if any(c.child_node_id for c in node.choices):
-        raise HTTPException(status_code=400, detail="Cannot regenerate — node has descendants")
+    async with mgr.advance_lock(game_id):
+        node = save.nodes.get(save.current_node_id)
+        if node is None:
+            raise HTTPException(status_code=400, detail="No current node")
+        if node.parent_id is None or node.chosen_choice_id is None:
+            raise HTTPException(status_code=400, detail="Cannot regenerate root node")
+        if any(c.child_node_id for c in node.choices):
+            raise HTTPException(
+                status_code=400, detail="Cannot regenerate — node has descendants"
+            )
 
-    parent_id = node.parent_id
-    choice_id = node.chosen_choice_id
+        parent_id = node.parent_id
+        choice_id = node.chosen_choice_id
 
-    # Prune the current node
-    prune_subtree(save, node_id=node.id)
+        # Prune the current node
+        prune_subtree(save, node_id=node.id)
 
-    # Re-advance from parent with the same choice
-    pipeline = mgr.get_pipeline(game_id)
-    if pipeline is None:
+        # Re-advance from parent with the same choice
+        pipeline = mgr.get_pipeline(game_id)
+        if pipeline is None:
+            callbacks = ws_manager.make_callbacks(game_id)
+            pipeline, _img = build_pipeline(save, config, callbacks=callbacks)
+            mgr.get_or_create(game_id, save, pipeline)
+
         callbacks = ws_manager.make_callbacks(game_id)
-        pipeline, _img = build_pipeline(save, config, callbacks=callbacks)
-        mgr.get_or_create(game_id, save, pipeline)
-    mgr.update_save(game_id, save)
-    callbacks = ws_manager.make_callbacks(game_id)
 
-    try:
-        new_node = await pipeline.advance(
-            save,
-            from_node_id=parent_id,
-            choice_id=choice_id,
-            callbacks=callbacks,
-        )
-    except Exception as exc:
-        # SEC-004: do not leak the provider/pipeline exception string.
-        _logger.exception("regenerate_node failed for game %s", game_id)
-        raise HTTPException(status_code=500, detail="internal error") from exc
+        try:
+            new_node = await pipeline.advance(
+                save,
+                from_node_id=parent_id,
+                choice_id=choice_id,
+                callbacks=callbacks,
+            )
+        except Exception as exc:
+            # SEC-004: do not leak the provider/pipeline exception string.
+            _logger.exception("regenerate_node failed for game %s", game_id)
+            raise HTTPException(status_code=500, detail="internal error") from exc
 
-    mgr.update_save(game_id, save)
-    save = load_game(game_id)
-    new_char_ids = [c for c in save.characters if c.introduced_at_node_id == new_node.id]
+        # ARC-101: no post-advance reload — the owned save was mutated in place.
+        new_char_ids = [
+            c for c in save.characters if c.introduced_at_node_id == new_node.id
+        ]
 
     return AdvanceResponse(
         node=_node_to_detail(new_node),

@@ -4,7 +4,7 @@ Presents the four user-visible bio fields — ``name`` / ``personality`` /
 ``physical_description`` / ``backstory`` — for in-place editing. The modal
 itself is pure UI: it returns a :class:`CharacterEditResult` on Save and the
 caller (PortraitsScreen) is responsible for applying the diff against the
-live :class:`~storygen.llm.models.Character`, persisting the save, and
+live :class:`~storygen.core.models.Character`, persisting the save, and
 deciding whether to sync ``portrait_prompt``.
 
 Design notes:
@@ -31,7 +31,7 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Static, TextArea
 
-from storygen.llm.models import Character
+from storygen.core.models import Character
 
 
 class CharacterEditResult(BaseModel):

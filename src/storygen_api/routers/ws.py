@@ -15,7 +15,6 @@ from typing import Any, cast
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
-from storygen.storage.save import load_game
 from storygen_api.deps import build_pipeline, get_app_config, get_session_manager
 from storygen_api.security import ws_authorize, ws_check_origin
 from storygen_api.ws import ws_manager
@@ -80,22 +79,22 @@ async def websocket_endpoint(
 
     await ws_manager.connect(game_id, ws)
     try:
-        # Ensure a pipeline exists for this game
+        # Ensure a pipeline exists for this game. ARC-101: the manager owns the
+        # single live GameSave — ``get_or_load_save`` returns the cached instance
+        # so the pipeline's ``_on_usage`` closure agrees with later advances.
+        mgr = get_session_manager()
         try:
-            save = load_game(game_id)
+            save = mgr.get_or_load_save(game_id)
         except FileNotFoundError:
             await ws.close(code=4404, reason="Game not found")
             return
 
-        mgr = get_session_manager()
         existing = mgr.get_pipeline(game_id)
         if existing is None:
             config = get_app_config()
             callbacks = ws_manager.make_callbacks(game_id)
             pipeline, _img = build_pipeline(save, config, callbacks=callbacks)
             mgr.get_or_create(game_id, save, pipeline)
-        else:
-            mgr.update_save(game_id, save)
 
         while True:
             try:
@@ -143,75 +142,77 @@ async def websocket_endpoint(
                     )
                     continue
 
-                # Reload save for latest state
+                # ARC-101: the manager owns the single live GameSave.
+                # ARC-102: the per-game asyncio.Lock serializes validate→
+                # advance→persist so two concurrent WS advances cannot lose
+                # a child node.
                 try:
-                    save = load_game(game_id)
+                    save = mgr.get_or_load_save(game_id)
                 except FileNotFoundError:
                     await ws.send_json(
                         {"type": "error", "code": "not_found", "message": "Game not found"}
                     )
                     break
-                mgr.update_save(game_id, save)
 
-                # ARC-007: validate choice_id / from_node_id against the
-                # actual save BEFORE invoking pipeline.advance. Pre-ARC-007
-                # arbitrary strings were passed straight through; an unknown
-                # id either tripped the pipeline's internal ValueError after
-                # LLM/image work had already started, or — for a malformed
-                # from_node_id — silently produced a bogus beat. Reject
-                # early with a clean bad_request event instead.
-                parent_node = save.nodes.get(from_node_id)
-                if parent_node is None:
-                    await ws.send_json(
-                        {
-                            "type": "error",
-                            "code": "bad_request",
-                            "message": f"unknown from_node_id: {from_node_id}",
-                        }
-                    )
-                    continue
-                if not any(c.id == choice_id for c in parent_node.choices):
-                    await ws.send_json(
-                        {
-                            "type": "error",
-                            "code": "bad_request",
-                            "message": (
-                                f"choice_id {choice_id} is not on node {from_node_id}"
-                            ),
-                        }
-                    )
-                    continue
+                async with mgr.advance_lock(game_id):
+                    # ARC-007: validate choice_id / from_node_id against the
+                    # actual save BEFORE invoking pipeline.advance. Pre-ARC-007
+                    # arbitrary strings were passed straight through; an unknown
+                    # id either tripped the pipeline's internal ValueError after
+                    # LLM/image work had already started, or — for a malformed
+                    # from_node_id — silently produced a bogus beat. Reject
+                    # early with a clean bad_request event instead.
+                    parent_node = save.nodes.get(from_node_id)
+                    if parent_node is None:
+                        await ws.send_json(
+                            {
+                                "type": "error",
+                                "code": "bad_request",
+                                "message": f"unknown from_node_id: {from_node_id}",
+                            }
+                        )
+                        continue
+                    if not any(c.id == choice_id for c in parent_node.choices):
+                        await ws.send_json(
+                            {
+                                "type": "error",
+                                "code": "bad_request",
+                                "message": (
+                                    f"choice_id {choice_id} is not on node {from_node_id}"
+                                ),
+                            }
+                        )
+                        continue
 
-                pipeline = mgr.get_pipeline(game_id)
-                if pipeline is None:
-                    await ws.send_json(
-                        {"type": "error", "code": "no_pipeline", "message": "No pipeline"}
-                    )
-                    break
+                    pipeline = mgr.get_pipeline(game_id)
+                    if pipeline is None:
+                        await ws.send_json(
+                            {"type": "error", "code": "no_pipeline", "message": "No pipeline"}
+                        )
+                        break
 
-                callbacks = ws_manager.make_callbacks(game_id)
-                try:
-                    await pipeline.advance(
-                        save,
-                        from_node_id=from_node_id,
-                        choice_id=choice_id,
-                        callbacks=callbacks,
-                    )
-                    mgr.update_save(game_id, save)
-                except Exception:
-                    # SEC-004: log server-side; emit a generic error code,
-                    # never the raw exception string (which can leak the
-                    # configured base_url, internal paths, or provider body).
-                    _logger.exception(
-                        "WS pipeline.advance failed for game %s", game_id
-                    )
-                    await ws.send_json(
-                        {
-                            "type": "error",
-                            "code": "internal_error",
-                            "message": "internal error",
-                        }
-                    )
+                    callbacks = ws_manager.make_callbacks(game_id)
+                    try:
+                        await pipeline.advance(
+                            save,
+                            from_node_id=from_node_id,
+                            choice_id=choice_id,
+                            callbacks=callbacks,
+                        )
+                    except Exception:
+                        # SEC-004: log server-side; emit a generic error code,
+                        # never the raw exception string (which can leak the
+                        # configured base_url, internal paths, or provider body).
+                        _logger.exception(
+                            "WS pipeline.advance failed for game %s", game_id
+                        )
+                        await ws.send_json(
+                            {
+                                "type": "error",
+                                "code": "internal_error",
+                                "message": "internal error",
+                            }
+                        )
             else:
                 await ws.send_json(
                     {

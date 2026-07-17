@@ -12,13 +12,7 @@ import pytest
 from PIL import Image
 from textual.app import App, ComposeResult
 
-from storygen.images.base import ReferencePortrait
-from storygen.images.openai_provider import (
-    PORTRAIT_QUALITY,
-    PORTRAIT_SIZE,
-)
-from storygen.images.pricing import image_cost
-from storygen.llm.models import (
+from storygen.core.models import (
     Character,
     CharacterOutfit,
     ImageProviderConfig,
@@ -28,6 +22,12 @@ from storygen.llm.models import (
     Theme,
     Tone,
 )
+from storygen.images.base import ReferencePortrait
+from storygen.images.openai_provider import (
+    PORTRAIT_QUALITY,
+    PORTRAIT_SIZE,
+)
+from storygen.images.pricing import image_cost
 from storygen.screens._character_edit_modal import (
     CharacterEditModal,
     CharacterEditResult,

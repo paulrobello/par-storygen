@@ -22,7 +22,7 @@ import pytest
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from storygen.llm.models import (
+from storygen.core.models import (
     Character,
     ImageProviderConfig,
     StoredChoice,

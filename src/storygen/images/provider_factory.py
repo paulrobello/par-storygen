@@ -12,13 +12,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Literal, get_args
 
+from storygen.core.models import ImageProviderConfig
 from storygen.images.base import ImageProvider
 from storygen.images.gemini_provider import GeminiImageProvider
 from storygen.images.ollama_provider import OllamaImageProvider
 from storygen.images.openai_provider import OpenAIImageProvider
 from storygen.images.routed_provider import RoutedImageProvider
 from storygen.images.zai_provider import ZaiImageProvider
-from storygen.llm.models import ImageProviderConfig
 from storygen.storage.app_state import (
     PROVIDER_SUPPORTS_REFS,
     SUGGESTED_IMAGE_MODELS,

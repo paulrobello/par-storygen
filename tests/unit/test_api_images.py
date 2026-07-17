@@ -26,7 +26,7 @@ from typing import Any
 import pytest
 from starlette.testclient import TestClient
 
-from storygen.llm.models import (
+from storygen.core.models import (
     Character,
     ImageProviderConfig,
     StoredChoice,

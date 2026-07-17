@@ -23,7 +23,7 @@ from typing import Any
 import pytest
 
 from storygen.config import AppConfig
-from storygen.llm.models import (
+from storygen.core.models import (
     Character,
     ImageProviderConfig,
     StoredChoice,

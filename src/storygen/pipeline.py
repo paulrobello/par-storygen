@@ -17,16 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
-from storygen.images.base import ReferencePortrait
-from storygen.images.constants import (
-    OPENAI_PARTIAL_IMAGES,
-    PORTRAIT_QUALITY,
-    PORTRAIT_SIZE,
-    SCENE_QUALITY,
-    SCENE_SIZE,
-)
-from storygen.images.pricing import image_cost
-from storygen.llm.models import (
+from storygen.core.models import (
     Character,
     Choice,
     IllustrationPlan,
@@ -36,6 +27,15 @@ from storygen.llm.models import (
     StoryNode,
     Summary,
 )
+from storygen.images.base import ReferencePortrait
+from storygen.images.constants import (
+    OPENAI_PARTIAL_IMAGES,
+    PORTRAIT_QUALITY,
+    PORTRAIT_SIZE,
+    SCENE_QUALITY,
+    SCENE_SIZE,
+)
+from storygen.images.pricing import image_cost
 from storygen.pipeline_prefetch import PrefetchCoordinator
 from storygen.storage import app_state, paths
 from storygen.storage.llm_cache import dump_llm_exchange
