@@ -259,8 +259,13 @@ def test_get_session_manager_returns_singleton() -> None:
     assert mgr1 is mgr2
 
 
-def test_build_split_image_provider_for_wizard_returns_split(xdg_tmp: Any) -> None:
+def test_build_split_image_provider_for_wizard_returns_split(
+    xdg_tmp: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Wizard provider builder returns a SplitImageProvider without raising."""
+    # The OpenAI client refuses to construct without a key; provide a dummy
+    # one so this test does not depend on a real OPENAI_API_KEY in the env.
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     from storygen.config import load_config
     from storygen.images.split_provider import SplitImageProvider
 
@@ -269,8 +274,11 @@ def test_build_split_image_provider_for_wizard_returns_split(xdg_tmp: Any) -> No
     assert isinstance(provider, SplitImageProvider)
 
 
-def test_build_split_image_provider_returns_split(xdg_tmp: Any) -> None:
+def test_build_split_image_provider_returns_split(
+    xdg_tmp: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Save-pinned provider builder returns a SplitImageProvider without raising."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     from storygen.images.split_provider import SplitImageProvider
 
     save = _make_save(xdg_tmp)
