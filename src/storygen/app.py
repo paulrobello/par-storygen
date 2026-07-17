@@ -456,6 +456,7 @@ class StoryGenApp(App[None]):
             summary_agent=summary_agent,
             image_provider=save_image_provider,
             callbacks=PipelineCallbacks(),
+            tts_player=self._tts_player,
         )
         # Backfill cover art for legacy saves. Fire-and-forget so the player
         # sees the spinner immediately instead of a blank pause.

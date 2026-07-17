@@ -15,7 +15,12 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    # Type-only: avoids a runtime import cycle for callers of ``BeatPipeline``
+    # that don't otherwise touch the TTS subsystem.
+    from storygen.tts.player import TTSPlayer
 
 from storygen.core.models import (
     Character,
@@ -170,6 +175,7 @@ class BeatPipeline:
         summary_agent: SummaryAgentLike | None,
         image_provider: ImageProviderLike,
         callbacks: PipelineCallbacks | None = None,
+        tts_player: TTSPlayer | None = None,
     ) -> None:
         self._beat = beat_agent
         self._illustration = illustration_agent
@@ -183,8 +189,10 @@ class BeatPipeline:
         # Background prefetch lifecycle (task registry, failure-log dedup,
         # LLM-call semaphore) — see :class:`PrefetchCoordinator`. Captures
         # ``self.advance`` so a prefetch reuses the exact advance path with
-        # side effects suppressed.
-        self._prefetch = PrefetchCoordinator(self.advance)
+        # side effects suppressed. ENH-006-T2: ``tts_player`` (when wired and
+        # the user opts in via ``TTSPrefs.pregenerate_prefetch_audio``) lets
+        # the coordinator speculatively synth prefetched narration audio.
+        self._prefetch = PrefetchCoordinator(self.advance, tts_player=tts_player)
 
     async def advance(
         self,

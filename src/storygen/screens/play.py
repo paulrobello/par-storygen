@@ -31,7 +31,7 @@ from storygen.screens.portraits import PortraitsScreen
 from storygen.screens.relationships import RelationshipsScreen
 from storygen.storage import app_state, paths
 from storygen.storage.save import GameSave, save_game
-from storygen.tts.cache import relative_tts_cache_path, tts_cache_path
+from storygen.tts.cache import relative_tts_cache_path, synthesize_to_cache, tts_cache_path
 from storygen.tts.player import TTSPlayer, TTSState
 from storygen.util import open_in_system_viewer
 from storygen.widgets.choice_list import ChoiceList
@@ -1040,6 +1040,20 @@ class PlayScreen(Screen[None]):
         )
         cache = self._tts_cache_path(node.id, tts_prefs)
         relative_cache = self._relative_tts_cache_path(node.id, tts_prefs)
+        # ENH-006-T2: ensure the cache exists under the per-node synth lock so
+        # a concurrent prefetch synth for this same node serializes to a
+        # single provider call. ``speak`` then finds the cache file and plays
+        # without re-generating. If the lock-aware synth fails (returns None),
+        # ``speak`` falls through to its own generate path as the unlocked
+        # fallback — acceptable because the prefetch caller has already
+        # drained by then (no concurrent in-flight synth to race against).
+        await synthesize_to_cache(
+            self._tts_player,
+            str(self._save.id),
+            node.id,
+            node.narration,
+            tts_prefs,
+        )
         ok = await self._tts_player.speak(node.narration, cache_path=cache)
         if ok and node.tts_audio_path != relative_cache:
             node.tts_audio_path = relative_cache
