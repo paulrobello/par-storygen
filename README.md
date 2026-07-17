@@ -33,14 +33,16 @@
 * [Export book](#export-book)
 * [Keyboard shortcuts](#keyboard-shortcuts)
 * [Web API and frontend (optional)](#web-api-and-frontend-optional)
+* [Troubleshooting](#troubleshooting)
 * [Contributing](#contributing)
 * [Roadmap](#roadmap)
 
 ![CI](https://github.com/paulrobello/par-storygen/actions/workflows/ci.yml/badge.svg)
+![PyPI - Version](https://img.shields.io/pypi/v/par-storygen)
 ![PyPI - Python Version](https://img.shields.io/badge/python-3.13-blue)
 ![Runs on Linux | MacOS | Windows](https://img.shields.io/badge/runs%20on-Linux%20%7C%20MacOS%20%7C%20Windows-blue)
 ![Arch x86-64 | ARM | AppleSilicon](https://img.shields.io/badge/arch-x86--64%20%7C%20ARM%20%7C%20AppleSilicon-blue)
-![PyPI - License](https://img.shields.io/pypi/l/mit)
+![PyPI - License](https://img.shields.io/pypi/l/par-storygen)
 
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/probello3)
 
@@ -168,14 +170,31 @@ make setup
 ```
 
 ## Command line arguments
-```
-usage: storygen run [--resume]
 
-par-storygen -- AI-driven TUI choose-your-own-adventure.
+The TUI ships as the `storygen` console script. Bare `uv run storygen` is equivalent to `storygen run` with no flags.
 
-options:
-  -r, --resume   Re-open last-played save
 ```
+storygen --version          Print the version and exit.
+storygen --help             Show top-level help.
+storygen run                Launch the TUI.
+storygen run --resume (-r)  Skip the menu and resume the most recently played story.
+```
+
+### `storygen-api` (optional `[api]` extra)
+
+The FastAPI server ships as a separate console script, available after `uv sync --extra api`. Its single (default) command starts uvicorn:
+
+```
+storygen-api serve --host 127.0.0.1 --port 8101 --no-reload
+```
+
+| Flag | Default | Purpose |
+|------|---------|---------|
+| `--host` | `127.0.0.1` | Bind address. Pass `0.0.0.0` for LAN access (and set `STORYGEN_API_TOKEN`). |
+| `--port` | `8101` | Bind port — pairs with the Next.js dev server on `:8100`. |
+| `--reload` / `--no-reload` | `--no-reload` | Auto-reload on source changes (dev only). |
+
+`make api-dev` runs uvicorn with `--reload --port 8101`; `make api-prod` pins `--workers 1` (the server is single-worker — see [Web API and frontend](#web-api-and-frontend-optional)).
 
 ## Environment Variables
 
@@ -204,6 +223,12 @@ options:
 * `STORYGEN_CHARACTER_IMAGE_API_KEY` — Override API key for the character portrait provider
 
 See [`.env.example`](./.env.example) for the full list.
+
+### FastAPI server variables (optional `[api]` extra)
+* `STORYGEN_API_TOKEN` — shared bearer token. Unset → loopback trusted, off-box rejected (HTTP 503 / WS 4403); set → required of every client including loopback.
+* `STORYGEN_API_ALLOWED_ORIGINS` — CORS origins (comma-separated; default `http://localhost:8100,http://127.0.0.1:8100`).
+* `STORYGEN_WS_ALLOWED_ORIGINS` — WebSocket handshake origin allowlist (default mirrors `STORYGEN_API_ALLOWED_ORIGINS`).
+* `STORYGEN_API_RATE_LIMIT` — per-IP sliding-window limit on cost-incurring routes, format `<count>/<period>` with period `second`/`minute`/`hour` (default `30/minute`; `0` disables).
 
 ## Data locations
 
@@ -475,7 +500,7 @@ make api-prod            # uvicorn ... --port 8101 --workers 1
 - **WebSocket:** connect to `/api/ws/{game_id}` to receive `narration_delta`, `beat_committed`, `image_committed`, and `image_failed` events during play.
 - **Single worker only:** the server keeps in-memory session/WebSocket/TTS state per process, so always run with `--workers 1` (the Makefile target does this). A second worker silently desyncs game state.
 
-> **Security — bind address and auth.** As of v0.5.x the server binds to `127.0.0.1` by default (loopback only). To expose it on a LAN, pass `--host 0.0.0.0` **and** set `STORYGEN_API_TOKEN` so every state-changing or cost-incurring route is gated by a shared bearer token. When `STORYGEN_API_TOKEN` is unset, those protected routes fail closed with `503`. See `.env.example` for the variable and the expected `Authorization: Bearer <token>` (HTTP) and `Sec-WebSocket-Protocol: bearer.<token>` (WebSocket) usage.
+> **Security — bind address and auth.** The server binds to `127.0.0.1` by default (loopback only). Auth is two-mode: when `STORYGEN_API_TOKEN` is unset, loopback peers are trusted (so `make api-dev` + `make web-dev` work out of the box) and off-box clients are rejected with HTTP 503 / WebSocket close 4403; when the token is set, every client — loopback included — must send the matching bearer token. To expose it on a LAN, pass `--host 0.0.0.0` **and** set `STORYGEN_API_TOKEN`. See `.env.example` for the variable and the expected `Authorization: Bearer <token>` (HTTP) and `Sec-WebSocket-Protocol: bearer.<token>` (WebSocket) usage.
 
 ### Next.js frontend (`web/`)
 
@@ -487,36 +512,25 @@ make web-dev             # Next.js dev server on :8100 (run alongside `make api-
 make web-build           # production build
 ```
 
-The dev server origin (`http://localhost:8100`) is the one the API allows for CORS; keep both ports at their defaults or update the CORS allowlist in `src/storygen_api/main.py` and `API_BASE` in `web/src/lib/api.ts` together.
+The dev server origin (`http://localhost:8100`) is the one the API allows for CORS by default. Point the frontend at a different API via the `NEXT_PUBLIC_API_BASE` build-time variable (see [`web/README.md`](./web/README.md)); change the API's CORS or WebSocket origin allowlist via `STORYGEN_API_ALLOWED_ORIGINS` / `STORYGEN_WS_ALLOWED_ORIGINS` (comma-separated; both default to `http://localhost:8100,http://127.0.0.1:8100`).
+
+## Troubleshooting
+
+Common runtime problems — missing API keys, Ollama not reachable, image-provider 4xx errors, blank image panel, TTS with no audio, and the web UI failing to reach the API — are covered in [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md). Each entry follows a symptom → cause → fix → verify format.
 
 ## Contributing
 
-Clone the repo and run the setup make target. Note `uv` is required.
+Contributions are welcome. The full setup, gate, pre-commit, commit-style, and branch/PR flow live in [`CONTRIBUTING.md`](./CONTRIBUTING.md). The short version:
+
 ```bash
 git clone https://github.com/paulrobello/par-storygen
 cd par-storygen
-make setup
+make build         # uv sync --extra api --dev
+make web-install   # only if you touch web/
+make checkall      # ruff lint + pyright + pytest (the CI gate)
 ```
 
-Please ensure that all pull requests are formatted with ruff, pass ruff lint and pyright.
-You can run the make target **checkall** to ensure the pipeline will pass with your changes.
-
-```bash
-make checkall    # ruff format + lint + pyright + pytest
-```
-
-The easiest way to setup your environment for smooth pull requests:
-
-With uv installed:
-```bash
-uv tool install pre-commit
-```
-
-From repo root:
-```bash
-pre-commit install
-pre-commit run --all-files
-```
+Please ensure pull requests are formatted with ruff, pass `make checkall`, and follow the [Conventional Commits](https://www.conventionalcommits.org/) style used throughout the history (`fix(scope):`, `feat(scope):`, `docs(scope):`, …).
 
 ## Roadmap
 
@@ -535,7 +549,7 @@ As of v0.5.0. See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
 * **Export Book** — Standalone HTML book reader with 3D page turns, inline audio, and auto-read
 * **Story Templates & Presets** — Curated and custom presets; Quick Start from the menu, Load/Save Preset in the wizard
 * **Narrative Recap** — On-demand "Previously on..." summaries (`Shift+R`), auto-recap, and resume recap
-* **Relationship Tracking** — Pairwise character relationships extracted inline, viewable via `f`
+* **Relationship Tracking** — Pairwise character relationships extracted inline, viewable via `i` → Relationships
 * **Image Style Gallery** — Browse and apply art styles from Settings
 * **Dynamic Pacing** — Slow / Moderate / Fast pacing per story
 

@@ -1,3 +1,11 @@
+"""Image Style Gallery screen.
+
+A Textual ``Screen`` reachable from Settings that generates the same
+character description across several image providers side-by-side so the
+player can compare model, generation time, and estimated cost before
+committing. Supports OpenAI, Gemini, Z.AI, and Ollama.
+"""
+
 from __future__ import annotations
 
 import os

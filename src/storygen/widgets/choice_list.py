@@ -12,6 +12,23 @@ from storygen.core.models import Choice
 
 
 def format_choice_line(n: int, choice: Choice, *, highlighted: bool = False) -> Text:
+    """Render one numbered choice as a Rich ``Text`` line for the choice list.
+
+    Appends ``" [selected]"`` when the choice already has a ``child_node_id``
+    (i.e. that branch has been explored before) so the player can tell cache
+    hits from unexplored options. When ``highlighted`` is set the whole line is
+    styled bold reverse-video to mark the keyboard cursor.
+
+    Args:
+        n: 1-based position shown to the player (the footer binding number).
+        choice: The choice to render (a ``Choice`` or ``StoredChoice`` subclass;
+            the ``child_node_id`` attribute is read via ``getattr`` so plain
+            ``Choice`` values simply omit the selected marker).
+        highlighted: True for the currently keyboard-highlighted choice.
+
+    Returns:
+        A Rich ``Text`` ready to append to the rendered list.
+    """
     selected_marker = " [selected]" if getattr(choice, "child_node_id", None) else ""
     label = f"{n}. {choice.text}{selected_marker}"
     text = Text(label)

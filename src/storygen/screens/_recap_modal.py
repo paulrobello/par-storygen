@@ -1,3 +1,11 @@
+"""The "Previously on..." recap modal.
+
+A read-only Textual ``Screen`` shown on demand (PlayScreen's ``R`` / Shift+R
+binding), on auto-recap, and on resume when a recap is available. Renders the
+cached ``node.recap_text`` and offers a ``t`` binding to read the recap aloud
+via the active TTS player.
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar

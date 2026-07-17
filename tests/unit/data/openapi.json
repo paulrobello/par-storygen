@@ -2,12 +2,15 @@
   "components": {
     "schemas": {
       "AdvanceRequest": {
+        "description": "Body for `POST /api/games/{id}/advance` — pick a choice.",
         "properties": {
           "choice_id": {
+            "description": "Id of the choice being taken.",
             "title": "Choice Id",
             "type": "string"
           },
           "from_node_id": {
+            "description": "Node the choice is being taken from.",
             "title": "From Node Id",
             "type": "string"
           }
@@ -20,6 +23,7 @@
         "type": "object"
       },
       "AdvanceResponse": {
+        "description": "Result of an advance: the landed node plus any side effects.",
         "properties": {
           "image_status": {
             "anyOf": [
@@ -30,9 +34,11 @@
                 "type": "null"
               }
             ],
+            "description": "Scene-image state at response time (the image may still be rendering asynchronously).",
             "title": "Image Status"
           },
           "new_characters": {
+            "description": "Characters introduced by this beat (may be empty).",
             "items": {
               "$ref": "#/components/schemas/Character"
             },
@@ -166,6 +172,7 @@
         "type": "object"
       },
       "CharacterCreateRequest": {
+        "description": "Body for creating a new library character from a concept.",
         "properties": {
           "concept": {
             "title": "Concept",
@@ -184,6 +191,7 @@
         "type": "object"
       },
       "CharacterExportRequest": {
+        "description": "Body for exporting a character into the library.",
         "properties": {
           "backstory": {
             "title": "Backstory",
@@ -238,12 +246,14 @@
         "type": "object"
       },
       "CharacterLibraryEntry": {
+        "description": "One exported character in the cross-game library.",
         "properties": {
           "backstory": {
             "title": "Backstory",
             "type": "string"
           },
           "exported_at": {
+            "description": "When the character was exported.",
             "format": "date-time",
             "title": "Exported At",
             "type": "string"
@@ -259,6 +269,7 @@
             "type": "boolean"
           },
           "id": {
+            "description": "Library id (uuid4 hex, independent of save char id).",
             "title": "Id",
             "type": "string"
           },
@@ -275,6 +286,7 @@
             "type": "string"
           },
           "portrait_prompt": {
+            "description": "Prompt the portrait was generated from.",
             "title": "Portrait Prompt",
             "type": "string"
           },
@@ -308,6 +320,7 @@
         "type": "object"
       },
       "CharacterLibraryResponse": {
+        "description": "Response envelope for `GET /api/library`.",
         "properties": {
           "characters": {
             "items": {
@@ -364,6 +377,7 @@
         "type": "object"
       },
       "CharacterUpdateRequest": {
+        "description": "Partial update for an in-place library character edit.",
         "properties": {
           "backstory": {
             "anyOf": [
@@ -425,6 +439,7 @@
         "type": "object"
       },
       "ChoiceOption": {
+        "description": "A single choice offered at a node, with its resolved child if explored.",
         "properties": {
           "child_node_id": {
             "anyOf": [
@@ -435,13 +450,16 @@
                 "type": "null"
               }
             ],
+            "description": "Id of the node this choice leads to, or null while unexplored.",
             "title": "Child Node Id"
           },
           "id": {
+            "description": "Stable choice id (unique within the parent node).",
             "title": "Id",
             "type": "string"
           },
           "text": {
+            "description": "Player-facing choice label.",
             "title": "Text",
             "type": "string"
           }
@@ -454,12 +472,15 @@
         "type": "object"
       },
       "GameDetail": {
+        "description": "Full game state: the node tree plus aggregated metadata.",
         "properties": {
           "art_style": {
+            "description": "Art-style string threaded into image prompts.",
             "title": "Art Style",
             "type": "string"
           },
           "characters": {
+            "description": "Current cast roster (may grow mid-story).",
             "items": {
               "additionalProperties": true,
               "type": "object"
@@ -468,15 +489,18 @@
             "type": "array"
           },
           "created_at": {
+            "description": "Save creation time.",
             "format": "date-time",
             "title": "Created At",
             "type": "string"
           },
           "current_node_id": {
+            "description": "Cursor position in the tree.",
             "title": "Current Node Id",
             "type": "string"
           },
           "endings_reached": {
+            "description": "Node ids of every ending the player has reached.",
             "items": {
               "type": "string"
             },
@@ -484,6 +508,7 @@
             "type": "array"
           },
           "id": {
+            "description": "Save UUID (hex).",
             "title": "Id",
             "type": "string"
           },
@@ -491,6 +516,7 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/NodeDetail"
             },
+            "description": "Full node map keyed by id.",
             "title": "Nodes",
             "type": "object"
           },
@@ -504,44 +530,53 @@
             "type": "array"
           },
           "root_node_id": {
+            "description": "Root node id.",
             "title": "Root Node Id",
             "type": "string"
           },
           "text_total_input_tokens": {
             "default": 0,
+            "description": "Cumulative input tokens.",
             "title": "Text Total Input Tokens",
             "type": "integer"
           },
           "text_total_output_tokens": {
             "default": 0,
+            "description": "Cumulative output tokens.",
             "title": "Text Total Output Tokens",
             "type": "integer"
           },
           "text_total_requests": {
             "default": 0,
+            "description": "Cumulative LLM call count.",
             "title": "Text Total Requests",
             "type": "integer"
           },
           "theme": {
             "additionalProperties": true,
+            "description": "Theme blob (premise, tone, etc.).",
             "title": "Theme",
             "type": "object"
           },
           "title": {
+            "description": "Human-readable story title.",
             "title": "Title",
             "type": "string"
           },
           "tone": {
             "additionalProperties": true,
+            "description": "Tone blob (preset + descriptor).",
             "title": "Tone",
             "type": "object"
           },
           "total_image_cost_usd": {
             "default": 0.0,
+            "description": "Cumulative image spend in USD.",
             "title": "Total Image Cost Usd",
             "type": "number"
           },
           "updated_at": {
+            "description": "Last write time.",
             "format": "date-time",
             "title": "Updated At",
             "type": "string"
@@ -565,6 +600,7 @@
         "type": "object"
       },
       "GameListResponse": {
+        "description": "Response envelope for `GET /api/games`.",
         "properties": {
           "games": {
             "items": {
@@ -581,6 +617,7 @@
         "type": "object"
       },
       "GameSummary": {
+        "description": "One row in the game list (lightweight, no node tree).",
         "properties": {
           "has_cover": {
             "default": false,
@@ -588,22 +625,27 @@
             "type": "boolean"
           },
           "id": {
+            "description": "Save UUID (hex).",
             "title": "Id",
             "type": "string"
           },
           "is_ending": {
+            "description": "True when the current cursor sits on a terminal (ending) node.",
             "title": "Is Ending",
             "type": "boolean"
           },
           "node_count": {
+            "description": "Number of nodes currently in the tree.",
             "title": "Node Count",
             "type": "integer"
           },
           "title": {
+            "description": "Human-readable story title.",
             "title": "Title",
             "type": "string"
           },
           "updated_at": {
+            "description": "Last write time of the save.",
             "format": "date-time",
             "title": "Updated At",
             "type": "string"
@@ -620,6 +662,7 @@
         "type": "object"
       },
       "GraphEdge": {
+        "description": "One parent→child edge in the story tree.",
         "properties": {
           "child_id": {
             "anyOf": [
@@ -630,13 +673,16 @@
                 "type": "null"
               }
             ],
+            "description": "Child node id, or null while unexplored.",
             "title": "Child Id"
           },
           "choice_text": {
+            "description": "Label of the choice leading to the child.",
             "title": "Choice Text",
             "type": "string"
           },
           "parent_id": {
+            "description": "Parent node id.",
             "title": "Parent Id",
             "type": "string"
           }
@@ -649,6 +695,7 @@
         "type": "object"
       },
       "GraphResponse": {
+        "description": "Edge list for `GET /api/games/{id}/graph`.",
         "properties": {
           "edges": {
             "items": {
@@ -678,8 +725,10 @@
         "type": "object"
       },
       "JumpRequest": {
+        "description": "Body for the jump-to-node endpoint.",
         "properties": {
           "target_node_id": {
+            "description": "Node to move the cursor to.",
             "title": "Target Node Id",
             "type": "string"
           }
@@ -691,6 +740,7 @@
         "type": "object"
       },
       "NodeDetail": {
+        "description": "Full projection of a single story node for the client.",
         "properties": {
           "choices": {
             "default": [],
@@ -709,14 +759,17 @@
                 "type": "null"
               }
             ],
+            "description": "Id of the choice taken from the parent to reach this node.",
             "title": "Chosen Choice Id"
           },
           "created_at": {
+            "description": "When the node was first committed.",
             "format": "date-time",
             "title": "Created At",
             "type": "string"
           },
           "id": {
+            "description": "Node id (content-addressed).",
             "title": "Id",
             "type": "string"
           },
@@ -729,6 +782,7 @@
                 "type": "null"
               }
             ],
+            "description": "Relative path to the scene image, when present.",
             "title": "Image Path"
           },
           "image_prompt": {
@@ -740,6 +794,7 @@
                 "type": "null"
               }
             ],
+            "description": "Prompt used (or to be used) for the scene image.",
             "title": "Image Prompt"
           },
           "image_status": {
@@ -751,17 +806,21 @@
                 "type": "null"
               }
             ],
+            "description": "Scene-image lifecycle state: not_planned | generating | done | failed.",
             "title": "Image Status"
           },
           "is_ending": {
+            "description": "True when this node ends the story.",
             "title": "Is Ending",
             "type": "boolean"
           },
           "is_major": {
+            "description": "True for major (summary-triggering) beats.",
             "title": "Is Major",
             "type": "boolean"
           },
           "narration": {
+            "description": "Narration text shown to the player.",
             "title": "Narration",
             "type": "string"
           },
@@ -774,6 +833,7 @@
                 "type": "null"
               }
             ],
+            "description": "Parent node id; null for the root.",
             "title": "Parent Id"
           },
           "summary_to_here": {
@@ -785,6 +845,7 @@
                 "type": "null"
               }
             ],
+            "description": "Cumulative story-so-far summary anchored at this node, present only on major beats.",
             "title": "Summary To Here"
           }
         },
@@ -799,6 +860,7 @@
         "type": "object"
       },
       "OutfitRequest": {
+        "description": "Body for creating a character outfit.",
         "properties": {
           "description": {
             "title": "Description",
@@ -817,6 +879,7 @@
         "type": "object"
       },
       "PortraitEditRequest": {
+        "description": "Body for the portrait edit/regenerate endpoint.",
         "properties": {
           "art_style": {
             "default": "children's story book",
@@ -845,6 +908,7 @@
         "type": "object"
       },
       "PortraitRegenerateRequest": {
+        "description": "Body for the portrait-regenerate endpoint.",
         "properties": {
           "art_style": {
             "default": "children's story book",
@@ -856,8 +920,10 @@
         "type": "object"
       },
       "PruneRequest": {
+        "description": "Body for the prune-subtree endpoint.",
         "properties": {
           "node_id": {
+            "description": "Root of the subtree to delete.",
             "title": "Node Id",
             "type": "string"
           }
@@ -875,6 +941,7 @@
         "type": "object"
       },
       "SceneEditRequest": {
+        "description": "Body for the scene-prompt-edit endpoint.",
         "properties": {
           "prompt": {
             "title": "Prompt",
@@ -888,6 +955,7 @@
         "type": "object"
       },
       "SettingsResponse": {
+        "description": "Snapshot of every persisted preference + provider default.",
         "properties": {
           "art_enabled": {
             "default": true,
@@ -979,6 +1047,7 @@
         "type": "object"
       },
       "SettingsUpdateRequest": {
+        "description": "Partial update for `PUT /api/settings` — only set fields are applied.",
         "properties": {
           "art_enabled": {
             "anyOf": [
@@ -1166,8 +1235,10 @@
         "type": "object"
       },
       "StoryImportRequest": {
+        "description": "Body for importing characters from another save into the library.",
         "properties": {
           "character_ids": {
+            "description": "Character ids to import.",
             "items": {
               "type": "string"
             },
@@ -1175,6 +1246,7 @@
             "type": "array"
           },
           "save_id": {
+            "description": "Source save to pull characters from.",
             "title": "Save Id",
             "type": "string"
           }
@@ -1227,6 +1299,7 @@
         "type": "object"
       },
       "WizardCharactersRequest": {
+        "description": "Body for the character-generation wizard step.",
         "properties": {
           "imported_characters": {
             "default": [],
@@ -1244,6 +1317,7 @@
           },
           "theme": {
             "additionalProperties": true,
+            "description": "Theme blob from the theme step.",
             "title": "Theme",
             "type": "object"
           }
@@ -1255,6 +1329,7 @@
         "type": "object"
       },
       "WizardCharactersResponse": {
+        "description": "Generated cast roster.",
         "properties": {
           "characters": {
             "items": {
@@ -1272,6 +1347,7 @@
         "type": "object"
       },
       "WizardConfirmRequest": {
+        "description": "Body for the confirm-and-create-game wizard step.",
         "properties": {
           "art_style": {
             "default": "children's story book",
@@ -1336,12 +1412,15 @@
         "type": "object"
       },
       "WizardConfirmResponse": {
+        "description": "Ids of the newly created game.",
         "properties": {
           "game_id": {
+            "description": "UUID of the new save.",
             "title": "Game Id",
             "type": "string"
           },
           "title": {
+            "description": "Generated story title.",
             "title": "Title",
             "type": "string"
           }
@@ -1354,8 +1433,10 @@
         "type": "object"
       },
       "WizardThemeRequest": {
+        "description": "Body for the theme-generation wizard step.",
         "properties": {
           "prompt": {
+            "description": "Free-text premise the theme is derived from.",
             "title": "Prompt",
             "type": "string"
           }
@@ -1367,6 +1448,7 @@
         "type": "object"
       },
       "WizardThemeResponse": {
+        "description": "Generated theme blob.",
         "properties": {
           "theme": {
             "additionalProperties": true,

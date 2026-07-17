@@ -78,3 +78,78 @@ describe("authHeaders (SEC-102)", () => {
     expect("Authorization" in merged).toBe(false);
   });
 });
+
+// QA-013: sceneImageUrl centralizes the /api/images/<game>/scene/<node> URL
+// shape and — critically — returns null unless image_status === "done", so the
+// UI renders a placeholder/spinner instead of fetching a 404. Pinning both the
+// null-vs-URL branch and the URL shape guards against a regression that would
+// re-introduce the pre-QA-013 five-site duplication (and the 404-on-pending
+// flashes that motivated it).
+describe("sceneImageUrl (QA-013)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.unstubAllEnvs();
+  });
+
+  it("returns null for every non-done image_status", async () => {
+    const { sceneImageUrl } = await import("./api");
+    for (const status of ["not_planned", "generating", "failed"] as const) {
+      expect(sceneImageUrl("g1", { id: "n1", image_status: status })).toBeNull();
+    }
+  });
+
+  it("returns the canonical scene URL when image_status is done", async () => {
+    // API_BASE defaults to http://localhost:8101 in the vitest env.
+    const { sceneImageUrl } = await import("./api");
+    expect(sceneImageUrl("g1", { id: "n1", image_status: "done" })).toBe(
+      "http://localhost:8101/api/images/g1/scene/n1",
+    );
+  });
+});
+
+// Error propagation: every wrapper funnels non-2xx through handleResponse,
+// which throws `new Error("API <status>: <body>")`. Pinning the message shape
+// so UI error displays (game-store's `error` field) keep rendering the status
+// code + body instead of an opaque "request failed".
+describe("apiGet error propagation", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.unstubAllEnvs();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("throws an Error carrying the status code and response body on non-2xx", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: async () => "internal boom",
+      }),
+    );
+    const { apiGet } = await import("./api");
+
+    await expect(apiGet("/api/games/g1")).rejects.toThrow(/API 500: internal boom/);
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to 'Unknown error' when the response body cannot be read", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        text: async () => {
+          throw new Error("read failed");
+        },
+      }),
+    );
+    const { apiGet } = await import("./api");
+
+    await expect(apiGet("/api/games/g1")).rejects.toThrow(/API 502: Unknown error/);
+  });
+});

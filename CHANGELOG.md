@@ -232,7 +232,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings screen** — persisted in-app configuration for provider defaults, art toggle, streaming, prefetch options, and wizard defaults
 - **Save/resume** — `--resume` flag re-opens the last-played save; full game state persistence
 
-[Unreleased]: https://github.com/paulrobello/par-storygen/compare/v0.3.1...HEAD
+<!-- NOTE: tags v0.2.0–v0.5.0 are not yet pushed; the compare links below
+     will 404 until those tags exist on the remote. Do not push tags from
+     docs work — tagging is a release-time, owner decision. -->
+
+[Unreleased]: https://github.com/paulrobello/par-storygen/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/paulrobello/par-storygen/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/paulrobello/par-storygen/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/paulrobello/par-storygen/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/paulrobello/par-storygen/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/paulrobello/par-storygen/compare/v0.2.1...v0.2.2

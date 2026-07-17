@@ -8,6 +8,6 @@ The repository ships three surfaces that share the `storage` / `llm` / `images` 
 - **FastAPI server** (`src/storygen_api/`, optional `[api]` extra; `uv run storygen-api serve`) — a second composition root exposing the wizard + play loop over REST + WebSocket on `:8101`.
 - **Next.js frontend** (`web/`) — drives the API from the browser on `:8100`.
 
-Before non-trivial work, consult `docs/ARCHITECTURE.md` (implementation depth), `docs/DOCUMENTATION_STYLE_GUIDE.md` (prose conventions), and `AUDIT.md` (known findings).
+Before non-trivial work, consult `docs/ARCHITECTURE.md` (implementation depth, including the "Auth + SSRF defense" section), `docs/DOCUMENTATION_STYLE_GUIDE.md` (prose conventions), and `CHANGELOG.md` ([Unreleased] describes the in-flight audit remediation).
 
 read @CLAUDE.md

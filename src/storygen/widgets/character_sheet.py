@@ -14,6 +14,12 @@ from storygen.widgets.image_util import pixels_from_image
 
 
 def format_character_entry(c: Character) -> str:
+    """Format a character as a one-line roster entry: ``"<name> -- <personality>"``.
+
+    Only the first sentence of ``personality`` (up to the first ``.``) is used
+    so each row stays scannable in the sidebar. Used by ``CharacterSheet`` to
+    render the cast list.
+    """
     first_line_of_personality = c.personality.split(".", 1)[0]
     return f"{c.name} -- {first_line_of_personality}"
 

@@ -1,3 +1,12 @@
+"""Story presets / templates — curated and user-saved.
+
+Loads bundled TOML presets from package resources and custom presets from
+``$XDG_CONFIG_HOME/storygen/presets/``. The wizard's "Load Preset" action
+reads from this module; "Save as Preset" writes a custom preset via
+:func:`save_preset`, which sanitizes the filename slug (SEC-105) so a
+user-supplied name cannot escape the presets directory via path traversal.
+"""
+
 from __future__ import annotations
 
 import re

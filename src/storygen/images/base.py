@@ -38,7 +38,26 @@ class ImageProvider(Protocol):
         art_style: str = "children's story book",
         on_partial: Callable[[bytes], Awaitable[None]] | None = None,
         reference_image: bytes | None = None,
-    ) -> bytes: ...
+    ) -> bytes:
+        """Generate a single character portrait.
+
+        Args:
+            description: Physical description used as the portrait prompt base.
+            transparent: Request a transparent background. Providers/models
+                that cannot honor this (e.g. OpenAI ``gpt-image-2``) render an
+                opaque neutral background instead.
+            art_style: Art-style string threaded into the prompt.
+            on_partial: Optional partial-image callback (OpenAI streaming only);
+                invoked with each preview chunk as it arrives; other providers
+                ignore it.
+            reference_image: Optional single reference image bytes for
+                providers that anchor a portrait to an existing look
+                (OpenAI only today); silently dropped by non-ref providers.
+
+        Returns:
+            The generated PNG bytes.
+        """
+        ...
 
     async def generate_scene(
         self,
@@ -47,4 +66,19 @@ class ImageProvider(Protocol):
         reference_portraits: list[ReferencePortrait],
         art_style: str = "children's story book",
         on_partial: Callable[[bytes], Awaitable[None]] | None = None,
-    ) -> bytes: ...
+    ) -> bytes:
+        """Generate a scene illustration.
+
+        Args:
+            prompt: Scene description (illustration-plan ``image_prompt``).
+            reference_portraits: Named reference portraits for featured
+                characters; ref-aware providers fold them into the call
+                (OpenAI via ``images.edit``, Gemini inline) so faces stay
+                consistent. Non-ref providers silently drop them.
+            art_style: Art-style string threaded into the prompt.
+            on_partial: Optional partial-image callback (OpenAI streaming only).
+
+        Returns:
+            The generated PNG bytes.
+        """
+        ...

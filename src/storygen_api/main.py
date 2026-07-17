@@ -163,14 +163,15 @@ def serve(
     # runtime; pyright sees the placeholder's type as unknown. This is typer's
     # documented pattern — see https://typer.tiangolo.com/tutorial/options/
     host: str = typer.Option("127.0.0.1", help="Bind host (loopback by default)"),  # type: ignore[reportUnknownMemberType]
-    port: int = typer.Option(8000, help="Bind port"),  # type: ignore[reportUnknownMemberType]
+    port: int = typer.Option(8101, help="Bind port"),  # type: ignore[reportUnknownMemberType]
     reload: bool = typer.Option(False, help="Enable auto-reload"),  # type: ignore[reportUnknownMemberType]
 ) -> None:
     """Start the storygen API server.
 
-    Binds to ``127.0.0.1`` by default (SEC-006). To expose on a LAN, pass
-    ``--host 0.0.0.0`` AND set ``STORYGEN_API_TOKEN`` so SEC-001 auth gates
-    every state-changing route.
+    Binds to ``127.0.0.1:8101`` by default (SEC-006; the port pairs with the
+    Next.js dev server on :8100). To expose on a LAN, pass ``--host 0.0.0.0``
+    AND set ``STORYGEN_API_TOKEN`` so SEC-001 auth gates every
+    state-changing route.
     """
     uvicorn.run(
         "storygen_api.main:create_app",
