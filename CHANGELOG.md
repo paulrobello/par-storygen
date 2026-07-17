@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+<!-- 2026-07-16 audit remediation (SEC-101..107, ARC-101..116, QA-001..019, DOC-001..015) -->
+
+### Security
+
+- **Static-asset side-door closed + client auth wired** — Removed the unauthenticated `games_root` static mount that served `game.json` and the LLM cache over `/api/images/*`; every image/audio asset now flows through an existing token-gated router route. The web frontend can now present the bearer token (`NEXT_PUBLIC_API_TOKEN`) on REST calls and the WebSocket `bearer.<token>` subprotocol; WebSocket `advance` frames are rate-limited like REST; `/api/presets` is token-gated; preset-name slugs are sanitized; CORS `allow_credentials` is `False`. (SEC-101…107)
+
+### Changed
+
+- **API session owns the live save (ARC-101/102/106)** — `PipelineSessionManager` is the single owner of the in-memory `GameSave` per active game (`get_or_load_save`), with a per-game `asyncio.Lock` serializing load→advance→persist across REST and WebSocket. Fixes silent usage/cost loss after the first advance (stale-save closure aliasing) and concurrent-advance save clobbering; adds idle-eviction.
+- **Settings, listing, and provider correctness** — `get_app_config` cache invalidated on settings update (ARC-103); game-listing schema moved into `storage/save.py` so migrations always apply (ARC-109); the `llm/models.py` shim is retired for `core.models` (ARC-105); TTS uses a per-request player (ARC-107); `BeatPipeline.advance` decomposed (ARC-110); `ImageProvider` declares `supports_reference_images` (ARC-115); `deps.py` back-compat cruft removed (ARC-113); OpenAPI snapshot drift guard added (ARC-108).
+- **Web God-components decomposed** — PlayPage (1218→367 lines) and CharactersPage (1226→195) split into focused modals + hooks; 45 new web tests cover the store + extracted components. (QA-001/002/003)
+- **`make checkall` now covers the web surface** — New `web-check` target (eslint + vitest + tsc) is part of the gate; `make build` installs the `[api]` extra + dev deps so a fresh checkout passes; CI lints the web. (QA-004/ARC-111/ARC-116)
+- **`storygen-api serve` default port** is now 8101 (was 8000), matching docs and the :8100 CORS pairing. (DOC-010)
+
+### Internal
+
+- **2026-07-16 audit remediation** — Resolved all 54 findings (7 security, 15 architecture, 17 code-quality, 15 documentation), including a documentation sweep: two-mode auth semantics across 5 docs, repointed stale `AUDIT.md` references, keybinding + `runtime/`-layer fixes in ARCHITECTURE, missing env vars, new `docs/TROUBLESHOOTING.md` and `CONTRIBUTING.md`, and API schema docstrings. `make checkall` is 922 Python + 62 web tests; ruff, pyright strict, and tsc clean.
+
 ### Fixed
 
 - **Graph path highlighting precision** — In the graph view, cyan path highlighting now follows the direct root-to-current lineage only. Path-node rows show cyan on the branch connector (├── / └──), expand icon, and label; ancestor guide columns stay default. "Between" rows (siblings of a path node that come before it, plus their descendants) get only the single T-junction cell highlighted. Rows past where the path branches off and descendants of the current node are no longer highlighted. The internal `_StoryTree` was refactored to compute a single column span per row and split segments at character boundaries for partial cells.
