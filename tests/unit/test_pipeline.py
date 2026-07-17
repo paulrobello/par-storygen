@@ -150,6 +150,18 @@ def _bootstrap_save(
     return save
 
 
+def _char(char_id: str, name: str, node_id: str = "root") -> Character:
+    """Minimal Character for relationship-merge tests (id/name are what matter)."""
+    return Character(
+        id=char_id,
+        name=name,
+        backstory="b",
+        personality="p",
+        physical_description="d",
+        introduced_at_node_id=node_id,
+    )
+
+
 @pytest.mark.asyncio
 async def test_pipeline_cache_hit_skips_agents(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -2251,6 +2263,11 @@ async def test_pipeline_merges_relationship_updates(
     save = _bootstrap_save(tmp_path, monkeypatch)
     from storygen.core.models import Relationship, RelationshipType
 
+    # Change 1 (name/id normalization) requires relationship endpoints to
+    # resolve to a known character id; register "a"/"b" so the update isn't
+    # skipped as unresolvable.
+    save.characters.append(_char("a", "Aria"))
+    save.characters.append(_char("b", "Bram"))
     beat = StoryBeat(
         narration="They fought side by side.",
         choices=[Choice(id="c1", text="onward")],
@@ -2294,6 +2311,11 @@ async def test_pipeline_merges_relationship_update_existing(
     save = _bootstrap_save(tmp_path, monkeypatch)
     from storygen.core.models import Relationship, RelationshipType
 
+    # Change 1 (name/id normalization) requires relationship endpoints to
+    # resolve to a known character id; register "a"/"b" so the update isn't
+    # skipped as unresolvable.
+    save.characters.append(_char("a", "Aria"))
+    save.characters.append(_char("b", "Bram"))
     save.relationships.append(
         Relationship(
             char_a_id="a",
@@ -2381,3 +2403,194 @@ async def test_pipeline_merges_relationship_no_updates(
     await pipeline.advance(save, from_node_id="root", choice_id="c1")
     assert len(save.relationships) == 1
     assert save.relationships[0].type == RelationshipType.RIVAL
+
+
+@pytest.mark.asyncio
+async def test_pipeline_merges_relationship_update_by_character_name(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A relationship_updates entry keyed by character NAME (any casing)
+    resolves to the matching character id and merges into an existing
+    id-keyed relationship for the same pair instead of duplicating it."""
+    save = _bootstrap_save(tmp_path, monkeypatch)
+    from storygen.core.models import Relationship, RelationshipType
+
+    save.characters.append(_char("a", "Aria"))
+    save.characters.append(_char("b", "Bram"))
+    save.relationships.append(
+        Relationship(
+            char_a_id="a",
+            char_b_id="b",
+            type=RelationshipType.NEUTRAL,
+            strength=1,
+            context="strangers",
+            updated_at_node_id="root",
+        )
+    )
+    beat = StoryBeat(
+        narration="They became close friends.",
+        choices=[Choice(id="c1", text="onward")],
+        is_major=False,
+        is_ending=False,
+        relationship_updates=[
+            # NAMES instead of ids, mixed casing — must still merge with the
+            # existing id-keyed relationship for the same pair.
+            Relationship(
+                char_a_id="BRAM",
+                char_b_id="aria",
+                type=RelationshipType.ALLY,
+                strength=4,
+                context="became close friends",
+                updated_at_node_id="pending",
+            ),
+        ],
+    )
+    plan = IllustrationPlan(
+        should_illustrate=False, image_prompt="", featured_character_ids=[], reasoning=""
+    )
+    pipeline = BeatPipeline(
+        beat_agent=FakeBeatAgent(beat),
+        illustration_agent=FakeIllustrationAgent(plan),
+        summary_agent=None,
+        image_provider=FakeImageProvider(),
+        callbacks=PipelineCallbacks(),
+    )
+    await pipeline.advance(save, from_node_id="root", choice_id="c1")
+
+    assert len(save.relationships) == 1
+    merged = save.relationships[0]
+    assert (merged.char_a_id, merged.char_b_id) == ("a", "b")
+    assert merged.type == RelationshipType.ALLY
+    assert merged.strength == 4
+    assert merged.context == "became close friends"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_merges_relationship_unknown_character_skipped(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """An update referencing an unknown character is skipped without raising
+    and does not land on save.relationships."""
+    save = _bootstrap_save(tmp_path, monkeypatch)
+    from storygen.core.models import Relationship, RelationshipType
+
+    save.characters.append(_char("a", "Aria"))
+    beat = StoryBeat(
+        narration="A stranger passed by.",
+        choices=[Choice(id="c1", text="onward")],
+        is_major=False,
+        is_ending=False,
+        relationship_updates=[
+            Relationship(
+                char_a_id="a",
+                char_b_id="ghost",
+                type=RelationshipType.NEUTRAL,
+                strength=1,
+                context="unnamed passerby",
+                updated_at_node_id="pending",
+            ),
+        ],
+    )
+    plan = IllustrationPlan(
+        should_illustrate=False, image_prompt="", featured_character_ids=[], reasoning=""
+    )
+    pipeline = BeatPipeline(
+        beat_agent=FakeBeatAgent(beat),
+        illustration_agent=FakeIllustrationAgent(plan),
+        summary_agent=None,
+        image_provider=FakeImageProvider(),
+        callbacks=PipelineCallbacks(),
+    )
+    await pipeline.advance(save, from_node_id="root", choice_id="c1")
+
+    assert save.relationships == []
+
+
+@pytest.mark.asyncio
+async def test_pipeline_merges_relationship_same_character_skipped(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """An update whose two endpoints resolve to the same character (one given
+    by id, the other by name) is skipped rather than merged."""
+    save = _bootstrap_save(tmp_path, monkeypatch)
+    from storygen.core.models import Relationship, RelationshipType
+
+    save.characters.append(_char("a", "Aria"))
+    beat = StoryBeat(
+        narration="Aria reflected alone.",
+        choices=[Choice(id="c1", text="onward")],
+        is_major=False,
+        is_ending=False,
+        relationship_updates=[
+            Relationship(
+                char_a_id="Aria",
+                char_b_id="a",
+                type=RelationshipType.NEUTRAL,
+                strength=1,
+                context="self-reflection",
+                updated_at_node_id="pending",
+            ),
+        ],
+    )
+    plan = IllustrationPlan(
+        should_illustrate=False, image_prompt="", featured_character_ids=[], reasoning=""
+    )
+    pipeline = BeatPipeline(
+        beat_agent=FakeBeatAgent(beat),
+        illustration_agent=FakeIllustrationAgent(plan),
+        summary_agent=None,
+        image_provider=FakeImageProvider(),
+        callbacks=PipelineCallbacks(),
+    )
+    await pipeline.advance(save, from_node_id="root", choice_id="c1")
+
+    assert save.relationships == []
+
+
+# --- Concurrent stage 2/3 + summary (advance) ---------------------------------
+
+
+@pytest.mark.asyncio
+async def test_pipeline_illustration_failure_raises_but_summary_still_lands(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Stage 2/3 (illustration) and the summary now run concurrently: an
+    illustration-agent failure still propagates out of advance(), but by the
+    time it surfaces the summary agent's result has already landed on the
+    node — a semantics change from the previous sequential behavior, where an
+    illustration failure prevented the summary from running at all."""
+    save = _bootstrap_save(tmp_path, monkeypatch)
+    beat = StoryBeat(
+        narration="A major beat lands.",
+        choices=[Choice(id="x", text="x")],
+        is_major=True,
+        is_ending=False,
+    )
+
+    class FailingIllustrationAgent:
+        async def run(
+            self, beat: StoryBeat, characters: list[Character], raw_sink: Any = None
+        ) -> IllustrationPlan:
+            del beat, characters, raw_sink
+            raise RuntimeError("illustration provider down")
+
+    class SlowSummaryAgent:
+        async def run(self, path_summary_prompt: str, raw_sink: Any = None) -> Summary:
+            del path_summary_prompt, raw_sink
+            await asyncio.sleep(0)
+            return Summary(text="recap text")
+
+    pipeline = BeatPipeline(
+        beat_agent=FakeBeatAgent(beat),
+        illustration_agent=FailingIllustrationAgent(),
+        summary_agent=SlowSummaryAgent(),
+        image_provider=FakeImageProvider(),
+        callbacks=PipelineCallbacks(),
+    )
+
+    before_ids = set(save.nodes)
+    with pytest.raises(RuntimeError, match="illustration provider down"):
+        await pipeline.advance(save, from_node_id="root", choice_id="c1")
+
+    new_node_id = next(iter(set(save.nodes) - before_ids))
+    assert save.nodes[new_node_id].summary_to_here == "recap text"

@@ -346,19 +346,29 @@ class BeatPipeline:
                 added = [c for c in save.characters if c.id in new_char_ids]
                 await cb.on_new_characters(added)
 
-        # --- Stage 2 + 3: illustration planning + background scene ---
-        await self._run_stage_2_and_3(
-            save, new_node, beat.new_characters, skip_image=skip_image, callbacks=cb
+        # --- Stage 2 + 3 (illustration) and the summary run concurrently ---
+        # They're independent: the summary needs the beat narration + ancestor
+        # chain, the illustration needs narration + roster. Both mutate
+        # save.nodes[new_node_id] via read -> model_copy -> assign with no
+        # `await` between read and write, so their writes serialize safely on
+        # the event loop regardless of completion order.
+        results: tuple[BaseException | None, BaseException | None] = await asyncio.gather(
+            self._run_stage_2_and_3(
+                save, new_node, beat.new_characters, skip_image=skip_image, callbacks=cb
+            ),
+            self._maybe_generate_summary(save, beat, new_node_id),
+            return_exceptions=True,
         )
-
-        # --- Summary (optional) ---
-        await self._maybe_generate_summary(save, beat, new_node_id)
+        for result in results:
+            if isinstance(result, BaseException):
+                # _maybe_generate_summary swallows its own agent failures, so
+                # in practice only the illustration path raises here — but
+                # keep prior error-surfacing semantics regardless of source.
+                raise result
 
         return save.nodes[new_node_id]
 
-    def _merge_new_characters(
-        self, save: GameSave, beat: StoryBeat, new_node_id: str
-    ) -> None:
+    def _merge_new_characters(self, save: GameSave, beat: StoryBeat, new_node_id: str) -> None:
         """Introduce new characters from the beat and merge relationship updates.
 
         New characters are appended with a ``"pending"`` placeholder for
@@ -398,9 +408,7 @@ class BeatPipeline:
         if segment:
             beat_texts = "\n\n".join(
                 f"--- Beat {i + 1} ---\n{narration}"
-                for i, narration in enumerate(
-                    n.narration for n in segment if n.id != new_node_id
-                )
+                for i, narration in enumerate(n.narration for n in segment if n.id != new_node_id)
                 if narration
             )
             if beat_texts:
@@ -419,9 +427,7 @@ class BeatPipeline:
                 exc_info=True,
             )
         else:
-            updated = save.nodes[new_node_id].model_copy(
-                update={"summary_to_here": summary.text}
-            )
+            updated = save.nodes[new_node_id].model_copy(update={"summary_to_here": summary.text})
             save.nodes[new_node_id] = updated
             save.updated_at = datetime.now(UTC)
             save_game(save)
@@ -451,9 +457,7 @@ class BeatPipeline:
         Delegates to :class:`PrefetchCoordinator`; returns ``None`` if no task
         exists or it failed.
         """
-        return await self._prefetch.await_one(
-            save, from_node_id=from_node_id, choice_id=choice_id
-        )
+        return await self._prefetch.await_one(save, from_node_id=from_node_id, choice_id=choice_id)
 
     async def cancel_all_prefetches(self) -> None:
         """Cancel in-flight prefetches and await their cleanup (shutdown)."""
@@ -882,8 +886,54 @@ class BeatPipeline:
 
 
 def _merge_relationships(save: GameSave, updates: list[Relationship], node_id: str) -> None:
-    """Merge relationship deltas from a beat into the save's relationship list."""
+    """Merge relationship deltas from a beat into the save's relationship list.
+
+    The beat agent is instructed to reference characters by their bracketed
+    CAST roster id, but sometimes emits a character NAME instead. Each
+    endpoint is resolved to a known character id (case-insensitively, by
+    name) before merging so a name-keyed update lands on the same
+    ``(char_a_id, char_b_id)`` key as an id-keyed one for the same pair,
+    instead of duplicating. An update referencing an unresolvable character,
+    or whose endpoints resolve to the same character, is skipped.
+    """
+    known_ids = {c.id for c in save.characters}
+    name_to_id = {c.name.strip().lower(): c.id for c in save.characters}
     for update in updates:
+        char_a_id = (
+            update.char_a_id
+            if update.char_a_id in known_ids
+            else name_to_id.get(update.char_a_id.strip().lower())
+        )
+        char_b_id = (
+            update.char_b_id
+            if update.char_b_id in known_ids
+            else name_to_id.get(update.char_b_id.strip().lower())
+        )
+        if char_a_id is None or char_b_id is None:
+            _logger.debug(
+                "skipping relationship update with unresolved character reference: %r / %r",
+                update.char_a_id,
+                update.char_b_id,
+            )
+            continue
+        if char_a_id == char_b_id:
+            _logger.debug(
+                "skipping relationship update whose endpoints resolve to the same character: %r",
+                char_a_id,
+            )
+            continue
+        if char_a_id != update.char_a_id or char_b_id != update.char_b_id:
+            # Re-construct (not model_copy) so the model validator re-runs and
+            # re-normalizes endpoint ordering and the mentor/student swap for
+            # the rewritten ids.
+            update = Relationship(
+                char_a_id=char_a_id,
+                char_b_id=char_b_id,
+                type=update.type,
+                strength=update.strength,
+                context=update.context,
+                updated_at_node_id=node_id,
+            )
         key = (update.char_a_id, update.char_b_id)
         existing = next(
             (r for r in save.relationships if (r.char_a_id, r.char_b_id) == key),
