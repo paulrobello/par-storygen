@@ -19,24 +19,32 @@ from textual.screen import Screen
 from textual.widgets import Button, Checkbox, Footer, Header, Input, Label, Static
 
 from storygen.images.pricing import image_cost
+from storygen.storage import app_state
 
 _DEFAULT_CHARACTER = (
     "A warrior princess with flowing red hair and emerald green eyes, "
     "wearing ornate silver armor, standing in a confident pose"
 )
 
-_PROVIDER_OPTIONS: list[tuple[str, str, str]] = [
-    ("openai", "OpenAI", "gpt-image-2"),
-    ("gemini", "Gemini", "gemini-3.1-flash-image-preview"),
-    ("zai", "Z.AI", "glm-image"),
-    ("ollama", "Ollama", "x/z-image-turbo"),
-]
-
-_API_KEY_ENV: dict[str, str] = {
-    "openai": "OPENAI_API_KEY",
-    "gemini": "GEMINI_API_KEY",
-    "zai": "ZAI_API_KEY",
+# Compact display labels for the comparison checkboxes — intentionally shorter
+# than ``IMAGE_PROVIDERS[pid].label`` (verbose by design for the Settings
+# dropdown). Providers not listed here fall back to the registry label.
+_SHORT_LABELS: dict[str, str] = {
+    "openai": "OpenAI",
+    "gemini": "Gemini",
+    "zai": "Z.AI",
+    "ollama": "Ollama",
 }
+
+# (provider_id, short_label, default_model) triples. The provider ids, the
+# default model per provider (its first registry suggestion), and the env-var
+# lookups below all flow from the registry via app_state — adding a new image
+# provider is a one-file registry change; only add a _SHORT_LABELS entry if
+# you want a compact override (the registry label is the fallback).
+_PROVIDER_OPTIONS: list[tuple[str, str, str]] = [
+    (pid, _SHORT_LABELS.get(pid, label), app_state.SUGGESTED_IMAGE_MODELS[pid][0])
+    for label, pid in app_state.IMAGE_PROVIDER_CHOICES
+]
 
 
 class StyleGalleryScreen(Screen[None]):
@@ -67,7 +75,8 @@ class StyleGalleryScreen(Screen[None]):
 
                 yield Label("Providers to compare:")
                 for pid, pname, default_model in _PROVIDER_OPTIONS:
-                    has_key = pid == "ollama" or bool(os.environ.get(_API_KEY_ENV.get(pid, ""), ""))
+                    env_var = app_state.IMAGE_API_KEY_ENV.get(pid)
+                    has_key = env_var is None or bool(os.environ.get(env_var, ""))
                     label = f"{pname} ({default_model})"
                     if not has_key:
                         label += " — no API key"
@@ -152,9 +161,10 @@ class StyleGalleryScreen(Screen[None]):
                 )
 
     def _get_api_key(self, provider: str) -> str | None:
-        if provider == "ollama":
+        env_var = app_state.IMAGE_API_KEY_ENV.get(provider)
+        if env_var is None:
             return None
-        return os.environ.get(_API_KEY_ENV.get(provider, ""), "") or None
+        return os.environ.get(env_var, "") or None
 
     CSS = """
     #gallery-body {

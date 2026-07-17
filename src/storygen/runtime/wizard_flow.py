@@ -32,6 +32,7 @@ from storygen.images.constants import (
 )
 from storygen.images.pricing import image_cost
 from storygen.images.prompts import build_cover_prompt
+from storygen.images.provider_factory import ImageProviderName
 from storygen.llm.usage import UsageTotals
 from storygen.storage import app_state, paths
 from storygen.storage.library import LibraryCharacter, library_portrait_path, load_library_character
@@ -82,7 +83,11 @@ class WizardFlow:
         self._text_config = text_config
         self._image_config = image_config
         self._character_image_config = character_image_config or ImageProviderConfig(
-            provider="openai", model="gpt-image-2"
+            # app_state constant is str-typed but always one of the allow-listed
+            # provider ids (it derives from IMAGE_PROVIDERS); narrow via cast
+            # rather than a type: ignore. Mirrors config.py:135.
+            provider=cast(ImageProviderName, app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER),
+            model=app_state.DEFAULT_CHARACTER_IMAGE_MODEL,
         )
         self._theme_agent = theme_agent
         self._character_agent_factory = character_agent_factory

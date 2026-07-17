@@ -97,6 +97,11 @@ def _image_base_url_placeholder(provider: str) -> str:
     explicit "(not used by Gemini)" hint rather than leaving the field empty
     (which would look identical to a provider whose default URL is unknown).
     """
+    # Gemini's google-genai SDK ignores OpenAI-style base URLs — see
+    # IMAGE_PROVIDERS["gemini"].default_base_url is None. The branch is a
+    # per-provider runtime quirk (OpenAI's default_base_url is also None but
+    # for a different reason: it uses the SDK default), so default_base_url
+    # alone is not a clean discriminator; the explicit id check stays.
     if provider == "gemini":
         return "(not used by Gemini)"
     return resolve_image_base_url(provider)
@@ -653,6 +658,10 @@ class SettingsScreen(Screen[None]):
     def _refresh_ollama_warning(self) -> None:
         primary = self._current_primary_image_provider()
         fallback = self._current_fallback_image_provider()
+        # Advisory text is Ollama-specific (>=0.13.3, macOS-only) — not a
+        # registry-owned fact. IMAGE_PROVIDERS["ollama"].key_env_var is None
+        # and allows_loopback_base_url is True, but neither is what this
+        # warning is about, so the explicit id check stays.
         self._ollama_warning.display = primary == "ollama" or fallback == "ollama"
 
     def _populate_from_state(self) -> None:
