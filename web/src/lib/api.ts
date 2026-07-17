@@ -3,9 +3,9 @@
 // ARC-016: API_BASE lives in a single config module so every frontend route,
 // hook, and component derives from one source. Re-exported here so existing
 // `import { API_BASE } from "@/lib/api"` call sites keep working.
-import { API_BASE } from "@/lib/config";
+import { API_BASE, API_TOKEN } from "@/lib/config";
 
-export { API_BASE };
+export { API_BASE, API_TOKEN };
 
 // ---------------------------------------------------------------------------
 // Domain types matching the FastAPI / Python models
@@ -244,6 +244,19 @@ export interface AdvanceResponse {
 // Fetch helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Return the auth header when a bearer token is configured (SEC-102).
+ *
+ * Spread into every fetch wrapper's headers so a token set via
+ * ``NEXT_PUBLIC_API_TOKEN`` reaches all REST calls (the API server checks it
+ * via ``Authorization: Bearer <token>`` when ``STORYGEN_API_TOKEN`` is set).
+ * Returns an empty object when no token is configured, preserving local-dev
+ * loopback-trust behavior.
+ */
+export function authHeaders(): Record<string, string> {
+  return API_TOKEN ? { Authorization: `Bearer ${API_TOKEN}` } : {};
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const text = await response.text().catch(() => "Unknown error");
@@ -253,14 +266,14 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`);
+  const res = await fetch(`${API_BASE}${path}`, { headers: { ...authHeaders() } });
   return handleResponse<T>(res);
 }
 
 export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,
   });
   return handleResponse<T>(res);
@@ -269,14 +282,20 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
 export async function apiPut<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   return handleResponse<T>(res);
 }
 
 export async function apiPostForm<T>(path: string, formData: FormData): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { method: "POST", body: formData });
+  // FormData: the browser sets Content-Type (multipart boundary) itself; we
+  // only add the Authorization header when a token is configured.
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { ...authHeaders() },
+    body: formData,
+  });
   if (!res.ok) {
     const text = await res.text().catch(() => "Unknown error");
     throw new Error(`API ${res.status}: ${text}`);
@@ -285,7 +304,10 @@ export async function apiPostForm<T>(path: string, formData: FormData): Promise<
 }
 
 export async function apiDelete(path: string): Promise<void> {
-  const res = await fetch(`${API_BASE}${path}`, { method: "DELETE" });
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "DELETE",
+    headers: { ...authHeaders() },
+  });
   if (!res.ok) {
     const text = await res.text().catch(() => "Unknown error");
     throw new Error(`API ${res.status}: ${text}`);

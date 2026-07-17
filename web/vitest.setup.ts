@@ -24,13 +24,18 @@ class MockWebSocket {
 
   readyState: number = MockWebSocket.OPEN;
   url: string;
+  // SEC-102: the subprotocols the client offered (e.g. ["bearer.<token>"]).
+  // Models the real WebSocket's second constructor argument so tests can
+  // assert on it; unused by existing tests.
+  protocols: string[] = [];
   onopen: WSHandler = null;
   onmessage: ((ev: MessageEvent) => void) | null = null;
   onclose: (() => void) | null = null;
   onerror: ((ev: Event) => void) | null = null;
 
-  constructor(url: string) {
+  constructor(url: string, protocols: string | string[] = []) {
     this.url = url;
+    this.protocols = Array.isArray(protocols) ? [...protocols] : [protocols];
     MockWebSocket.instances.push(this);
   }
   send(_data: string): void {

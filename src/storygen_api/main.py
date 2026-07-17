@@ -1,7 +1,10 @@
 """FastAPI application factory for the ``storygen_api`` REST + WebSocket surface.
 
-Wires lifespan (single-worker guard, ARC-004), CORS (SEC-008), route mounting,
-and static-asset serving.
+Wires lifespan (single-worker guard, ARC-004), CORS (SEC-008), and route
+mounting. All game assets are served by token-gated router endpoints
+(``routers/images.py``) — there is intentionally no static file mount over the
+save-data directory (SEC-101: a ``StaticFiles`` mount there bypassed
+``verify_token`` and exposed ``game.json`` / ``llm/`` unauthenticated).
 """
 
 from __future__ import annotations
@@ -15,10 +18,8 @@ import typer
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from storygen import __version__
-from storygen.storage import paths
 from storygen_api.deps import get_app_config, get_session_manager
 from storygen_api.routers import characters, games, images, presets, settings, tts, wizard
 from storygen_api.routers import ws as ws_router
@@ -113,15 +114,6 @@ def create_app() -> FastAPI:
     app.include_router(presets.router)
     app.include_router(tts.router)
     app.include_router(ws_router.router, prefix="/api")
-
-    # Mount game image directories as static files
-    games_root = paths.games_root()
-    if games_root.exists():
-        app.mount(
-            "/api/images",
-            StaticFiles(directory=str(games_root)),
-            name="game-images",
-        )
 
     @app.get("/api/health")
     async def _health() -> dict[str, str]:  # pyright: ignore[reportUnusedFunction] - registered as a FastAPI route by the @app.get decorator above; pyright doesn't model the decorator's registration side-effect

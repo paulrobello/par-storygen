@@ -17,6 +17,19 @@
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8101";
 
 /**
+ * Optional bearer token sent on every REST request (``Authorization: Bearer
+ * <token>``) and offered as the ``Sec-WebSocket-Protocol: bearer.<token>``
+ * subprotocol on WebSocket handshakes (SEC-102). Only needed when the API
+ * server has ``STORYGEN_API_TOKEN`` configured; when unset, the client
+ * behaves as before (the server trusts loopback peers in local dev).
+ *
+ * Because this is a ``NEXT_PUBLIC_*`` var it is embedded in the client
+ * bundle at build time — appropriate for a self-hosted single-user deploy,
+ * but it must not be relied upon as a secret from untrusted clients.
+ */
+export const API_TOKEN: string = process.env.NEXT_PUBLIC_API_TOKEN ?? "";
+
+/**
  * Derive the WebSocket base URL from {@link API_BASE} by swapping the scheme.
  * `http://` → `ws://`, `https://` → `wss://`. Anything else falls back to the
  * dev default so a misconfigured `NEXT_PUBLIC_API_BASE` surfaces as a

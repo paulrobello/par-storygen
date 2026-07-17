@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import type { ServerEvent } from "@/lib/ws-types";
 import type { StoryNode } from "@/lib/api";
-import { API_BASE, WS_BASE } from "@/lib/config";
+import { API_BASE, API_TOKEN, WS_BASE } from "@/lib/config";
 import { useGameStore } from "@/stores/game-store";
 
 interface UseWebSocketOptions {
@@ -23,7 +23,17 @@ export function useWebSocket({ gameId, enabled = true }: UseWebSocketOptions) {
   const connect = useCallback(() => {
     if (!gameId || !enabled) return;
 
-    const ws = new WebSocket(`${WS_BASE}/api/ws/${gameId}`);
+    // SEC-102: when a bearer token is configured, offer it as the
+    // ``bearer.<token>`` WebSocket subprotocol so the server's
+    // ``ws_authorize`` accepts the handshake (browsers cannot set arbitrary
+    // headers on a WS upgrade). The server reads the offered subprotocol
+    // from the request; it does not need to echo it back for the browser to
+    // consider the handshake successful. No token → plain WS (loopback-trust
+    // mode in local dev).
+    const wsUrl = `${WS_BASE}/api/ws/${gameId}`;
+    const ws = API_TOKEN
+      ? new WebSocket(wsUrl, [`bearer.${API_TOKEN}`])
+      : new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
