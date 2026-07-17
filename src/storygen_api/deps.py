@@ -27,7 +27,7 @@ from storygen.runtime.adapters import (
     build_split_provider,
     build_split_provider_for_save,
 )
-from storygen.storage.save import GameSave, save_game
+from storygen.storage.save import GameSave
 from storygen_api.session import PipelineSessionManager
 
 # ---------------------------------------------------------------------------
@@ -50,8 +50,8 @@ def build_pipeline(
     text_model = build_text_model(save.text_config)
 
     def _on_usage(usage: object) -> None:
+        # Record usage in memory only; pipeline's end-of-advance save_game persists it.
         record_usage_on_save(save, model=model_name, usage=usage)
-        save_game(save)
 
     beat_agent = BeatAgentAdapter(
         agent_mod.build_beat_agent(

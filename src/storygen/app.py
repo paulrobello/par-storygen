@@ -417,8 +417,8 @@ class StoryGenApp(App[None]):
         text_model = build_text_model(save.text_config)
 
         def _on_usage(usage: object) -> None:
+            # Record usage in memory only; pipeline's end-of-advance save_game persists it.
             record_usage_on_save(save, model=model_name, usage=usage)
-            save_game(save)
             # If the play screen is mounted, refresh its header so totals update.
             with contextlib.suppress(Exception):
                 screen = self.screen
