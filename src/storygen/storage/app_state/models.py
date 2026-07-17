@@ -24,6 +24,7 @@ from storygen.storage.app_state.defaults import (
     DEFAULT_TONE_PRESET,
     DEFAULT_TTS_AUTO_READ,
     DEFAULT_TTS_AUTO_READ_RECAP,
+    DEFAULT_TTS_PREGENERATE_PREFETCH_AUDIO,
     DEFAULT_TTS_PROVIDER,
     MAX_TARGET_MAJOR_BEATS,
     MIN_TARGET_MAJOR_BEATS,
@@ -105,3 +106,7 @@ class TTSPrefs:
     voice: str = ""  # blank → use provider default
     auto_read: bool = DEFAULT_TTS_AUTO_READ
     auto_read_recap: bool = DEFAULT_TTS_AUTO_READ_RECAP
+    # ENH-006-T2: speculative narration synth during branch prefetch. Off by
+    # default (spends provider credits). Uses the voice configured at prefetch
+    # time — change voice and the next speak() regenerates.
+    pregenerate_prefetch_audio: bool = DEFAULT_TTS_PREGENERATE_PREFETCH_AUDIO

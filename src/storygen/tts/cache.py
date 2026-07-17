@@ -22,13 +22,65 @@ ENH-006 prefetch hook needs.
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from storygen.storage import paths
 from storygen.storage.app_state import TTSPrefs
 from storygen.tts.player import TTSPlayer
 
-__all__ = ["relative_tts_cache_path", "synthesize_to_cache", "tts_cache_path"]
+__all__ = [
+    "clear_synth_locks",
+    "relative_tts_cache_path",
+    "synthesize_to_cache",
+    "tts_cache_path",
+]
+
+# ENH-006-T2: per-node in-flight synth lock registry. Without this, prefetch
+# synthing node X while the user picks X (triggering PlayScreen's on-demand
+# speak path) would race: both call ``TTSPlayer.generate`` for the same
+# ``cache_path`` → two provider calls + a file-write race. The lock serializes
+# concurrent synths for the same ``(game_id, node_id)`` so the second caller
+# awaits the first, then sees the cache populated and short-circuits via
+# ``generate()``'s ``cache_path.exists()`` check.
+#
+# The registry is module-level and unbounded by design — locks are tiny
+# (~100 B), the key space is ``(game_id, node_id)`` pairs the session has
+# synthesized, and a single game's worth of nodes is O(10²). For a long-lived
+# multi-game session the registry grows roughly with the union of visited
+# nodes; that is still small. A bounded/evicting registry is a viable future
+# improvement but would need to coordinate with any in-flight waiter to avoid
+# evicting a lock a concurrent caller is about to acquire.
+_synth_locks: dict[tuple[str, str], asyncio.Lock] = {}
+
+
+def _get_synth_lock(game_id: str, node_id: str) -> asyncio.Lock:
+    """Return the per-node synth lock, creating it lazily on first request.
+
+    Lazy creation is safe under concurrency: ``synthesize_to_cache`` is the
+    only caller, and dict get/set on a single key is atomic under the GIL for
+    the CPython interpreter the project targets. Two racing first-callers for
+    the same key would each create a Lock and one would win the dict slot; the
+    losing caller would still publish its Lock via ``setdefault`` semantics —
+    use ``setdefault`` to guarantee both callers observe the SAME instance.
+    """
+    key = (game_id, node_id)
+    lock = _synth_locks.get(key)
+    if lock is None:
+        lock = asyncio.Lock()
+        # setdefault so two concurrent first-callers for the same key observe
+        # the same Lock instance (whoever's Lock lost the race is discarded;
+        # both callers proceed against the winner).
+        existing = _synth_locks.setdefault(key, lock)
+        if existing is not lock:
+            lock = existing
+    return lock
+
+
+def clear_synth_locks() -> None:
+    """Drop every registered synth lock. Test-only — used between tests so the
+    registry doesn't leak locks (and therefore false-sharing) across cases."""
+    _synth_locks.clear()
 
 
 def _preferred_extension(player: TTSPlayer | None) -> str:
@@ -98,6 +150,12 @@ async def synthesize_to_cache(
     demand. Playback state is never touched — this is the cache-only primitive
     ENH-006's prefetch hook calls in the background.
 
+    The synth runs under a per-node lock (see ``_synth_locks``) so two
+    concurrent callers for the same ``(game_id, node_id)`` — e.g. a background
+    prefetch synth racing PlayScreen's on-demand speak path for the same node
+    — collapse into a single provider call. The second caller awaits the
+    first, then ``generate()`` sees the cache file exists and short-circuits.
+
     Args:
         player: The TTS player to synthesize with. ``None`` is tolerated and
             short-circuits to ``None`` so prefetch callers can hand in an
@@ -117,5 +175,10 @@ async def synthesize_to_cache(
     if player is None:
         return None
     cache_path = tts_cache_path(player, game_id, node_id, tts_prefs)
-    ok = await player.generate(text, cache_path=cache_path)
+    # Per-node lock: see module docstring + ``_synth_locks`` comment. The lock
+    # wraps the full ``generate()`` call (including its cache-existence check)
+    # so a concurrent caller that queued on the lock observes the file the
+    # first caller wrote and returns immediately without a second provider hit.
+    async with _get_synth_lock(game_id, node_id):
+        ok = await player.generate(text, cache_path=cache_path)
     return cache_path if ok else None

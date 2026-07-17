@@ -39,6 +39,7 @@ from storygen.storage.app_state.defaults import (
     DEFAULT_TONE_PRESET,
     DEFAULT_TTS_AUTO_READ,
     DEFAULT_TTS_AUTO_READ_RECAP,
+    DEFAULT_TTS_PREGENERATE_PREFETCH_AUDIO,
     DEFAULT_TTS_PROVIDER,
 )
 from storygen.storage.app_state.models import (
@@ -488,6 +489,9 @@ def read_tts_prefs() -> TTSPrefs:
         voice=str(raw.get("voice", "")),
         auto_read=bool(raw.get("auto_read", DEFAULT_TTS_AUTO_READ)),
         auto_read_recap=bool(raw.get("auto_read_recap", DEFAULT_TTS_AUTO_READ_RECAP)),
+        pregenerate_prefetch_audio=bool(
+            raw.get("pregenerate_prefetch_audio", DEFAULT_TTS_PREGENERATE_PREFETCH_AUDIO)
+        ),
     )
 
 
@@ -499,6 +503,7 @@ def serialize_tts_prefs(prefs: TTSPrefs) -> dict[str, Any]:
         "voice": prefs.voice,
         "auto_read": prefs.auto_read,
         "auto_read_recap": prefs.auto_read_recap,
+        "pregenerate_prefetch_audio": prefs.pregenerate_prefetch_audio,
     }
 
 

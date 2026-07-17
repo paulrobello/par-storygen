@@ -89,6 +89,11 @@ DEFAULT_TTS_PROVIDER: str = "openai"
 DEFAULT_TTS_VOICE: str = ""
 DEFAULT_TTS_AUTO_READ: bool = False
 DEFAULT_TTS_AUTO_READ_RECAP: bool = False
+# ENH-006-T2: speculative TTS synth during branch prefetch. Off by default —
+# it spends TTS-provider credits on choices the user may never pick. The cache
+# key embeds provider+voice, so a voice change after pregeneration means the
+# next speak() misses and regenerates (correct, slightly wasteful).
+DEFAULT_TTS_PREGENERATE_PREFETCH_AUDIO: bool = False
 DEFAULT_AUTO_RECAP: bool = False
 DEFAULT_RESUME_RECAP: bool = True
 DEFAULT_RECAP_INTERVAL: int = 3
