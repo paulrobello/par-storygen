@@ -28,6 +28,9 @@ export type GameSummary = components["schemas"]["GameSummary"];
 export type GameDetail = components["schemas"]["GameDetail"];
 export type NodeDetail = components["schemas"]["NodeDetail"];
 export type CharacterLibraryEntry = components["schemas"]["CharacterLibraryEntry"];
+// ENH-005: provider registry types from the OpenAPI snapshot.
+export type ProviderInfoOut = components["schemas"]["ProviderInfoOut"];
+export type ProvidersResponse = components["schemas"]["ProvidersResponse"];
 
 // Hand-written types not exposed in API (internal models)
 export interface Theme {
@@ -350,4 +353,43 @@ export function sceneImageUrl(
 ): string | null {
   if (node.image_status !== "done") return null;
   return `${API_BASE}/api/images/${gameId}/scene/${node.id}`;
+}
+
+// ---------------------------------------------------------------------------
+// Provider registry (ENH-005)
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch the text + image provider registry from `GET /api/providers`.
+ *
+ * Replaces the per-page hardcoded `TEXT_PROVIDERS` / `IMAGE_PROVIDERS` arrays
+ * in settings and style-gallery so adding a provider is a single backend
+ * registry edit (no UI list update required). Returns the raw registry
+ * envelope; callers project to `{ label, value }` option pairs for selects.
+ */
+export async function getProviders(): Promise<ProvidersResponse> {
+  return apiGet<ProvidersResponse>("/api/providers");
+}
+
+/**
+ * Project a list of `ProviderInfoOut` into the `{ label, value }` shape
+ * the existing `<select>` option arrays use, so registry-derived options
+ * stay byte-compatible with the pre-ENH-005 hardcoded arrays.
+ *
+ * The label uses the registry's `label` field directly — for the four image
+ * providers, those labels are `OpenAI gpt-image`, `Google Gemini (Nano
+ * Banana 2/Pro)`, `Z.AI GLM-image`, `Ollama (local, macOS-only)`. Settings
+ * and style-gallery previously shortened `Google Gemini` / `Ollama (local)`;
+ * this helper preserves those shortened labels until the registry is the
+ * single source, so the helper takes an optional `labelMap` for caller-supplied
+ * display-name overrides. Callers passing no map get the registry labels verbatim.
+ */
+export function toProviderOptions(
+  providers: ProviderInfoOut[],
+  labelMap?: Record<string, string>,
+): { label: string; value: string }[] {
+  return providers.map((p) => ({
+    label: labelMap?.[p.id] ?? p.label,
+    value: p.id,
+  }));
 }

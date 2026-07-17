@@ -153,3 +153,136 @@ describe("apiGet error propagation", () => {
     await expect(apiGet("/api/games/g1")).rejects.toThrow(/API 502: Unknown error/);
   });
 });
+
+// ENH-005: getProviders / toProviderOptions — registry-derived provider
+// dropdowns. Pins: getProviders hits `/api/providers` (no other path) and
+// threads auth headers; toProviderOptions preserves registry order/ids and
+// applies the optional labelMap verbatim, including the pre-ENH-005 web
+// display-name overrides the settings + style-gallery pages pass.
+describe("getProviders / toProviderOptions (ENH-005)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("getProviders GETs /api/providers and returns the parsed registry", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_TOKEN", "registry-token");
+    vi.resetModules();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        text_providers: [
+          {
+            id: "openai",
+            label: "OpenAI",
+            kind: ["text"],
+            key_env_var: "OPENAI_API_KEY",
+            default_model: "gpt-4o-mini",
+            default_base_url: "https://api.openai.com/v1",
+            allows_loopback_base_url: false,
+            supports_reference_images: false,
+            suggested_models: ["gpt-4o-mini", "gpt-4o"],
+          },
+        ],
+        image_providers: [],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { getProviders, API_BASE } = await import("./api");
+
+    const registry = await getProviders();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE}/api/providers`);
+    expect(init.method).toBeUndefined(); // apiGet uses default GET
+    expect((init.headers as Record<string, string>).Authorization).toBe(
+      "Bearer registry-token",
+    );
+    expect(registry.text_providers).toHaveLength(1);
+    expect(registry.text_providers[0].id).toBe("openai");
+  });
+
+  it("toProviderOptions mirrors the registry's id order verbatim when no labelMap", async () => {
+    const { toProviderOptions } = await import("./api");
+    const options = toProviderOptions([
+      {
+        id: "openai",
+        label: "OpenAI gpt-image",
+        kind: ["image"],
+        key_env_var: "OPENAI_API_KEY",
+        default_model: "gpt-image-2",
+        default_base_url: "https://api.openai.com/v1",
+        allows_loopback_base_url: false,
+        supports_reference_images: true,
+        suggested_models: ["gpt-image-2"],
+      },
+      {
+        id: "gemini",
+        label: "Google Gemini (Nano Banana 2/Pro)",
+        kind: ["image"],
+        key_env_var: "GEMINI_API_KEY",
+        default_model: null,
+        default_base_url: null,
+        allows_loopback_base_url: false,
+        supports_reference_images: true,
+        suggested_models: [],
+      },
+    ]);
+    expect(options).toEqual([
+      { label: "OpenAI gpt-image", value: "openai" },
+      { label: "Google Gemini (Nano Banana 2/Pro)", value: "gemini" },
+    ]);
+  });
+
+  it("toProviderOptions applies labelMap overrides (pre-ENH-005 web labels)", async () => {
+    // Pins the labelMap the settings + style-gallery pages pass — these
+    // overrides are what keeps the visible dropdown options byte-identical
+    // to the pre-ENH-005 hardcoded arrays while ids + order come from the
+    // registry.
+    const { toProviderOptions } = await import("./api");
+    const options = toProviderOptions(
+      [
+        {
+          id: "gemini",
+          label: "Google Gemini (Nano Banana 2/Pro)",
+          kind: ["image"],
+          key_env_var: "GEMINI_API_KEY",
+          default_model: null,
+          default_base_url: null,
+          allows_loopback_base_url: false,
+          supports_reference_images: true,
+          suggested_models: [],
+        },
+        {
+          id: "ollama",
+          label: "Ollama (local, macOS-only)",
+          kind: ["image"],
+          key_env_var: null,
+          default_model: null,
+          default_base_url: "http://localhost:11434/v1/",
+          allows_loopback_base_url: true,
+          supports_reference_images: false,
+          suggested_models: [],
+        },
+      ],
+      { gemini: "Google Gemini", ollama: "Ollama (local)" },
+    );
+    expect(options).toEqual([
+      { label: "Google Gemini", value: "gemini" },
+      { label: "Ollama (local)", value: "ollama" },
+    ]);
+  });
+
+  it("toProviderOptions returns an empty list for an empty registry", async () => {
+    const { toProviderOptions } = await import("./api");
+    expect(toProviderOptions([])).toEqual([]);
+  });
+});

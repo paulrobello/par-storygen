@@ -8,19 +8,22 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { Save, Palette } from "lucide-react";
 import Link from "next/link";
 import type { SettingsResponse } from "@/lib/api";
+import { getProviders, toProviderOptions } from "@/lib/api";
 
-const TEXT_PROVIDERS = [
-  { label: "OpenAI", value: "openai" },
-  { label: "OpenRouter", value: "openrouter" },
-  { label: "Ollama (local)", value: "ollama" },
-];
-
-const IMAGE_PROVIDERS = [
-  { label: "OpenAI gpt-image", value: "openai" },
-  { label: "Google Gemini", value: "gemini" },
-  { label: "Z.AI GLM-image", value: "zai" },
-  { label: "Ollama (local)", value: "ollama" },
-];
+// ENH-005: provider dropdowns are sourced from GET /api/providers so adding a
+// provider on the backend surfaces here without a UI edit. The pre-ENH-005
+// web labels for two image providers were shorter than the registry labels
+// (`Google Gemini` vs `Google Gemini (Nano Banana 2/Pro)`;
+// `Ollama (local)` vs `Ollama (local, macOS-only)`). To preserve the existing
+// UI verbatim (zero behavior change to valid flows), we override those two
+// labels via labelMap. The TUI Settings screen uses the full registry labels.
+// Removing this labelMap is a follow-up that should land alongside a decision
+// to converge on a single label set.
+const TEXT_LABEL_MAP: Record<string, string> = {};
+const IMAGE_LABEL_MAP: Record<string, string> = {
+  gemini: "Google Gemini",
+  ollama: "Ollama (local)",
+};
 
 const TTS_PROVIDERS = [
   { label: "OpenAI", value: "openai" },
@@ -126,10 +129,42 @@ export default function SettingsPage() {
   const [form, setForm] = useState<SettingsResponse | null>(null);
   const [saving, setSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // ENH-005: provider option lists come from the registry. Empty until the
+  // first successful fetch resolves; the page's loading gate below already
+  // covers the initial paint, and SelectField tolerates an empty option list.
+  const [textProviderOptions, setTextProviderOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [imageProviderOptions, setImageProviderOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
 
   useEffect(() => {
     loadSettings();
   }, [loadSettings]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getProviders()
+      .then((registry) => {
+        if (cancelled) return;
+        setTextProviderOptions(
+          toProviderOptions(registry.text_providers, TEXT_LABEL_MAP),
+        );
+        setImageProviderOptions(
+          toProviderOptions(registry.image_providers, IMAGE_LABEL_MAP),
+        );
+      })
+      .catch(() => {
+        // Surface stays empty — same shape as a backend-down load. The page
+        // already shows "Unable to load settings" when settings fail to
+        // load, and selects simply render no options if the registry call
+        // fails independently.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (settings && !form) {
@@ -190,7 +225,7 @@ export default function SettingsPage() {
               label="Provider"
               value={form.text_provider.provider}
               onChange={(v) => update("text_provider", { ...form.text_provider, provider: v })}
-              options={TEXT_PROVIDERS}
+              options={textProviderOptions}
             />
             <InputField
               label="Model"
@@ -213,7 +248,7 @@ export default function SettingsPage() {
               label="Provider"
               value={form.image_provider.provider}
               onChange={(v) => update("image_provider", { ...form.image_provider, provider: v })}
-              options={IMAGE_PROVIDERS}
+              options={imageProviderOptions}
             />
             <InputField
               label="Model"
@@ -228,7 +263,7 @@ export default function SettingsPage() {
                 ...form.image_provider,
                 fallback_provider: v === "none" ? "" : v,
               })}
-              options={[{ label: "None", value: "none" }, ...IMAGE_PROVIDERS]}
+              options={[{ label: "None", value: "none" }, ...imageProviderOptions]}
             />
             <div className="pt-2">
               <Link href="/style-gallery">
@@ -247,7 +282,7 @@ export default function SettingsPage() {
               label="Provider"
               value={form.character_image_provider.provider}
               onChange={(v) => update("character_image_provider", { ...form.character_image_provider, provider: v })}
-              options={IMAGE_PROVIDERS}
+              options={imageProviderOptions}
             />
             <InputField
               label="Model"

@@ -1,17 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { GameLayout } from "@/components/layout/GameLayout";
 import { Button } from "@/components/ui/Button";
 import { Palette, ArrowLeft, Sparkles, Clock } from "lucide-react";
+import { getProviders, toProviderOptions } from "@/lib/api";
 
-const IMAGE_PROVIDERS = [
-  { label: "OpenAI gpt-image", value: "openai" },
-  { label: "Google Gemini", value: "gemini" },
-  { label: "Z.AI GLM-image", value: "zai" },
-  { label: "Ollama (local)", value: "ollama" },
-];
+// ENH-005: image-provider dropdown is sourced from GET /api/providers. The
+// pre-ENH-005 web labels for two providers were shorter than the registry
+// labels — preserve them via labelMap so the visible options are unchanged
+// (mirrors the settings page; see there for the full note).
+const IMAGE_LABEL_MAP: Record<string, string> = {
+  gemini: "Google Gemini",
+  ollama: "Ollama (local)",
+};
 
 interface ProviderConfig {
   provider: string;
@@ -69,10 +72,12 @@ function ProviderColumn({
   index,
   config,
   onChange,
+  imageProviderOptions,
 }: {
   index: number;
   config: ProviderConfig;
   onChange: (config: ProviderConfig) => void;
+  imageProviderOptions: { label: string; value: string }[];
 }) {
   return (
     <div className="flex-1 bg-gray-900/50 border border-gray-800 rounded-xl p-5 space-y-4">
@@ -83,7 +88,7 @@ function ProviderColumn({
         label="Provider"
         value={config.provider}
         onChange={(v) => onChange({ ...config, provider: v })}
-        options={IMAGE_PROVIDERS}
+        options={imageProviderOptions}
       />
       <InputField
         label="Model"
@@ -121,6 +126,31 @@ export default function StyleGalleryPage() {
     model: "gemini-2.0-flash-exp",
     baseUrl: "",
   });
+  // ENH-005: image-provider option list is sourced from GET /api/providers.
+  // Empty until the first successful fetch resolves; SelectField tolerates
+  // an empty list while loading.
+  const [imageProviderOptions, setImageProviderOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getProviders()
+      .then((registry) => {
+        if (cancelled) return;
+        setImageProviderOptions(
+          toProviderOptions(registry.image_providers, IMAGE_LABEL_MAP),
+        );
+      })
+      .catch(() => {
+        // Stay empty on fetch failure — ProviderColumn renders an empty
+        // <select> in that case, which is the same shape as a backend-down
+        // load on every other page.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <GameLayout>
@@ -149,8 +179,18 @@ export default function StyleGalleryPage() {
 
         {/* Provider columns */}
         <div className="flex gap-6 mb-6">
-          <ProviderColumn index={1} config={config1} onChange={setConfig1} />
-          <ProviderColumn index={2} config={config2} onChange={setConfig2} />
+          <ProviderColumn
+            index={1}
+            config={config1}
+            onChange={setConfig1}
+            imageProviderOptions={imageProviderOptions}
+          />
+          <ProviderColumn
+            index={2}
+            config={config2}
+            onChange={setConfig2}
+            imageProviderOptions={imageProviderOptions}
+          />
         </div>
 
         {/* Generate button area */}
