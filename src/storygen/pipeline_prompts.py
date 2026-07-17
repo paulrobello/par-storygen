@@ -43,9 +43,17 @@ def build_beat_prompt(save: GameSave, from_node_id: str, choice_text: str) -> st
     if save.characters:
         cast_lines: list[str] = []
         for c in save.characters:
+            # backstory_summary is auto-derived as the first sentence of
+            # backstory, so only fold it into the one-liner when there is no
+            # full backstory line following — otherwise the same sentence
+            # would be sent twice per character per beat.
             line = (
                 f"- [{c.id}] {c.name}: {_one_sentence(c.personality)}"
-                + (f" {_one_sentence(c.backstory_summary)}" if c.backstory_summary else "")
+                + (
+                    f" {_one_sentence(c.backstory_summary)}"
+                    if c.backstory_summary and not c.backstory
+                    else ""
+                )
                 + f" ({_one_sentence(c.physical_description)})"
             )
             if c.backstory:
@@ -80,7 +88,15 @@ def build_beat_prompt(save: GameSave, from_node_id: str, choice_text: str) -> st
         beat_lines: list[str] = []
         for node in segment:
             chosen = resolve_chosen_text(save, node)
-            line = f"- {node.narration}"
+            # The root node holds the back-cover marketing blurb, not story
+            # narration — label it so the beat agent doesn't mistake it for
+            # an in-story event.
+            if node.parent_id is None:
+                line = (
+                    f"- [Opening blurb — marketing copy, not in-story narration] {node.narration}"
+                )
+            else:
+                line = f"- {node.narration}"
             if chosen:
                 line += f"\n  -> player chose: {chosen}"
             beat_lines.append(line)
@@ -89,17 +105,34 @@ def build_beat_prompt(save: GameSave, from_node_id: str, choice_text: str) -> st
     sections.append(f"PLAYER JUST CHOSE: {choice_text}")
 
     # Pacing is measured in MAJOR beats so far (the unit target_major_beats
-    # is denominated in), not total beats. Count across the full ancestor path.
+    # is denominated in), not total beats. Count across the full ancestor
+    # path, excluding the root (its is_major=True marks the marketing blurb,
+    # not a real beat). total_beats is the raw beat count (also root-excluded)
+    # used as a runaway guard in case the model under-marks is_major.
     full_chain = path_from_root(save, from_node_id)
-    major_so_far = sum(1 for n in full_chain if n.is_major)
-    pacing_hint = pacing_hint_for_depth(major_so_far, save.target_major_beats, save.pacing)
+    major_so_far = sum(1 for n in full_chain if n.is_major and n.parent_id is not None)
+    total_beats = max(len(full_chain) - 1, 0)
+    pacing_hint = pacing_hint_for_depth(
+        major_so_far, save.target_major_beats, save.pacing, total_beats=total_beats
+    )
     if pacing_hint:
         sections.append(pacing_hint.strip())
     return "\n\n".join(sections)
 
 
-def pacing_hint_for_depth(depth: int, target: int, pacing: str = "moderate") -> str:
+def pacing_hint_for_depth(
+    depth: int, target: int, pacing: str = "moderate", *, total_beats: int = 0
+) -> str:
     """Encourage the model to wind down rather than meander indefinitely.
+
+    ``depth`` is the count of real major beats so far (the unit ``target`` is
+    denominated in — a beat qualifies as "major" per the model's own
+    ``is_major`` flag). ``total_beats`` is the raw count of all beats so far
+    (major or not) and acts as a runaway guard: if the model under-marks
+    ``is_major``, ``depth`` alone would never advance the pacing tier, so a
+    story that has simply run long by raw beat count is force-advanced to at
+    least the climax tier (past ``guard_climax``) or the resolve tier (past
+    ``guard_resolve``) regardless of ``depth``.
 
     Uses ratios of the per-save ``target`` so very short stories don't get a
     "tighten" prod at beat 5 of 5 and very long stories don't get told to
@@ -109,20 +142,39 @@ def pacing_hint_for_depth(depth: int, target: int, pacing: str = "moderate") -> 
     silent_threshold = max(int(target * 0.3 * multiplier), 1)
     tension_threshold = max(int(target * 0.6 * multiplier), 1)
     climax_threshold = max(int(target * 0.9 * multiplier), 1)
+    guard_climax = int(target * 3 * multiplier)
+    guard_resolve = int(target * 4 * multiplier)
+
     if depth <= silent_threshold:
+        tier = 0
+    elif depth <= tension_threshold:
+        tier = 1
+    elif depth <= climax_threshold:
+        tier = 2
+    else:
+        tier = 3
+
+    if total_beats > guard_resolve:
+        tier = 3
+    elif total_beats > guard_climax:
+        tier = max(tier, 2)
+
+    if tier == 0:
         return ""
-    if depth <= tension_threshold:
-        return f" This will be beat #{depth + 1}; keep tension rising."
-    if depth <= climax_threshold:
+    if tier == 1:
+        return f" Progress: {depth} of ~{target} major beats so far. Keep tension rising."
+    if tier == 2:
         return (
-            f" This will be beat #{depth + 1}; start tightening toward a"
-            " climax — set up the resolution rather than introducing new"
-            " unrelated mysteries."
+            f" Progress: {depth} of ~{target} major beats so far ({total_beats} beats"
+            " total). Start tightening toward a climax — set up the resolution"
+            " rather than introducing new unrelated mysteries. Make at least one"
+            " choice drive directly at the central conflict."
         )
     return (
-        f" This will be beat #{depth + 1}; the story has run long. Strongly"
-        " consider resolving the central conflict in this beat or the next."
-        " Set is_ending=true once the resolution lands."
+        f" Progress: {depth} of ~{target} major beats ({total_beats} beats total) —"
+        " the story has run long. Strongly consider resolving the central conflict"
+        " in this beat or the next; set is_ending=true once the resolution lands."
+        " Include at least one choice that leads directly to resolution."
     )
 
 
