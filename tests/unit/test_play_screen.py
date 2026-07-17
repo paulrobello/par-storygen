@@ -600,6 +600,43 @@ def test_play_screen_tts_cache_path_uses_current_provider_voice_and_extension(
     assert rel == f"audio/{path.name}"
 
 
+def test_play_screen_tts_cache_path_is_byte_identical_to_shared_helper(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """PlayScreen delegates to the shared tts.cache helpers (ENH-006-T1).
+
+    Pins that ``PlayScreen._tts_cache_path`` / ``_relative_tts_cache_path``
+    produce byte-identical strings to the lower-layer
+    :func:`storygen.tts.cache.tts_cache_path` / ``relative_tts_cache_path``
+    that the prefetch coordinator (Task 2) will call — so on-demand and
+    background-pregenerated audio land at the exact same path.
+    """
+    from storygen.tts.cache import relative_tts_cache_path, tts_cache_path
+
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    save = _minimal_save()
+    player = _WavTTSPlayer()
+    screen = PlayScreen(save, pipeline=None, tts_player=player)
+    prefs = app_state.TTSPrefs(provider="gemini", voice="Kore")
+
+    # Same player / game / node / prefs in — same absolute and relative paths out.
+    assert screen._tts_cache_path("node-1", prefs) == tts_cache_path(  # pyright: ignore[reportPrivateUsage]
+        player, str(save.id), "node-1", prefs
+    )
+    assert screen._relative_tts_cache_path(  # pyright: ignore[reportPrivateUsage]
+        "node-1", prefs
+    ) == relative_tts_cache_path(player, "node-1", prefs)
+
+    # Also holds when the player is None (TTS disabled) — ext falls back to mp3.
+    screen_no_player = PlayScreen(save, pipeline=None, tts_player=None)
+    assert screen_no_player._tts_cache_path(  # pyright: ignore[reportPrivateUsage]
+        "node-1", prefs
+    ) == tts_cache_path(None, str(save.id), "node-1", prefs)
+    assert screen_no_player._relative_tts_cache_path(  # pyright: ignore[reportPrivateUsage]
+        "node-1", prefs
+    ) == relative_tts_cache_path(None, "node-1", prefs)
+
+
 @pytest.mark.asyncio
 async def test_speak_current_node_refreshes_stale_tts_audio_path_after_success(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
