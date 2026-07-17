@@ -10,6 +10,7 @@ from typing import cast
 from dotenv import find_dotenv, load_dotenv
 
 from storygen.core.models import ImageProviderConfig, TextProviderConfig
+from storygen.core.providers import IMAGE_PROVIDERS, TEXT_PROVIDERS
 from storygen.images.provider_factory import (
     ALLOWED_IMAGE_PROVIDERS as _ALLOWED_IMAGE_PROVIDERS,
 )
@@ -96,9 +97,7 @@ def _resolve_text_config() -> TextProviderConfig:
     base_url: str | None = base_url_raw if base_url_raw else None
 
     _KEY_ENV: dict[str, str | None] = {
-        "openai": "OPENAI_API_KEY",
-        "openrouter": "OPENROUTER_API_KEY",
-        "ollama": None,
+        pid: info.key_env_var for pid, info in TEXT_PROVIDERS.items()
     }
     api_key: str | None = None
     env_var = _KEY_ENV.get(provider)
@@ -119,10 +118,14 @@ def _resolve_text_config() -> TextProviderConfig:
 
 
 def _character_openai_api_key_pin() -> str:
+    # OpenAI's key env var name sourced from the registry (single source of
+    # truth). The ``and`` short-circuit keeps this sound if openai's
+    # ``key_env_var`` were ever ``None`` (it isn't — OpenAI requires a key).
+    openai_key_env = IMAGE_PROVIDERS["openai"].key_env_var
     return (
         _env_or_none("STORYGEN_CHARACTER_IMAGE_API_KEY")
         or _env_or_none("STORYGEN_IMAGE_API_KEY")
-        or _env_or_none("OPENAI_API_KEY")
+        or (openai_key_env and _env_or_none(openai_key_env))
         or ""
     )
 
