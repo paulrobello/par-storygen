@@ -8,6 +8,7 @@ from storygen.llm.prompts import (
     beat_system_prompt,
     blurb_system_prompt,
     character_system_prompt,
+    summary_system_prompt,
     theme_system_prompt,
 )
 
@@ -50,8 +51,9 @@ def test_beat_prompt_uses_target_major_beats() -> None:
     # Stale hardcoded wording must be gone.
     assert "6-12" not in out
     assert "beat 8+" not in out
-    # New tightening threshold should be max(target - 2, 4) = 13 here.
-    assert "beat 13+" in out
+    # New tightening threshold should be max(target - 2, 1) = 13 here.
+    assert "about 13 major beats" in out
+    assert "beat 13+" not in out
 
 
 def test_beat_prompt_default_target_is_five() -> None:
@@ -60,6 +62,55 @@ def test_beat_prompt_default_target_is_five() -> None:
     out = beat_system_prompt(theme=theme, tone=tone, narration_style="third_person")
     assert "5" in out
     assert "6-12" not in out
+
+
+def test_beat_prompt_includes_premise() -> None:
+    theme = Theme(title="t", setting="s", premise="A rogue AI threatens the city.", keywords=[])
+    tone = Tone(preset="serious", custom_descriptor=None)
+    out = beat_system_prompt(theme=theme, tone=tone, narration_style="third_person")
+    assert "A rogue AI threatens the city." in out
+    assert "central conflict established in the premise" in out
+
+
+def test_beat_prompt_tighten_threshold_floors_at_one() -> None:
+    """target=2 should floor the tighten threshold at 1, not the stale 4."""
+    theme = Theme(title="t", setting="s", premise="p", keywords=[])
+    tone = Tone(preset="serious", custom_descriptor=None)
+    out = beat_system_prompt(
+        theme=theme, tone=tone, narration_style="third_person", target_major_beats=2
+    )
+    assert "about 1 major beat" in out
+    assert "about 4 major beat" not in out
+
+
+def test_beat_prompt_choice_guidance_discourages_filler() -> None:
+    theme = Theme(title="t", setting="s", premise="p", keywords=[])
+    tone = Tone(preset="serious", custom_descriptor=None)
+    out = beat_system_prompt(theme=theme, tone=tone, narration_style="third_person")
+    assert "distinct direction" in out
+    assert "Wait and see" in out
+
+
+def test_beat_prompt_continuity_rules_present() -> None:
+    theme = Theme(title="t", setting="s", premise="p", keywords=[])
+    tone = Tone(preset="serious", custom_descriptor=None)
+    out = beat_system_prompt(theme=theme, tone=tone, narration_style="third_person")
+    assert "enacting the player's chosen action" in out
+    assert "never contradict them" in out
+
+
+def test_beat_prompt_new_character_restraint() -> None:
+    theme = Theme(title="t", setting="s", premise="p", keywords=[])
+    tone = Tone(preset="serious", custom_descriptor=None)
+    out = beat_system_prompt(theme=theme, tone=tone, narration_style="third_person")
+    assert "at most one per beat" in out
+
+
+def test_summary_prompt_covers_structured_sections() -> None:
+    out = summary_system_prompt()
+    assert "open threads" in out.lower()
+    assert "established facts" in out.lower()
+    assert "current situation" in out.lower()
 
 
 def test_beat_prompt_includes_reader_level_guidance() -> None:
