@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- **Web API hardened** — The FastAPI surface (`src/storygen_api`) is now auth-gated (bearer token via `STORYGEN_API_TOKEN`, fail-closed 503 when unset), loopback-bound by default, SSRF-allowlisted (provider base-URL allowlist rejecting private/link-local IP ranges), path-validated (uuid/node/char id checks at every path builder), rate-limited (sliding-window per IP), and no longer leaks exception strings in error responses. CORS is pinned to actual method/header usage with configurable origins. (Audit SEC-001…011)
+- **Web API hardened** — The FastAPI surface (`src/storygen_api`) is now auth-gated (bearer token via `STORYGEN_API_TOKEN`), loopback-bound by default, SSRF-allowlisted (provider base-URL allowlist rejecting private/link-local IP ranges), path-validated (uuid/node/char id checks at every path builder), rate-limited (sliding-window per IP), and no longer leaks exception strings in error responses. CORS is pinned to actual method/header usage with configurable origins. When the token is unset, loopback peers are trusted (so `make api-dev` + `make web-dev` work out of the box) and off-box clients stay fail-closed (503 / WS 4403); setting the token enforces bearer auth for all clients, loopback included. (Audit SEC-001…011)
 
 ### Changed
 

@@ -15,6 +15,7 @@ from starlette.requests import HTTPConnection, Request
 from storygen_api import security
 from storygen_api.security import (
     ProviderURLError,
+    is_loopback_peer,
     is_valid_token_format,
     reset_token_cache,
     validate_provider_base_url,
@@ -28,8 +29,14 @@ from storygen_api.security import (
 # ---------------------------------------------------------------------------
 
 
-def _make_request(headers: dict[str, str] | None = None) -> Request:
+def _make_request(
+    headers: dict[str, str] | None = None,
+    *,
+    client: tuple[str, int] | None = None,
+) -> Request:
     scope: dict[str, Any] = {"type": "http", "method": "GET", "path": "/", "headers": []}
+    if client is not None:
+        scope["client"] = [client[0], client[1]]
     if headers:
         header_list: list[tuple[bytes, bytes]] = [
             (k.lower().encode("latin-1"), v.encode("latin-1")) for k, v in headers.items()
@@ -48,11 +55,58 @@ def _isolate_token_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:  # py
 
 
 def test_verify_token_fails_closed_when_unset() -> None:
-    """SEC-001: when STORYGEN_API_TOKEN is unset, return 503 (fail closed)."""
+    """SEC-001: when STORYGEN_API_TOKEN is unset, return 503 (fail closed).
+
+    The default request has no known peer (``client`` is None), so an unknown
+    peer is treated as off-box and stays fail-closed.
+    """
     request = _make_request({"Authorization": "Bearer anything"})
     with pytest.raises(security.HTTPException) as exc_info:
         verify_token(request)
     assert exc_info.value.status_code == 503
+
+
+def test_verify_token_allows_loopback_when_token_unset() -> None:
+    """Local dev (loopback peer) reaches protected routes with no token set."""
+    request = _make_request(client=("127.0.0.1", 50000))
+    verify_token(request)  # should not raise
+
+
+def test_verify_token_fails_closed_for_offbox_when_token_unset() -> None:
+    """Off-box peers are still 503 when no token is configured."""
+    request = _make_request(client=("10.0.0.5", 50000))
+    with pytest.raises(security.HTTPException) as exc_info:
+        verify_token(request)
+    assert exc_info.value.status_code == 503
+
+
+def test_verify_token_still_enforces_token_on_loopback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Configuring a token locks the API down even for loopback clients."""
+    monkeypatch.setenv("STORYGEN_API_TOKEN", "super-secret-token")
+    reset_token_cache()
+    request = _make_request({"Authorization": "Bearer wrong"}, client=("127.0.0.1", 50000))
+    with pytest.raises(security.HTTPException) as exc_info:
+        verify_token(request)
+    assert exc_info.value.status_code == 403
+
+
+def test_is_loopback_peer_classifies_peers() -> None:
+    assert (
+        is_loopback_peer(HTTPConnection({"type": "http", "headers": [], "client": ["127.0.0.1", 1]}))
+        is True
+    )
+    assert (
+        is_loopback_peer(HTTPConnection({"type": "http", "headers": [], "client": ["::1", 1]}))
+        is True
+    )
+    assert (
+        is_loopback_peer(HTTPConnection({"type": "http", "headers": [], "client": ["10.0.0.5", 1]}))
+        is False
+    )
+    # No client in scope -> unknown peer -> not trusted.
+    assert is_loopback_peer(HTTPConnection({"type": "http", "headers": []})) is False
 
 
 def test_verify_token_rejects_missing_header(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -102,8 +156,20 @@ def test_verify_token_uses_constant_time_compare(monkeypatch: pytest.MonkeyPatch
 
 
 def test_ws_authorize_rejects_when_unset() -> None:
-    """SEC-001: WS handshake fails closed when no token configured."""
+    """SEC-001: WS handshake fails closed for an unknown/off-box peer when unset."""
     conn = HTTPConnection({"type": "http", "headers": []})
+    assert ws_authorize(conn) is False
+
+
+def test_ws_authorize_allows_loopback_when_token_unset() -> None:
+    """Local dev (loopback peer) opens the WS with no token configured."""
+    conn = HTTPConnection({"type": "http", "headers": [], "client": ["127.0.0.1", 50000]})
+    assert ws_authorize(conn) is True
+
+
+def test_ws_authorize_rejects_offbox_when_token_unset() -> None:
+    """Off-box WS peers are still rejected when no token is configured."""
+    conn = HTTPConnection({"type": "http", "headers": [], "client": ["10.0.0.5", 50000]})
     assert ws_authorize(conn) is False
 
 

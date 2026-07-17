@@ -67,24 +67,47 @@ def _extract_bearer(conn: HTTPConnection) -> str | None:
     return token or None
 
 
+def is_loopback_peer(conn: HTTPConnection) -> bool:
+    """True if the connection's peer is a loopback address (127.x / ::1).
+
+    Used to let the local single-user dev flow (``make api-dev`` +
+    ``make web-dev``, both on loopback) reach the API without a bearer token
+    while still failing closed for any off-box client. Returns ``False`` when
+    the peer address is unknown (e.g. a request scope with no ``client``), so
+    an unknown peer stays fail-closed rather than trusted.
+    """
+    client = conn.client
+    if client is None:
+        return False
+    host = client.host
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return host == "localhost"
+
+
 def verify_token(request: Request) -> None:
     """FastAPI dependency: reject the request unless the bearer token matches.
 
-    Fail-closed semantics: if ``STORYGEN_API_TOKEN`` is not configured the
-    dependency returns 503 so a misconfigured deploy cannot expose the API.
-    Token comparison uses :func:`hmac.compare_digest`` to avoid timing
-    side channels.
+    When ``STORYGEN_API_TOKEN`` is unset, loopback peers (local dev /
+    single-user) are trusted and the request is allowed; any off-box client
+    is rejected with 503 so a misconfigured deploy exposed beyond loopback
+    cannot open the API up. When the token *is* configured, every client —
+    loopback included — must present a matching bearer token. Comparison uses
+    :func:`hmac.compare_digest` to avoid timing side channels.
 
     Raise:
         HTTPException(401): missing/malformed Authorization header.
         HTTPException(403): token does not match.
-        HTTPException(503): server has no token configured.
+        HTTPException(503): no token configured AND the client is off-loopback.
     """
     expected = _expected_token()
     if expected is None:
-        # Fail closed: refuse to serve protected routes until an admin
-        # configures STORYGEN_API_TOKEN. Loopback-only dev can still hit
-        # the open /api/health route.
+        # No token configured: trust loopback (local dev works out of the
+        # box), fail closed for anything arriving from off-box so exposing
+        # the API without setting a token stays safe.
+        if is_loopback_peer(request):
+            return
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="API auth not configured (set STORYGEN_API_TOKEN)",
@@ -125,12 +148,15 @@ def ws_authorize(conn: HTTPConnection) -> bool:
 
     Returns:
         ``True`` if the connection is authorised; ``False`` if the token is
-        missing, malformed, or does not match. Fail-closed: returns ``False``
-        when ``STORYGEN_API_TOKEN`` is unset.
+        missing, malformed, or does not match. When ``STORYGEN_API_TOKEN`` is
+        unset, loopback peers (local dev) are trusted and off-box peers are
+        rejected — mirroring :func:`verify_token`'s fail-closed-for-off-box
+        policy.
     """
     expected = _expected_token()
     if expected is None:
-        return False
+        # No token configured: allow loopback (local dev), reject off-box.
+        return is_loopback_peer(conn)
     # Try subprotocol first (browser-compatible).
     subprotocols = conn.headers.get("sec-websocket-protocol")
     if subprotocols:
