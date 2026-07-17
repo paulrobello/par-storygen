@@ -57,12 +57,15 @@ _synth_locks: dict[tuple[str, str], asyncio.Lock] = {}
 def _get_synth_lock(game_id: str, node_id: str) -> asyncio.Lock:
     """Return the per-node synth lock, creating it lazily on first request.
 
-    Lazy creation is safe under concurrency: ``synthesize_to_cache`` is the
-    only caller, and dict get/set on a single key is atomic under the GIL for
-    the CPython interpreter the project targets. Two racing first-callers for
-    the same key would each create a Lock and one would win the dict slot; the
-    losing caller would still publish its Lock via ``setdefault`` semantics —
-    use ``setdefault`` to guarantee both callers observe the SAME instance.
+    Every caller for a given ``(game_id, node_id)`` must observe the SAME
+    ``Lock`` instance, or the per-node exactly-one-provider-call guarantee
+    breaks. ``setdefault`` is the single publish point: the first caller to
+    reach it installs its Lock; any later caller for the same key gets the
+    existing Lock back and discards its own (the ``existing is not lock``
+    check adopts the winner). The body has no ``await``, so under the
+    single-threaded asyncio loop it cannot interleave with another caller —
+    the ``get``-then-``setdefault`` ordering is belt-and-suspenders defense
+    against a future await/thread being added here, not a fix for a live race.
     """
     key = (game_id, node_id)
     lock = _synth_locks.get(key)
