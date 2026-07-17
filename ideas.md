@@ -15,16 +15,10 @@ Let players tag nodes with custom labels ("plot twist," "favorite scene," "scary
 ### Ambient Sound / Music System
 Layer background audio on top of TTS narration. Ship a few royalty-free ambient tracks (forest, dungeon, spaceship, city) or integrate with a free music API. Let the beat agent suggest mood tags that trigger audio transitions.
 
-### Full-Color Image Rendering (kitty / iTerm2)
-Detect terminal protocol support (kitty graphics, iTerm2 inline images, sixel) and render full-color images instead of half-block when available. Fall back to half-block for unsupported terminals. Rich-pixels already supports some of these protocols.
-
 ### Animated Scene Transitions
 Smooth fade or dissolve effect between scene images using terminal animation primitives. Could use a sequence of partial-image frames rendered in rapid succession on image swap.
 
 ## Cross-Game & Social
-
-### Story Export to HTML / PDF
-Export a completed story as a self-contained HTML file (or PDF) with inline images, narration text, and a clickable choice tree. Would make stories shareable outside the terminal. Use Jinja2 templates for HTML generation.
 
 ### Story Share Codes
 Encode a compressed story tree (choices made + seed) as a short shareable code. Other users paste the code to reconstruct the same story path (regenerating images/text from the same LLM calls if cached, or re-generating if not). Uses the existing content-addressed tree as the foundation.
@@ -32,19 +26,10 @@ Encode a compressed story tree (choices made + seed) as a short shareable code. 
 ### Multiplayer "Round Robin" Mode
 Two or more players take turns making choices, possibly with a timer per turn. Each player sees only the choices available on their turn. Could work locally (hot-seat) or via a simple file-sync mechanism.
 
-### Community Character Library
-Export/import library characters as portable JSON files that can be shared. Add a `library export --file` CLI command and `library import --file` counterpart. Extend to a future community hub if adoption grows.
-
 ## Technical & Quality of Life
-
-### GitHub CI Pipeline
-Add a GitHub Actions workflow running `make checkall` on PRs and pushes to `main`. Include pyright, ruff, pytest with coverage reporting. Current `release.yml` handles releases but there are no PR quality gates.
 
 ### Undo Stack
 Maintain an undo stack (last N choices) so users can go back without opening the full graph screen. Add a keybinding (`u`) that pops the stack and navigates to the parent node. Simple to implement given the existing tree structure.
-
-### Keyboard Navigation Improvements
-Add vim-style keybindings (j/k for up/down, Enter to select) and arrow-key navigation to all screens, not just the choice list. Especially useful for the library browser, load screen, and endings gallery.
 
 ### Offline / Air-Gap Mode
 Detect when no network is available and gracefully degrade: use only Ollama providers, disable image generation if no local provider is configured, and show a clear "offline mode" banner. Store this state and skip network-dependent UI options.
@@ -64,7 +49,7 @@ Allow users to remap keybindings via a config file (`$XDG_CONFIG_HOME/storygen/k
 ## LLM & AI Enhancements
 
 ### Multi-Model Pipeline
-Allow different LLM models for different agents — e.g., use a fast cheap model (gpt-4o-mini) for beat generation but a more capable model (gpt-4o) for character creation and illustration planning. Add per-agent model overrides in settings.
+*Partially done (verified 2026-07-17).* Image generation supports per-task model selection: `STORYGEN_IMAGE_MODEL` for scenes and a separate `STORYGEN_CHARACTER_IMAGE_MODEL` for portraits. **Remaining:** per-agent overrides for the *text* LLM — e.g. a fast/cheap model for beat generation and a more capable model for character creation and illustration planning — all text agents currently share one `STORYGEN_TEXT_MODEL`.
 
 ### Prompt Customization
 Expose the system prompts (or prompt templates) as user-editable files in `$XDG_CONFIG_HOME/storygen/prompts/`. Power users can tweak tone, style, or add constraints without modifying source code.
@@ -89,16 +74,10 @@ Ship alternate TUI color themes optimized for colorblind users and high-contrast
 ### Adjustable Text Speed
 Add a configurable text-reveal speed for the narration panel (instant, slow, medium, fast typewriter effect). Some users prefer dramatic reveal; others want instant text. Persist preference in app state.
 
-### Choice Timeout with Auto-Pick
-Optional per-beat choice timer — if the user doesn't pick within N seconds, auto-select (random or "best" as determined by a lightweight LLM call). Adds urgency and immersion. Disabled by default.
-
 ## Data & Storage
 
 ### Save Compression
 Compress save files (gzip or zstd) to reduce disk usage, especially for image-heavy stories. Transparently decompress on load. Could reduce save sizes by 60-80% for text-heavy stories.
-
-### Save Migration Framework
-The `save.py` migration stub is currently unused. Formalize a versioned migration system so future schema changes (new fields, renamed models) are handled gracefully across all existing saves.
 
 ### Cloud Sync / Backup
 Optional sync of save files and character library to cloud storage (S3, GCS, or a simple REST endpoint). Would enable playing across multiple machines. Use the existing XDG paths as the sync root.
@@ -107,9 +86,6 @@ Optional sync of save files and character library to cloud storage (S3, GCS, or 
 Add search/filter to the load screen — filter by theme, character names, date range, or completion status. Index save metadata on first load for fast filtering.
 
 ## Monetization & Distribution
-
-### PyPI Package
-Package for PyPI distribution (`pip install par-storygen`). Requires cleaning up the CLI entry point, adding proper metadata, and potentially vendoring or documenting optional dependencies (image providers, TTS).
 
 ### Homebrew Formula
 Create a Homebrew formula for macOS users. Bundle Python + dependencies so users don't need to manage Python versions. Could use `pyinstaller` or `nix` for the binary build.
@@ -120,6 +96,30 @@ Ship a Docker image with TUI access via `docker run -it`. Useful for running on 
 ---
 
 ## Completed
+
+### Full-Color Image Rendering (kitty / iTerm2)
+*Completed (verified 2026-07-17).* Scene and portrait images render through `par-textual-image`'s `TerminalImage` widget (`widgets/image_panel.py`), which auto-detects the best available terminal protocol — Kitty TGP, Sixel, iTerm2 inline images — and falls back to half-block for unsupported terminals. The protocol can also be force-selected from Settings.
+
+### Story Export to HTML / PDF
+*Completed (verified 2026-07-17).* `export/book.py` + `export/template.html` export a completed story as a self-contained HTML file with inline images, narration text, embedded TTS audio (with playback-speed control), and a clickable 3D page-turn choice tree. PDF was the alternative format in the original idea; HTML is shipped.
+
+### Community Character Library
+*Completed (verified 2026-07-17).* Library characters export/import as portable JSON via the in-app library browser, with optional backstory adaptation (`adapt_backstory_system_prompt`) when importing into a new story. The original idea suggested `library export --file` / `library import --file` CLI subcommands; the capability is shipped through the TUI rather than dedicated CLI commands.
+
+### GitHub CI Pipeline
+*Completed (verified 2026-07-17).* `.github/workflows/ci.yml` gates every push and PR with the full Python gate (`make checkall`: ruff + pyright strict + pytest), the web build (eslint + vitest + tsc), and Playwright e2e — complementing `release.yml`, which handles releases. Coverage reporting via pytest-cov.
+
+### Keyboard Navigation Improvements
+*Completed (verified 2026-07-17).* Vim-style `j`/`k` plus arrow-key navigation added to the PlayScreen choice list, LoadGameScreen, EndingsScreen, and CharacterCatalogScreen, with `Enter` to select. Shipped alongside the cross-platform TTS playback work.
+
+### Choice Timeout with Auto-Pick
+*Completed (verified 2026-07-17).* Implemented as "Auto play" mode (press `a` in PlayScreen). A 7-step cycle waits for the image to settle and a configurable viewing delay, then auto-selects a choice (random), rescheduling until disabled or an ending is reached. Action gating keeps menu / auto-select / TTS controls available during the sequence.
+
+### Save Migration Framework
+*Completed (verified 2026-07-17).* The migration stub in `storage/save.py` is formalized into a cumulative, versioned system. Current schema version is 4 (v1→v2: `recap_text`; v2→v3: `relationships`; v3→v4: `backstory_summary` auto-population); the game-listing schema also routes through migrations so they always apply.
+
+### PyPI Package
+*Completed (verified 2026-07-17).* `pyproject.toml` ships clean `storygen` and `storygen-api` console entry points, full metadata (classifiers, keywords, project URLs, MIT license), and an `[api]` extra for the optional FastAPI/web surface. `make package` builds sdist + wheel; `release.yml` cuts tagged releases.
 
 ### Character Relationship Tracking
 *Completed 2026-05-03.* Pairwise character relationships (ally, rival, neutral, romantic, mentor, student, family, stranger) tracked as the story progresses. The beat agent extracts relationship changes inline and they're fed back into subsequent beat prompts for narrative consistency. Press `f` during gameplay to view all relationships in a modal with strength bars and context. Relationships persisted in the save file with save migration v2→v3.
