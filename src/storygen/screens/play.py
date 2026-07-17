@@ -31,6 +31,7 @@ from storygen.screens.portraits import PortraitsScreen
 from storygen.screens.relationships import RelationshipsScreen
 from storygen.storage import app_state, paths
 from storygen.storage.save import GameSave, save_game
+from storygen.tts.cache import relative_tts_cache_path, tts_cache_path
 from storygen.tts.player import TTSPlayer, TTSState
 from storygen.util import open_in_system_viewer
 from storygen.widgets.choice_list import ChoiceList
@@ -1018,24 +1019,11 @@ class PlayScreen(Screen[None]):
 
     def _tts_cache_path(self, node_id: str, prefs: app_state.TTSPrefs) -> Path:
         """Return the current provider/voice-aware TTS cache path for a node."""
-        ext = self._tts_player.preferred_extension if self._tts_player is not None else "mp3"
-        return paths.tts_audio_path(
-            str(self._save.id),
-            node_id,
-            provider=prefs.provider,
-            voice=prefs.voice,
-            ext=ext,
-        )
+        return tts_cache_path(self._tts_player, str(self._save.id), node_id, prefs)
 
     def _relative_tts_cache_path(self, node_id: str, prefs: app_state.TTSPrefs) -> str:
         """Return the relative current provider/voice-aware TTS cache path for a node."""
-        ext = self._tts_player.preferred_extension if self._tts_player is not None else "mp3"
-        return paths.relative_tts_audio_path(
-            node_id,
-            provider=prefs.provider,
-            voice=prefs.voice,
-            ext=ext,
-        )
+        return relative_tts_cache_path(self._tts_player, node_id, prefs)
 
     async def _speak_current_node(self) -> None:
         """Generate/play TTS for the current node, with caching."""
