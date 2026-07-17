@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import time
 from typing import Any, cast
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
@@ -211,6 +212,7 @@ async def websocket_endpoint(
                         break
 
                     callbacks = ws_manager.make_callbacks(game_id)
+                    t0 = time.perf_counter()
                     try:
                         await pipeline.advance(
                             save,
@@ -222,6 +224,17 @@ async def websocket_endpoint(
                         # SEC-004: log server-side; emit a generic error code,
                         # never the raw exception string (which can leak the
                         # configured base_url, internal paths, or provider body).
+                        duration_ms = (time.perf_counter() - t0) * 1000.0
+                        # ENH-008: log advance duration even on failure, with a
+                        # truncated game id (no full UUID in logs).
+                        _logger.info(
+                            "ws advance",
+                            extra={
+                                "game": game_id[:8],
+                                "duration_ms": round(duration_ms, 1),
+                                "ok": False,
+                            },
+                        )
                         _logger.exception(
                             "WS pipeline.advance failed for game %s", game_id
                         )
@@ -232,6 +245,17 @@ async def websocket_endpoint(
                                 "message": "internal error",
                             }
                         )
+                        continue
+                    duration_ms = (time.perf_counter() - t0) * 1000.0
+                    # ENH-008: log advance duration with a truncated game id.
+                    _logger.info(
+                        "ws advance",
+                        extra={
+                            "game": game_id[:8],
+                            "duration_ms": round(duration_ms, 1),
+                            "ok": True,
+                        },
+                    )
             else:
                 await ws.send_json(
                     {

@@ -12,12 +12,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from collections.abc import AsyncGenerator
+import time
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager, suppress
 
 import typer
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from storygen import __version__
@@ -150,11 +151,66 @@ def create_app() -> FastAPI:
     async def _health() -> dict[str, str]:  # pyright: ignore[reportUnusedFunction] - registered as a FastAPI route by the @app.get decorator above; pyright doesn't model the decorator's registration side-effect
         return {"status": "ok"}
 
+    # ENH-008: request-timing middleware. Logs method, route template (not raw
+    # path, so game UUIDs don't spray into logs — consistent with SEC-004
+    # info-disclosure hygiene), status, and duration at INFO level. Structured
+    # via ``extra={}`` so it's grep/jq-able. WS connections bypass HTTP
+    # middleware (handled separately in the WS router).
+    @app.middleware("http")
+    async def _log_request_timing(  # type: ignore[no-untyped-def]
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        start = time.perf_counter()
+        try:
+            response = await call_next(request)
+        except Exception:
+            duration_ms = (time.perf_counter() - start) * 1000.0
+            _logger.info(
+                "request",
+                extra={
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status": 500,
+                    "duration_ms": round(duration_ms, 1),
+                },
+            )
+            raise
+        duration_ms = (time.perf_counter() - start) * 1000.0
+        _logger.info(
+            "request",
+            extra={
+                "method": request.method,
+                "path": request.url.path,
+                "status": response.status_code,
+                "duration_ms": round(duration_ms, 1),
+            },
+        )
+        return response
+
     return app
 
 
 # Typer CLI entry point
 _cli_app = typer.Typer(name="storygen-api", help="par-storygen HTTP API server")
+
+
+def _configure_logging() -> None:
+    """Set logger levels for the API surface from ``STORYGEN_LOG_LEVEL`` (ENH-008).
+
+    Uvicorn configures the root handlers; this only tunes the levels of the
+    ``storygen_api`` and ``storygen`` loggers so the request-timing /
+    provider-latency records (INFO / DEBUG respectively) are visible. Defaults
+    keep ``storygen.*`` (shared-layer) at WARNING — the TUI shares those modules
+    and INFO noise would land in Textual's devtools console.
+    """
+    raw = os.environ.get("STORYGEN_LOG_LEVEL", "").strip().upper()
+    api_level = raw if raw else "INFO"
+    # Shared-layer stays quiet unless the caller explicitly widens it via the
+    # same var — protecting the TUI from logging noise.
+    shared_level = raw if raw else "WARNING"
+    logging.getLogger("storygen_api").setLevel(api_level)
+    logging.getLogger("storygen").setLevel(shared_level)
 
 
 @_cli_app.command()
@@ -173,6 +229,7 @@ def serve(
     AND set ``STORYGEN_API_TOKEN`` so SEC-001 auth gates every
     state-changing route.
     """
+    _configure_logging()
     uvicorn.run(
         "storygen_api.main:create_app",
         factory=True,

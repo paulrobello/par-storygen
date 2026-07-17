@@ -21,6 +21,8 @@ The shared module uses the correct property form; both ``app.py`` and
 from __future__ import annotations
 
 import contextlib
+import logging
+import time
 from collections.abc import Callable
 from typing import cast
 
@@ -34,6 +36,27 @@ from storygen.images.routed_provider import RoutedImageProvider
 from storygen.images.split_provider import SplitImageProvider
 from storygen.storage import app_state
 from storygen.storage.save import GameSave
+
+# ENH-008: debug-level latency/timing logger for agent + image calls. Kept at
+# DEBUG so the shared ``storygen.*`` modules stay silent in the TUI (which
+# shares these modules and would otherwise leak INFO noise into Textual's
+# devtools console). The API surface bumps this to DEBUG via STORYGEN_LOG_LEVEL.
+_logger = logging.getLogger(__name__)
+
+
+def _log_usage(usage: object) -> dict[str, int | None]:
+    """Extract input/output token counts from a pydantic-ai usage object.
+
+    Returns a dict with ``input_tokens``/``output_tokens`` (None when absent)
+    for structured logging. Best-effort: usage shape varies by provider, so a
+    missing attribute logs None rather than raising.
+    """
+    inp = getattr(usage, "input_tokens", None)
+    out = getattr(usage, "output_tokens", None)
+    return {
+        "input_tokens": int(inp) if isinstance(inp, int) else None,
+        "output_tokens": int(out) if isinstance(out, int) else None,
+    }
 
 
 class BeatAgentAdapter:
@@ -61,7 +84,9 @@ class BeatAgentAdapter:
         self._on_usage = on_usage
 
     async def run(self, prompt, on_narration_delta, raw_sink=None):  # type: ignore[no-untyped-def]
+        t0 = time.perf_counter()
         result = await self._agent.run(prompt)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+        duration_ms = (time.perf_counter() - t0) * 1000.0
         if self._on_usage is not None:
             # ``result.usage`` is a property on pydantic-ai's AgentRunResult
             # (verified against 2.11.0). Calling ``result.usage()`` raises
@@ -69,6 +94,16 @@ class BeatAgentAdapter:
             # usage tracking. Never let usage tracking crash a beat regardless.
             with contextlib.suppress(Exception):
                 self._on_usage(result.usage)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+        # ENH-008: debug-level agent latency logging.
+        with contextlib.suppress(Exception):
+            _logger.debug(
+                "agent call",
+                extra={
+                    "agent": "beat",
+                    "duration_ms": round(duration_ms, 1),
+                    **_log_usage(result.usage),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                },
+            )
         if raw_sink is not None:
             # Debug-only raw cache; must never crash the pipeline.
             with contextlib.suppress(Exception):
@@ -93,10 +128,22 @@ class SummaryAdapter:
         self._on_usage = on_usage
 
     async def run(self, path_summary_prompt, raw_sink=None):  # type: ignore[no-untyped-def]
+        t0 = time.perf_counter()
         result = await self._agent.run(path_summary_prompt)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+        duration_ms = (time.perf_counter() - t0) * 1000.0
         if self._on_usage is not None:
             with contextlib.suppress(Exception):
                 self._on_usage(result.usage)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+        # ENH-008: debug-level agent latency logging.
+        with contextlib.suppress(Exception):
+            _logger.debug(
+                "agent call",
+                extra={
+                    "agent": "summary",
+                    "duration_ms": round(duration_ms, 1),
+                    **_log_usage(result.usage),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                },
+            )
         if raw_sink is not None:
             with contextlib.suppress(Exception):
                 raw_sink(result.all_messages_json())  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
@@ -120,10 +167,22 @@ class IllustrationAdapter:
             f"- {c.id}: {c.name} — {c.physical_description}"  # pyright: ignore[reportUnknownMemberType]
             for c in characters  # pyright: ignore[reportUnknownVariableType]
         )
+        t0 = time.perf_counter()
         result = await self._agent.run(summary)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+        duration_ms = (time.perf_counter() - t0) * 1000.0
         if self._on_usage is not None:
             with contextlib.suppress(Exception):
                 self._on_usage(result.usage)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+        # ENH-008: debug-level agent latency logging.
+        with contextlib.suppress(Exception):
+            _logger.debug(
+                "agent call",
+                extra={
+                    "agent": "illustration",
+                    "duration_ms": round(duration_ms, 1),
+                    **_log_usage(result.usage),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                },
+            )
         if raw_sink is not None:
             with contextlib.suppress(Exception):
                 raw_sink(result.all_messages_json())  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
