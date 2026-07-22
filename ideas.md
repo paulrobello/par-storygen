@@ -28,17 +28,11 @@ Two or more players take turns making choices, possibly with a timer per turn. E
 
 ## Technical & Quality of Life
 
-### Undo Stack
-Maintain an undo stack (last N choices) so users can go back without opening the full graph screen. Add a keybinding (`u`) that pops the stack and navigates to the parent node. Simple to implement given the existing tree structure.
-
 ### Offline / Air-Gap Mode
 Detect when no network is available and gracefully degrade: use only Ollama providers, disable image generation if no local provider is configured, and show a clear "offline mode" banner. Store this state and skip network-dependent UI options.
 
 ### Story Statistics Dashboard
 Add a stats screen showing: total words generated, play time, choices made, unique endings found, total images generated, total API cost, characters encountered, tree depth and breadth. Aggregate across all saves for an all-time view.
-
-### Auto-Save Checkpoints
-Periodically auto-save in-progress stories (every N beats or on a timer) in addition to the explicit save on ending. Protects against unexpected crashes. Store as `.autosave` alongside the main save and offer recovery on next launch.
 
 ### Search Within Story
 Add a `/` keybinding during gameplay to search narration text across all visited nodes. Highlight matches and allow jumping to the matching beat. Useful for revisiting clues or favorite passages in longer stories.
@@ -53,9 +47,6 @@ Allow users to remap keybindings via a config file (`$XDG_CONFIG_HOME/storygen/k
 
 ### Prompt Customization
 Expose the system prompts (or prompt templates) as user-editable files in `$XDG_CONFIG_HOME/storygen/prompts/`. Power users can tweak tone, style, or add constraints without modifying source code.
-
-### Streaming Beat Text
-Stream the narration text token-by-token as the LLM generates it (like ChatGPT), instead of waiting for the full beat to complete. The `StoryPanel` widget already supports `write()` — wire it to a streaming agent response.
 
 ### Story Consistency Checker
 Run a background consistency pass every N beats that checks for contradictions (character traits, plot points, world rules) and either warns the user or feeds corrections back into the next beat prompt. Could use a separate LLM call with a "consistency audit" prompt.
