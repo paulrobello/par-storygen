@@ -37,9 +37,6 @@ Add a stats screen showing: total words generated, play time, choices made, uniq
 ### Search Within Story
 Add a `/` keybinding during gameplay to search narration text across all visited nodes. Highlight matches and allow jumping to the matching beat. Useful for revisiting clues or favorite passages in longer stories.
 
-### Configurable Keybindings
-Allow users to remap keybindings via a config file (`$XDG_CONFIG_HOME/storygen/keybindings.toml`). Start with the play screen (choice keys, undo, graph, endings, etc.) and extend to all screens.
-
 ## LLM & AI Enhancements
 
 ### Multi-Model Pipeline
