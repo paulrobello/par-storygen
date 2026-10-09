@@ -11,10 +11,18 @@ import { defineConfig, devices } from "@playwright/test";
  *
  * Run locally with `npm run e2e` (reuses a running dev server if present).
  */
+// Browser tests run locally on the real Metal GPU (headless Chromium).
+// PW_GPU=swiftshader forces software GL.
+const gpu = process.env.PW_GPU ?? "metal";
+const args =
+  gpu === "metal"
+    ? ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"]
+    : ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"];
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
-  workers: 1,
+  workers: gpu === "swiftshader" ? 2 : "50%",
   // Next dev compiles each route on first visit (10–20s), so give assertions
   // and navigation a generous window. Production (`next start`) is far faster.
   timeout: 90_000,
@@ -27,6 +35,9 @@ export default defineConfig({
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     navigationTimeout: 60_000,
+    channel: "chromium",
+    headless: true,
+    launchOptions: { args },
   },
   projects: [
     {

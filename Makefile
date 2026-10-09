@@ -54,7 +54,7 @@ web-gen-api:
 # web/node_modules with a clear notice instead of failing, so `make checkall`
 # stays runnable in environments that carry only the Python toolchain (notably
 # CI's python-gate job, where the web surface is covered by the separate
-# web-build / web-e2e jobs). Locally, run `make web-install` once to enable it.
+# web-build job). Locally, run `make web-install` once to enable it.
 #
 # ENH-001: the gate first re-exports the OpenAPI schema and regenerates the
 # TS types, then asserts a clean git diff — so a Pydantic change that wasn't
@@ -63,7 +63,7 @@ web-gen-api:
 # `cd web` for the npm steps.
 web-check:
 	@if [ ! -d web/node_modules ]; then \
-		echo "web-check: web/node_modules absent - skipping (run 'make web-install' to enable; CI covers web in the web-build/web-e2e jobs)"; \
+		echo "web-check: web/node_modules absent - skipping (run 'make web-install' to enable; CI covers web in the web-build job)"; \
 	else \
 		uv run python scripts/export_openapi.py \
 			&& cd web && npm run gen:api:check \
