@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import Literal, get_args
 
-from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.models.openai import OpenAIChatModel, OpenAIChatModelSettings
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from storygen.core.models import TextProviderConfig
@@ -78,6 +78,20 @@ def validate_config(config: TextProviderConfig) -> tuple[bool, str]:
     return True, ""
 
 
+def _tool_settings_for(model: str) -> OpenAIChatModelSettings | None:
+    """Model settings required for tool-enabled requests, if any.
+
+    gpt-6-luna only supports function calling on Chat Completions with
+    ``reasoning_effort="none"`` (OpenAI model docs; the Responses API works
+    at any effort). par-storygen encodes every structured ``output_type`` as
+    an output tool, so all agent calls are tool-enabled — without this, the
+    default ``medium`` effort gets them rejected.
+    """
+    if model.startswith("gpt-6-luna"):
+        return OpenAIChatModelSettings(openai_reasoning_effort="none")
+    return None
+
+
 def build_text_model(config: TextProviderConfig) -> OpenAIChatModel:
     """Construct a pydantic-ai model pointed at the configured provider."""
     base_url = resolve_base_url(config.provider, override=config.base_url)
@@ -86,4 +100,8 @@ def build_text_model(config: TextProviderConfig) -> OpenAIChatModel:
         api_key=api_key,
         base_url=base_url,
     )
-    return OpenAIChatModel(model_name=config.model, provider=provider)
+    return OpenAIChatModel(
+        model_name=config.model,
+        provider=provider,
+        settings=_tool_settings_for(config.model),
+    )
