@@ -65,11 +65,11 @@ def test_get_providers_returns_registry_ids(api_client: TestClient) -> None:
     assert openai_text["label"] == "OpenAI"
     assert openai_text["kind"] == ["text"]
     assert openai_text["key_env_var"] == "OPENAI_API_KEY"
-    assert openai_text["default_model"] == "gpt-4o-mini"
+    assert openai_text["default_model"] == "gpt-6-luna"
     assert openai_text["default_base_url"] == "https://api.openai.com/v1"
     assert openai_text["allows_loopback_base_url"] is False
     assert openai_text["supports_reference_images"] is False
-    assert openai_text["suggested_models"] == ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini"]
+    assert openai_text["suggested_models"] == ["gpt-6-luna"]
     # Ollama is the only provider with loopback=True (text + image).
     for entry in body["text_providers"] + body["image_providers"]:
         assert entry["allows_loopback_base_url"] == (entry["id"] == "ollama"), (

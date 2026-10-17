@@ -216,7 +216,7 @@ class SettingsScreen(Screen[None]):
         )
         self._model_input = Input(
             value=app_state.DEFAULT_TEXT_MODEL,
-            placeholder="e.g. gpt-4o-mini",
+            placeholder="e.g. gpt-6-luna",
             id="provider-model",
         )
         self._base_url_input = Input(

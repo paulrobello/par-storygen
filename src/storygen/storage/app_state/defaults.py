@@ -34,7 +34,7 @@ DEFAULT_PACING: str = "moderate"
 DEFAULT_READER_LEVEL: ReaderLevel = "ages_11_15"
 
 DEFAULT_TEXT_PROVIDER: str = "openai"
-DEFAULT_TEXT_MODEL: str = "gpt-4o-mini"
+DEFAULT_TEXT_MODEL: str = "gpt-6-luna"
 
 # UI-facing (label, provider-id) pairs — consumed by the Settings screen Select widget.
 # Immutable tuple-of-tuples so callers can't mutate the module's source of truth.

@@ -158,7 +158,7 @@ def test_provider_prefs_empty_state_returns_defaults(
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     prefs = app_state.read_provider_prefs()
     assert prefs.provider == "openai"
-    assert prefs.model == "gpt-4o-mini"
+    assert prefs.model == "gpt-6-luna"
     assert prefs.base_url == ""
 
 
@@ -196,7 +196,7 @@ def test_provider_prefs_unknown_provider_falls_back(
     prefs = app_state.read_provider_prefs()
     # Falls back to defaults when provider isn't in allowlist.
     assert prefs.provider == "openai"
-    assert prefs.model == "gpt-4o-mini"
+    assert prefs.model == "gpt-6-luna"
 
 
 def test_provider_prefs_corrupt_state_returns_defaults(
@@ -222,7 +222,7 @@ def test_provider_prefs_partial_state_fills_defaults(
     )
     prefs = app_state.read_provider_prefs()
     assert prefs.provider == "ollama"
-    assert prefs.model == "gpt-4o-mini"
+    assert prefs.model == "gpt-6-luna"
     assert prefs.base_url == ""
 
 

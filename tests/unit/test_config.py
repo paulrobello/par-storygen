@@ -29,7 +29,7 @@ def test_loads_defaults_when_no_env(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     cfg = load_config()
 
     assert cfg.text_config.provider == "openai"
-    assert cfg.text_config.model == "gpt-4o-mini"
+    assert cfg.text_config.model == "gpt-6-luna"
     assert cfg.image_config.provider == "openai"
     assert cfg.image_config.model == "gpt-image-2"
     assert cfg.character_image_config.provider == "openai"
@@ -241,7 +241,7 @@ def test_invalid_resolved_config_falls_back_to_hardcoded_default(
 
     # Malformed base_url triggered fallback to hardcoded default.
     assert cfg.text_config.provider == "openai"
-    assert cfg.text_config.model == "gpt-4o-mini"
+    assert cfg.text_config.model == "gpt-6-luna"
     assert cfg.text_config.base_url is None
 
 
