@@ -7,9 +7,9 @@ from pydantic_ai.models.openai import OpenAIChatModel
 
 from storygen.core.models import TextProviderConfig
 from storygen.llm.provider_factory import (
-    _tool_settings_for,
     build_text_model,
     resolve_base_url,
+    tool_settings_for,
     validate_config,
 )
 
@@ -84,18 +84,20 @@ def test_validate_config_accepts_defaults() -> None:
 
 def test_tool_settings_for_luna_disables_reasoning() -> None:
     """gpt-6-luna needs reasoning_effort='none' for Chat Completions tools."""
-    settings = _tool_settings_for("gpt-6-luna")
+    settings = tool_settings_for("gpt-6-luna")
     assert settings is not None
-    assert settings["openai_reasoning_effort"] == "none"
+    assert settings.get("openai_reasoning_effort") == "none"
     # Dated snapshots are covered too.
-    assert _tool_settings_for("gpt-6-luna-2026-09-08") is not None
+    assert tool_settings_for("gpt-6-luna-2026-09-08") is not None
+    # OpenRouter-style namespaced IDs are covered too.
+    assert tool_settings_for("openai/gpt-6-luna") is not None
 
 
 def test_tool_settings_for_other_models_is_none() -> None:
     """Non-luna models must not get a forced reasoning effort."""
-    assert _tool_settings_for("gpt-4o-mini") is None
-    assert _tool_settings_for("anthropic/claude-3.5-sonnet") is None
-    assert _tool_settings_for("llama3.3:70b") is None
+    assert tool_settings_for("gpt-4o-mini") is None
+    assert tool_settings_for("anthropic/claude-3.5-sonnet") is None
+    assert tool_settings_for("llama3.3:70b") is None
 
 
 def test_validate_config_accepts_explicit_base_url() -> None:

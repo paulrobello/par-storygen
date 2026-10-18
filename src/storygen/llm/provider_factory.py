@@ -78,7 +78,7 @@ def validate_config(config: TextProviderConfig) -> tuple[bool, str]:
     return True, ""
 
 
-def _tool_settings_for(model: str) -> OpenAIChatModelSettings | None:
+def tool_settings_for(model: str) -> OpenAIChatModelSettings | None:
     """Model settings required for tool-enabled requests, if any.
 
     gpt-6-luna only supports function calling on Chat Completions with
@@ -87,7 +87,9 @@ def _tool_settings_for(model: str) -> OpenAIChatModelSettings | None:
     an output tool, so all agent calls are tool-enabled — without this, the
     default ``medium`` effort gets them rejected.
     """
-    if model.startswith("gpt-6-luna"):
+    # OpenRouter-style namespaced IDs ("openai/gpt-6-luna") carry an
+    # "<owner>/" prefix — match on the bare model name.
+    if model.rsplit("/", 1)[-1].startswith("gpt-6-luna"):
         return OpenAIChatModelSettings(openai_reasoning_effort="none")
     return None
 
@@ -103,5 +105,5 @@ def build_text_model(config: TextProviderConfig) -> OpenAIChatModel:
     return OpenAIChatModel(
         model_name=config.model,
         provider=provider,
-        settings=_tool_settings_for(config.model),
+        settings=tool_settings_for(config.model),
     )
