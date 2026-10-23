@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic_ai.models.openai import OpenAIChatModel
 
+from storygen import config as config_module
 from storygen.core.models import TextProviderConfig
 from storygen.llm.provider_factory import (
     build_text_model,
@@ -12,6 +13,33 @@ from storygen.llm.provider_factory import (
     tool_settings_for,
     validate_config,
 )
+from storygen.storage import app_state
+
+
+@pytest.mark.parametrize("environment_key_present", [True, False])
+def test_custom_text_endpoint_credential_precedence_without_requests(
+    monkeypatch: pytest.MonkeyPatch,
+    environment_key_present: bool,
+) -> None:
+    prefs = app_state.ProviderPrefs(
+        provider="openai",
+        model="custom-model",
+        base_url="https://custom.example/v1",
+        api_key="FAKE_SETTINGS_VALUE",
+    )
+    monkeypatch.setattr(app_state, "read_provider_prefs", lambda: prefs)
+    for name in ("STORYGEN_TEXT_PROVIDER", "STORYGEN_TEXT_MODEL", "STORYGEN_TEXT_BASE_URL"):
+        monkeypatch.delenv(name, raising=False)
+    if environment_key_present:
+        monkeypatch.setenv("OPENAI_API_KEY", "FAKE_ENV_VALUE")
+    else:
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    cfg = config_module._resolve_text_config()  # pyright: ignore[reportPrivateUsage]
+    model = build_text_model(cfg)
+    assert str(model.client.base_url).rstrip("/") == "https://custom.example/v1"
+    assert model.client.api_key == (
+        "FAKE_ENV_VALUE" if environment_key_present else "FAKE_SETTINGS_VALUE"
+    )
 
 
 def test_resolve_base_url_defaults() -> None:

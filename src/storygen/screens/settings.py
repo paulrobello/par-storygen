@@ -631,11 +631,14 @@ class SettingsScreen(Screen[None]):
             return
         persisted = self._text_api_key_input.value.strip()
         present = bool(os.environ.get(env_name))
-        if persisted:
+        if present:
+            self._api_key_status.update(
+                f"API key ({env_name}): present in environment/.env (overrides Settings)"
+            )
+        elif persisted:
             self._api_key_status.update(f"API key ({env_name}): set in settings")
         else:
-            mark = "present" if present else "missing"
-            self._api_key_status.update(f"API key ({env_name}): {mark}")
+            self._api_key_status.update(f"API key ({env_name}): missing")
 
     def _refresh_suggested(self, provider: str) -> None:
         models = app_state.SUGGESTED_MODELS.get(provider, [])

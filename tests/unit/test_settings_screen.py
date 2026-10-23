@@ -338,6 +338,34 @@ async def test_api_key_status_reflects_env(monkeypatch: pytest.MonkeyPatch, tmp_
         assert "missing" in str(status.content).lower()
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("environment_key_present", [True, False])
+async def test_text_key_status_shows_effective_source(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    environment_key_present: bool,
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    if environment_key_present:
+        monkeypatch.setenv("OPENAI_API_KEY", "FAKE_ENV_VALUE")
+    else:
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    app = _Harness()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, SettingsScreen)
+        screen.query_one("#text-api-key", Input).value = "FAKE_SETTINGS_VALUE"
+        screen._refresh_api_key_status("openai")  # pyright: ignore[reportPrivateUsage]
+        text = str(screen.query_one("#provider-api-key-status", Static).content)
+        if environment_key_present:
+            assert "overrides Settings" in text
+            assert "environment" in text
+        else:
+            assert "set in settings" in text
+        assert "FAKE_" not in text
+
+
 # ------------------------------------------------------------------
 # Image provider widgets (Phase 5)
 # ------------------------------------------------------------------

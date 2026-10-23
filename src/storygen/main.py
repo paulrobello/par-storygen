@@ -8,6 +8,7 @@ import typer
 
 import storygen
 from storygen.app import StoryGenApp
+from storygen.diagnostics import tui_diagnostic_logging
 
 app = typer.Typer(add_completion=False, help="AI-driven TUI choose-your-own-adventure.")
 
@@ -49,7 +50,8 @@ def run(
     ] = False,
 ) -> None:
     """Launch the TUI."""
-    StoryGenApp(resume_last=resume).run()
+    with tui_diagnostic_logging():
+        StoryGenApp(resume_last=resume).run()
 
 
 if __name__ == "__main__":

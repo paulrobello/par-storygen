@@ -20,6 +20,7 @@ from __future__ import annotations
 import contextlib
 from collections.abc import Awaitable, Callable
 
+from storygen.diagnostics import log_image_failure
 from storygen.images.base import ImageProvider, ReferencePortrait
 
 
@@ -46,12 +47,16 @@ class RoutedImageProvider:
         *,
         primary_label: str = "primary",
         fallback_label: str = "fallback",
+        primary_model: str = "",
+        fallback_model: str = "",
         on_fallback: Callable[[str, Exception], None] | None = None,
     ) -> None:
         self._primary = primary
         self._fallback = fallback
         self._primary_label = primary_label
         self._fallback_label = fallback_label
+        self._primary_model = primary_model
+        self._fallback_model = fallback_model
         self._on_fallback = on_fallback
         # ARC-115: snapshot the primary provider's reference-image capability.
         # Capability is static (a class attribute on concrete providers), so a
@@ -77,6 +82,13 @@ class RoutedImageProvider:
                 reference_image=reference_image,
             )
         except Exception as exc:
+            log_image_failure(
+                exc,
+                provider=self._primary_label,
+                model=self._primary_model,
+                operation="portrait",
+                reference_count=int(reference_image is not None),
+            )
             return await self._handle_fallback_portrait(
                 exc,
                 description=description,
@@ -102,6 +114,13 @@ class RoutedImageProvider:
                 on_partial=on_partial,
             )
         except Exception as exc:
+            log_image_failure(
+                exc,
+                provider=self._primary_label,
+                model=self._primary_model,
+                operation="scene",
+                reference_count=len(reference_portraits),
+            )
             return await self._handle_fallback_scene(
                 exc,
                 prompt=prompt,
@@ -135,6 +154,13 @@ class RoutedImageProvider:
                 reference_image=reference_image,
             )
         except Exception as fb_exc:
+            log_image_failure(
+                fb_exc,
+                provider=self._fallback_label,
+                model=self._fallback_model,
+                operation="portrait",
+                reference_count=int(reference_image is not None),
+            )
             # Fallback also failed — surface the primary's error (the user
             # asked for the primary), but chain the fallback's exception
             # as __cause__ so operators see both tracebacks.
@@ -162,6 +188,13 @@ class RoutedImageProvider:
                 on_partial=on_partial,
             )
         except Exception as fb_exc:
+            log_image_failure(
+                fb_exc,
+                provider=self._fallback_label,
+                model=self._fallback_model,
+                operation="scene",
+                reference_count=len(reference_portraits),
+            )
             # Fallback also failed — surface the primary's error, chaining
             # the fallback exception as __cause__ for debuggability.
             raise primary_exc from fb_exc
