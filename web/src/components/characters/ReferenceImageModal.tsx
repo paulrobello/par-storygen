@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ImagePlus } from "lucide-react";
@@ -72,9 +73,12 @@ export function ReferenceImageModal({
               className="w-32 h-32 rounded-lg border border-gray-700 flex items-center justify-center overflow-hidden"
               style={{ backgroundColor: "#828181" }}
             >
-              <img
+              <Image
                 src={refPreview}
                 alt="Preview"
+                width={128}
+                height={128}
+                unoptimized
                 className="w-full h-full object-contain"
               />
             </div>

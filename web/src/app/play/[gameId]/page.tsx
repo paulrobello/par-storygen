@@ -80,22 +80,24 @@ export default function PlayPage() {
   const [exportResult, setExportResult] = useState<string | null>(null);
   const [pathNodes, setPathNodes] = useState<PathNode[]>([]);
 
-  // Fetch breadcrumb path when the current node changes.
+  // Fetch breadcrumb path when the current node changes. The effect only
+  // sets state from async results; the no-node case never renders the path
+  // (early return below), so no synchronous reset is needed here. `cancelled`
+  // guards against a stale response landing after the node changed again.
   useEffect(() => {
-    if (!gameId || !currentNode) {
-      setPathNodes([]);
-      return;
-    }
-    (async () => {
-      try {
-        const nodes = await apiGet<PathNode[]>(
-          `/api/games/${gameId}/path?target_node_id=${currentNode.id}`,
-        );
-        setPathNodes(nodes);
-      } catch {
-        setPathNodes([]);
-      }
-    })();
+    const nodeId = currentNode?.id;
+    if (!gameId || !nodeId) return;
+    let cancelled = false;
+    apiGet<PathNode[]>(`/api/games/${gameId}/path?target_node_id=${nodeId}`)
+      .then((nodes) => {
+        if (!cancelled) setPathNodes(nodes);
+      })
+      .catch(() => {
+        if (!cancelled) setPathNodes([]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [gameId, currentNode?.id]);
 
   const handleChoice = async (choiceId: string) => {
@@ -226,7 +228,13 @@ export default function PlayPage() {
             </div>
           )}
 
-          <AudioPlayer gameId={gameId} nodeId={currentNode.id} narration={currentNode.narration} />
+          {/* key remounts the player per node so its audio state resets */}
+          <AudioPlayer
+            key={currentNode.id}
+            gameId={gameId}
+            nodeId={currentNode.id}
+            narration={currentNode.narration}
+          />
 
           {/* Story + Image side by side */}
           <div className="flex-1 flex overflow-hidden">

@@ -14,6 +14,12 @@ const eslintConfig = defineConfig([
       "react-hooks/set-state-in-effect": "warn",
       "react-hooks/immutability": "warn",
       "react-hooks/preserve-manual-memoization": "warn",
+      // A `_` prefix marks an intentionally-unused param/var (e.g. the
+      // MockWebSocket.send stub); keep those exempt.
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
     },
   },
   // Override default ignores of eslint-config-next.

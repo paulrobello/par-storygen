@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ImagePlus } from "lucide-react";
@@ -131,9 +132,12 @@ export function CreateCharacterModal({
               className="mt-2 w-24 h-24 rounded-lg border border-gray-700 flex items-center justify-center overflow-hidden"
               style={{ backgroundColor: "#828181" }}
             >
-              <img
+              <Image
                 src={createRefPreview}
                 alt="Preview"
+                width={96}
+                height={96}
+                unoptimized
                 className="w-full h-full object-contain"
               />
             </div>

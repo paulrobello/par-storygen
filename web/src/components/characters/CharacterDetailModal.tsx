@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { PortraitEditModal } from "./PortraitEditModal";
@@ -182,10 +183,13 @@ export function CharacterDetailModal({
                 style={{ backgroundColor: "#828181" }}
               >
                 {character.has_portrait ? (
-                  <img
+                  <Image
                     key={portraitVersion}
                     src={`${API_BASE}/api/characters/${character.id}/portrait?v=${portraitVersion}`}
                     alt={character.name}
+                    width={280}
+                    height={280}
+                    unoptimized
                     className="w-full h-full object-contain"
                   />
                 ) : (

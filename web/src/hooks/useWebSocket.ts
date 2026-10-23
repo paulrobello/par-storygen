@@ -31,6 +31,7 @@ export function useWebSocket({ gameId, enabled = true }: UseWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectDelayRef = useRef<number>(RECONNECT_BASE_MS);
+  const connectRef = useRef<(() => void) | null>(null);
   const appendNarration = useGameStore((s) => s.appendNarration);
   const setBeatCommitted = useGameStore((s) => s.setBeatCommitted);
   const setCurrentImageUrl = useGameStore((s) => s.setCurrentImageUrl);
@@ -129,7 +130,7 @@ export function useWebSocket({ gameId, enabled = true }: UseWebSocketOptions) {
       reconnectDelayRef.current = Math.min(delay * 2, RECONNECT_MAX_MS);
       debugLog(`[WS] Disconnected, reconnecting in ${delay}ms...`);
       reconnectTimeoutRef.current = setTimeout(() => {
-        connect();
+        connectRef.current?.();
       }, delay);
     };
 
@@ -147,6 +148,12 @@ export function useWebSocket({ gameId, enabled = true }: UseWebSocketOptions) {
     addCharacters,
     markImageFailed,
   ]);
+
+  // Deferred reconnects go through the ref so ws.onclose never references
+  // `connect` before its declaration (react-hooks/immutability).
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   useEffect(() => {
     connect();

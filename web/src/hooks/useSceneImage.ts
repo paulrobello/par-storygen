@@ -29,7 +29,7 @@ export function useSceneImage(gameId: string, currentNode: StoryNode | null): Sc
     if (!currentNode?.image_prompt) return;
     setEditPrompt(currentNode.image_prompt);
     setEditImageModal(true);
-  }, [currentNode?.image_prompt]);
+  }, [currentNode]);
 
   const submitEdit = useCallback(async () => {
     if (!editPrompt.trim()) return;

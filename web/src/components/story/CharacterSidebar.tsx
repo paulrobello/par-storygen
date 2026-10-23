@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import type { Character } from "@/lib/api";
 import { User, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { API_BASE } from "@/lib/config";
@@ -50,9 +51,12 @@ export function CharacterSidebar({ characters, gameId, onCharacterClick }: Chara
               >
                 {char.portrait_path && gameId ? (
                   <div className="w-10 h-10 rounded-lg overflow-hidden border border-gray-700 flex-shrink-0" style={{ backgroundColor: '#828181' }}>
-                    <img
+                    <Image
                       src={`${API_BASE}/api/images/${gameId}/portrait/${char.id}`}
                       alt={char.name}
+                      width={40}
+                      height={40}
+                      unoptimized
                       className="w-full h-full object-contain"
                     />
                   </div>
@@ -89,9 +93,12 @@ export function CharacterSidebar({ characters, gameId, onCharacterClick }: Chara
               title={char.name}
             >
               {char.portrait_path && gameId ? (
-                <img
+                <Image
                   src={`${API_BASE}/api/images/${gameId}/portrait/${char.id}`}
                   alt={char.name}
+                  width={28}
+                  height={28}
+                  unoptimized
                   className="w-full h-full object-contain"
                 />
               ) : (

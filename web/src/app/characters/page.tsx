@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import { GameLayout } from "@/components/layout/GameLayout";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -119,9 +120,12 @@ export default function CharactersPage() {
                   style={{ backgroundColor: "#828181" }}
                 >
                   {char.has_portrait ? (
-                    <img
+                    <Image
                       src={`${API_BASE}/api/characters/${char.id}/portrait`}
                       alt={char.name}
+                      width={48}
+                      height={48}
+                      unoptimized
                       className="w-full h-full object-contain"
                     />
                   ) : (

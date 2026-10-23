@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Volume2, VolumeX, Loader2, Play, Pause } from "lucide-react";
+import { Loader2, Play, Pause } from "lucide-react";
 import { apiPost } from "@/lib/api";
 import { API_BASE } from "@/lib/config";
 
@@ -18,15 +18,6 @@ export function AudioPlayer({ gameId, nodeId, narration }: AudioPlayerProps) {
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Clean up on node change.
-  useEffect(() => {
-    setAudioUrl(null);
-    setIsPlaying(false);
-    setIsGenerating(false);
-    setError(null);
-    setProgress(0);
-  }, [nodeId]);
 
   const generate = useCallback(async () => {
     if (!narration) return;

@@ -7,6 +7,7 @@
 // usePortraitActions hook. The toast is rendered by the page shell so it
 // survives modal close.
 import { useState } from "react";
+import Image from "next/image";
 import { Modal } from "@/components/ui/Modal";
 import { PortraitEditModal } from "@/components/play/PortraitEditModal";
 import { ArrowLeft, Pencil, User } from "lucide-react";
@@ -74,9 +75,12 @@ export function PortraitsModal({
                 style={{ backgroundColor: "#828181" }}
               >
                 {portraitChar.portrait_path && gameId ? (
-                  <img
+                  <Image
                     src={`${API}/api/images/${gameId}/portrait/${portraitChar.id}`}
                     alt={portraitChar.name}
+                    width={192}
+                    height={192}
+                    unoptimized
                     className="w-full h-full object-contain"
                   />
                 ) : (
@@ -157,9 +161,12 @@ export function PortraitsModal({
                           : "border-gray-700/50 bg-gray-800/40"
                       }`}
                     >
-                      <img
+                      <Image
                         src={`${API}/api/games/${gameId}/images/${o.portrait_path}`}
                         alt={o.name}
+                        width={40}
+                        height={40}
+                        unoptimized
                         className="w-10 h-10 rounded object-contain"
                         style={{ backgroundColor: "#828181" }}
                       />
@@ -281,9 +288,12 @@ export function PortraitsModal({
                   style={{ backgroundColor: "#828181" }}
                 >
                   {char.portrait_path && gameId ? (
-                    <img
+                    <Image
                       src={`${API}/api/images/${gameId}/portrait/${char.id}`}
                       alt={char.name}
+                      width={96}
+                      height={96}
+                      unoptimized
                       className="w-full h-full object-contain"
                     />
                   ) : (

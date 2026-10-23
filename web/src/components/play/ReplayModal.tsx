@@ -6,6 +6,7 @@
 // unless the node's image_status is "done" — no more speculative 404s on
 // nodes with image_path but no committed image.
 import { Film } from "lucide-react";
+import Image from "next/image";
 import { sceneImageUrl } from "@/lib/api";
 import type { StoryNode } from "@/lib/api";
 import { useGameStore } from "@/stores/game-store";
@@ -58,9 +59,12 @@ export function ReplayModal({
         </div>
         {sceneUrl && (
           <div className="max-w-lg w-full">
-            <img
+            <Image
               src={sceneUrl}
               alt="Scene illustration"
+              width={1536}
+              height={1024}
+              unoptimized
               className="w-full rounded-lg border border-gray-700"
             />
           </div>

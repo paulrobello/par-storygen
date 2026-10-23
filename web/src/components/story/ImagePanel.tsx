@@ -1,6 +1,7 @@
 "use client";
 
 import { ImageIcon } from "lucide-react";
+import Image from "next/image";
 
 interface ImagePanelProps {
   imageUrl: string | null;
@@ -26,9 +27,12 @@ export function ImagePanel({ imageUrl, imageStatus, alt = "Scene illustration" }
 
   return (
     <div className="w-full rounded-lg overflow-hidden border border-gray-800" style={{ backgroundColor: '#828181' }}>
-      <img
+      <Image
         src={imageUrl}
         alt={alt}
+        width={1536}
+        height={1024}
+        unoptimized
         className="w-full object-contain"
       />
     </div>

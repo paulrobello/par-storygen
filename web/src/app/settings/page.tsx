@@ -166,11 +166,16 @@ export default function SettingsPage() {
     };
   }, []);
 
-  useEffect(() => {
+  // Seed the editable form once settings arrive, adjusting state during
+  // render rather than in an effect
+  // (react.dev/learn/you-might-not-need-an-effect).
+  const [prevSettings, setPrevSettings] = useState<SettingsResponse | null>(null);
+  if (settings !== prevSettings) {
+    setPrevSettings(settings);
     if (settings && !form) {
       setForm(settings);
     }
-  }, [settings, form]);
+  }
 
   const handleSave = async () => {
     if (!form) return;

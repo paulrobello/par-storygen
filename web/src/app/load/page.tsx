@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { GameLayout } from "@/components/layout/GameLayout";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -123,9 +124,12 @@ export default function LoadPage() {
                 {/* Cover Art */}
                 <div className="flex-shrink-0 relative rounded-lg overflow-hidden h-[120px]" style={{ backgroundColor: '#828181' }}>
                   {game.has_cover ? (
-                    <img
+                    <Image
                       src={`${API_BASE}/api/images/${game.id}/scene/root`}
                       alt={game.title}
+                      width={1536}
+                      height={1024}
+                      unoptimized
                       className="h-full w-auto object-contain"
                     />
                   ) : (

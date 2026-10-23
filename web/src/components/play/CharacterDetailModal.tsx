@@ -5,6 +5,7 @@
 // page no longer needs the charEdit* useState cluster. Reset to read-only on
 // close, matching the prior in-page behavior.
 import { useState } from "react";
+import Image from "next/image";
 import { Modal } from "@/components/ui/Modal";
 import { Pencil, User } from "lucide-react";
 import { API_BASE as API } from "@/lib/config";
@@ -52,9 +53,12 @@ export function CharacterDetailModal({
               style={{ backgroundColor: "#828181" }}
             >
               {character.portrait_path && gameId ? (
-                <img
+                <Image
                   src={`${API}/api/images/${gameId}/portrait/${character.id}`}
                   alt={character.name}
+                  width={96}
+                  height={96}
+                  unoptimized
                   className="w-full h-full object-contain"
                 />
               ) : (

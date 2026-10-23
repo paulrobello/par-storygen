@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { GameLayout } from "@/components/layout/GameLayout";
 import { WizardStepper } from "@/components/wizard/WizardStepper";
@@ -464,9 +465,12 @@ export default function WizardPage() {
                             className="w-10 h-10 rounded-lg border border-gray-700 flex items-center justify-center flex-shrink-0 overflow-hidden"
                             style={{ backgroundColor: "#828181" }}
                           >
-                            <img
+                            <Image
                               src={`${API_BASE}/api/characters/${char.id}/portrait`}
                               alt={char.name}
+                              width={40}
+                              height={40}
+                              unoptimized
                               className="w-full h-full object-contain"
                             />
                           </div>
@@ -541,9 +545,12 @@ export default function WizardPage() {
                             style={{ backgroundColor: "#828181" }}
                           >
                             {libChar.has_portrait ? (
-                              <img
+                              <Image
                                 src={`${API_BASE}/api/characters/${libChar.id}/portrait`}
                                 alt={libChar.name}
+                                width={1024}
+                                height={1024}
+                                unoptimized
                                 className="w-full h-full object-contain"
                               />
                             ) : (
