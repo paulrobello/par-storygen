@@ -174,7 +174,7 @@ export function useCharacterActions(): CharacterActions {
         formData.append("concept", concept);
         if (name) formData.append("name", name);
         formData.append("reference_image", input.referenceImage);
-        await apiPostForm("/api/characters/create", formData);
+        await apiPostForm("/api/characters/create-with-reference", formData);
       } else {
         await apiPost("/api/characters/create", {
           concept,

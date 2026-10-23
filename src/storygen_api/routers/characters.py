@@ -7,7 +7,7 @@ import logging
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from PIL import Image
 
@@ -399,6 +399,40 @@ async def create_character(
     image_provider: SplitImageProvider = Depends(get_wizard_image_provider),
 ) -> CharacterLibraryEntry:
     """Create a new library character via LLM from a concept description."""
+    return await _create_character(body, image_provider)
+
+
+@router.post(
+    "/create-with-reference",
+    response_model=CharacterLibraryEntry,
+    status_code=201,
+    dependencies=[Depends(enforce_rate_limit)],
+)
+async def create_character_with_reference(
+    reference_image: UploadFile,
+    concept: str = Form(...),
+    name: str = Form(""),
+    image_provider: SplitImageProvider = Depends(get_wizard_image_provider),
+) -> CharacterLibraryEntry:
+    """Create a character with a multipart reference image, rendered once."""
+    raw_bytes = await reference_image.read()
+    if not raw_bytes:
+        raise HTTPException(status_code=400, detail="Empty image upload")
+    try:
+        png_bytes = _image_to_png_bytes(raw_bytes)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid image file") from exc
+    return await _create_character(
+        CharacterCreateRequest(concept=concept, name=name), image_provider, png_bytes
+    )
+
+
+async def _create_character(
+    body: CharacterCreateRequest,
+    image_provider: SplitImageProvider,
+    reference_image: bytes | None = None,
+) -> CharacterLibraryEntry:
+    """Share character generation and persistence across JSON and upload routes."""
     config = get_app_config()
     text_model = build_text_model(config.text_config)
 
@@ -434,6 +468,7 @@ async def create_character(
             char.physical_description,
             transparent=True,
             art_style=app_state.DEFAULT_ART_STYLE,
+            reference_image=reference_image,
         )
     except Exception:
         # Not a SEC-004 leak (no str(exc)); placeholder is the documented fallback.
@@ -449,8 +484,9 @@ async def create_character(
         portrait_prompt=char.physical_description,
         exported_at=datetime.now(UTC),
         source="created",
+        reference_image_path="reference.png" if reference_image is not None else None,
     )
-    save_library_character(lib_char, portrait_bytes)
+    save_library_character(lib_char, portrait_bytes, reference_bytes=reference_image)
     return _lib_to_entry(lib_char)
 
 
