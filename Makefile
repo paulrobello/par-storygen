@@ -1,4 +1,4 @@
-.PHONY: build setup test lint fmt typecheck checkall web-check web-gen-api precommit run resume clean package deploy api-dev web-install web-dev web-build
+.PHONY: build setup test lint fmt typecheck checkall checkall-ci web-check web-gen-api precommit run resume clean package deploy api-dev web-install web-dev web-build
 
 # ── Web (Next.js) ──
 web-install:         ## Install Next.js frontend dependencies
@@ -41,6 +41,12 @@ typecheck:
 # already runs `ruff format` on staged files; CI runs `make checkall` as the
 # authoritative green gate. Run `make fmt` explicitly to format.
 checkall: lint typecheck test web-check
+
+# CI-parity gate: everything ci.yml enforces on push/PR. `build` mirrors CI's
+# `uv sync --extra api --dev`; web-check carries the web lint/vitest/tsc legs
+# and web-build adds the Next.js production build from CI's web-build job —
+# the one check `checkall` omits. Push-safe and done claims require this gate.
+checkall-ci: build checkall web-build
 
 # ENH-001: regenerate the web API types from the current FastAPI OpenAPI
 # schema. Run this (then commit the two generated files) whenever a Pydantic
