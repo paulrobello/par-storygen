@@ -42,6 +42,9 @@
   },
   "overrides": {
     "postcss": "8.5.19",
-    "@babel/core": "7.29.6"
+    "@babel/core": "7.29.6",
+    "openapi-typescript": {
+      "typescript": "$typescript"
+    }
   }
 }
