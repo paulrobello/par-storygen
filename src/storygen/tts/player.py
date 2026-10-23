@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import os
 import shutil
 import signal
 import tempfile
@@ -21,6 +22,9 @@ from typing import cast
 
 from par_tts import Voice, get_provider
 from par_tts.providers.base import TTSProvider
+
+from storygen import diagnostics
+from storygen.storage import app_state
 
 _logger = logging.getLogger(__name__)
 
@@ -140,7 +144,13 @@ class TTSPlayer:
             self._audio_file = None
         try:
             cls = get_provider(provider)
-            resolved_key = api_key or None
+            # A blank key must fall back to the provider's env var here:
+            # several SDKs (e.g. ElevenLabs) read their key via a default
+            # parameter value, so an explicit api_key=None suppresses that
+            # fallback and every request goes out unauthenticated.
+            env_name = app_state.TTS_API_KEY_ENV.get(provider)
+            env_key = os.environ.get(env_name) if env_name else None
+            resolved_key = api_key or env_key or None
             self._provider = cls(api_key=resolved_key)
             _logger.info("TTS provider configured: %s", provider)
         except Exception as exc:
@@ -194,6 +204,7 @@ class TTSPlayer:
         try:
             return await self._generate_and_write(text, cache_path)
         except Exception as exc:
+            diagnostics.log_tts_failure(exc, provider=self._provider_name, operation="prefetch")
             _logger.warning("TTS generation failed: %s", exc)
             cache_path.unlink(missing_ok=True)
             return False
@@ -256,6 +267,13 @@ class TTSPlayer:
                 raise
             return False
         except Exception as exc:
+            # speak() serves both preview (no cache_path) and narration; the
+            # label is diagnostic only, restart() without a path logs as preview.
+            diagnostics.log_tts_failure(
+                exc,
+                provider=self._provider_name,
+                operation="preview" if cache_path is None else "narration",
+            )
             _logger.warning("TTS generation failed: %s", exc)
             self._state = TTSState.IDLE
             save_path.unlink(missing_ok=True)

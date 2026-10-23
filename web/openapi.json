@@ -56,6 +56,30 @@
         "title": "AdvanceResponse",
         "type": "object"
       },
+      "Body_create_character_with_reference_api_characters_create_with_reference_post": {
+        "properties": {
+          "concept": {
+            "title": "Concept",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "reference_image": {
+            "contentMediaType": "application/octet-stream",
+            "title": "Reference Image",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reference_image",
+          "concept"
+        ],
+        "title": "Body_create_character_with_reference_api_characters_create_with_reference_post",
+        "type": "object"
+      },
       "Body_upload_reference_image_api_characters__library_id__reference_image_post": {
         "properties": {
           "image": {
@@ -1683,6 +1707,48 @@
           }
         },
         "summary": "Create Character",
+        "tags": [
+          "characters"
+        ]
+      }
+    },
+    "/api/characters/create-with-reference": {
+      "post": {
+        "description": "Create a character with a multipart reference image, rendered once.",
+        "operationId": "create_character_with_reference_api_characters_create_with_reference_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_create_character_with_reference_api_characters_create_with_reference_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterLibraryEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Character With Reference",
         "tags": [
           "characters"
         ]

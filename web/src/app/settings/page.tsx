@@ -231,7 +231,7 @@ export default function SettingsPage() {
               label="Model"
               value={form.text_provider.model}
               onChange={(v) => update("text_provider", { ...form.text_provider, model: v })}
-              placeholder="gpt-4o-mini"
+              placeholder="gpt-6-luna"
             />
             <InputField
               label="Base URL (optional)"

@@ -26,6 +26,17 @@ Common runtime problems in par-storygen and how to resolve them. Each entry foll
 
 Set the key in your environment or `.env` file, or enter it under **Settings → Text provider**. Keys set as real environment variables override `.env`, which overrides Settings.
 
+A `401` during catalog character creation occurs during the text step, before
+portrait generation. The toast identifies text authentication, and the file log
+records `stage: text_generation`. Check that the effective text base URL and key
+belong to the same provider. The `openai` provider also supports custom
+OpenAI-compatible endpoints; it still reads `OPENAI_API_KEY` when that variable
+is set, overriding the key entered in Settings. The Settings status names this
+override without showing key values. Image-provider keys and settings do not
+repair a text-provider authentication failure. Correct the effective text
+configuration before retrying; this error is not evidence of an image-model
+request failure.
+
 **Verify:** Run a new story; the wizard's Generate Characters step completes without an auth error.
 
 ### Symptom: Ollama calls fail with `ConnectionError` or timeout
@@ -44,6 +55,47 @@ For a remote Ollama instance, set `STORYGEN_TEXT_BASE_URL=http://<host>:11434/v1
 **Verify:** `curl http://localhost:11434/api/tags` lists the model you configured.
 
 ## Image provider errors
+
+### Capture a TUI image-generation failure
+
+Start the TUI normally with `uv run storygen`. File diagnostics are enabled
+automatically for the CLI session. Reproduce the character-creation failure
+once, then exit the TUI and read the log from your shell:
+
+```bash
+tail -n 20 "${XDG_STATE_HOME:-$HOME/.local/state}/storygen/logs/tui.log"
+```
+
+The default path on Paul's MacDaddy is
+`/Users/probello/.local/state/storygen/logs/tui.log`. An exported `XDG_STATE_HOME`
+overrides the state directory. The log contains one JSON record per line, with
+UTC timestamps, provider/model, portrait or scene operation, reference count,
+exception types, traceback frames, and HTTP status/error code/parameter/request
+ID where available. Primary and fallback failures are recorded separately.
+Share the `image_generation_failed`, `character_creation` (failed/invalid
+outcome), or `tui_exception` record from the failed attempt, including its
+`exceptions` array when present. Character creation records dispatch, text
+generation, portrait generation, saving, and refresh failures separately;
+validation failures and skipped art also leave a record. A `tui_started` record
+with `diagnostic_version: 2` confirms the expanded diagnostics are active after
+restarting the TUI.
+
+Exception messages, traceback source lines and locals, full prompts, names,
+art styles, image data, provider response bodies, and authorization headers are
+omitted. Unexpected metadata is redacted. Traceback frames contain only the
+source filename, line number, and function. Files are private to the user and
+rotate at 1 MiB, retaining three backups (`tui.log.1` through `tui.log.3`).
+
+While the TUI runs, existing logging handlers are detached, raw application/SDK
+messages are discarded. Existing exception reports are translated into safe
+traceback metadata without copying their messages or arguments; `storygen`
+debug-level exception reports are enabled for this capture. Only the sanitized
+diagnostic channel writes to the file. Existing handlers and log levels are
+restored when the TUI exits; the API server's
+logging configuration is unchanged. File setup/write/rotation failures never
+fall back to stdout or stderr. If the file is absent, check that the state
+directory is writable. These diagnostics collect evidence; they do not resolve
+the underlying image-provider failure.
 
 ### Symptom: Image generation returns `400` / `404` / `422`
 

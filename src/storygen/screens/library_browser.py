@@ -21,7 +21,7 @@ import io
 import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import ClassVar, Literal, Protocol, cast
+from typing import ClassVar, Literal, Protocol, TypedDict, cast
 from uuid import uuid4
 
 from PIL import Image
@@ -33,6 +33,7 @@ from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 
 from storygen.core.models import Character
+from storygen.diagnostics import log_character_creation
 from storygen.screens._confirm_modal import ConfirmModal
 from storygen.screens._create_char_modal import CreateCharRequest
 from storygen.screens._library_edit_modal import LibraryEditModal, LibraryEditResult
@@ -57,6 +58,12 @@ from storygen.widgets.image_util import render_image_thumbnail
 SortMode = Literal["newest", "name"]
 
 _logger = logging.getLogger(__name__)
+
+
+class _CreationLogContext(TypedDict):
+    provider: str
+    model: str
+    reference_count: int
 
 
 def _load_portrait_bytes(library_id: str) -> bytes:
@@ -239,6 +246,10 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
         browse: bool = False,
         character_agent_factory: Callable[[], _CharacterAgentLike] | None = None,
         image_provider: _ImageProviderLike | None = None,
+        text_provider_label: str = "unknown",
+        text_model: str = "unknown",
+        image_provider_label: str = "unknown",
+        image_model: str = "unknown",
     ) -> None:
         super().__init__()
         self._browse = browse
@@ -254,6 +265,10 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
         self._creating: bool = False
         self._character_agent_factory = character_agent_factory
         self._image_provider = image_provider
+        self._text_provider_label = text_provider_label
+        self._text_model = text_model
+        self._image_provider_label = image_provider_label
+        self._image_model = image_model
         self._focused_idx: int = 0
         # Track in-flight portrait regenerations so all regen buttons are
         # disabled while any worker is running.
@@ -321,16 +336,47 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
         """Callback from CreateCharacterModal; validate and dispatch the worker."""
         if not isinstance(request, CreateCharRequest):
             return
+        log_character_creation(
+            stage="dispatch",
+            outcome="started",
+            provider=self._text_provider_label,
+            model=self._text_model,
+            reference_count=int(request.reference_image is not None),
+        )
         self._creating = True
-        self._rebuild()
-        self.notify("Generating character…", timeout=120)
-        self._create_character_worker(request)
+        try:
+            self._rebuild()
+            self.notify("Generating character…", timeout=120)
+            self._create_character_worker(request)
+        except Exception as exc:
+            log_character_creation(
+                stage="dispatch",
+                outcome="failed",
+                error=exc,
+                provider=self._text_provider_label,
+                model=self._text_model,
+                reference_count=int(request.reference_image is not None),
+            )
+            raise
 
     @work(exit_on_error=False)
     async def _create_character_worker(self, request: CreateCharRequest) -> None:
         """Generate a character from a concept description via LLM + image provider."""
+        ref_count = int(request.reference_image is not None)
+        text_context: _CreationLogContext = {
+            "provider": self._text_provider_label,
+            "model": self._text_model,
+            "reference_count": ref_count,
+        }
+        image_context: _CreationLogContext = {
+            "provider": self._image_provider_label,
+            "model": self._image_model,
+            "reference_count": ref_count,
+        }
         try:
+            log_character_creation(stage="text_generation", outcome="started", **text_context)
             if self._character_agent_factory is None:
+                log_character_creation(stage="text_generation", outcome="no_agent", **text_context)
                 self.notify(
                     "Character creation unavailable — no agent configured.",
                     severity="error",
@@ -345,22 +391,43 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
                 result = await agent.run(prompt)
                 raw_output = getattr(result, "output", None)
                 if not isinstance(raw_output, list) or not raw_output:
+                    log_character_creation(
+                        stage="text_generation", outcome="empty_output", **text_context
+                    )
                     self.notify("LLM returned no characters.", severity="error", timeout=5)
                     return
                 first = raw_output[0]  # type: ignore[reportUnknownVariableType]
                 if not isinstance(first, Character):
+                    log_character_creation(
+                        stage="text_generation", outcome="invalid_output", **text_context
+                    )
                     self.notify("LLM returned unexpected type.", severity="error", timeout=5)
                     return
                 char: Character = first
                 if request.name:
                     char = char.model_copy(update={"name": request.name})
-            except Exception:
+            except Exception as exc:
+                log_character_creation(
+                    stage="text_generation", outcome="failed", error=exc, **text_context
+                )
                 _logger.debug("Character generation failed", exc_info=True)
-                self.notify("Character generation failed.", severity="error", timeout=5)
+                if getattr(exc, "status_code", None) == 401:
+                    self.notify(
+                        "Text provider authentication failed (401). Check its URL/key "
+                        "and environment overrides. Portrait generation did not run.",
+                        severity="error",
+                        timeout=15,
+                    )
+                else:
+                    self.notify("Character generation failed.", severity="error", timeout=5)
                 return
 
+            log_character_creation(stage="text_generation", outcome="succeeded", **text_context)
             portrait_bytes: bytes | None = None
             if self._image_provider is not None and app_state.art_enabled():
+                log_character_creation(
+                    stage="portrait_generation", outcome="started", **image_context
+                )
                 try:
                     portrait_bytes = await self._image_provider.generate_portrait(
                         char.physical_description,
@@ -368,9 +435,20 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
                         art_style=app_state.DEFAULT_ART_STYLE,
                         reference_image=request.reference_image,
                     )
-                except Exception:
+                except Exception as exc:
+                    log_character_creation(
+                        stage="portrait_generation", outcome="failed", error=exc, **image_context
+                    )
                     _logger.debug("Portrait generation failed", exc_info=True)
                     self.notify("Portrait generation failed.", severity="warning", timeout=5)
+                else:
+                    log_character_creation(
+                        stage="portrait_generation", outcome="succeeded", **image_context
+                    )
+            else:
+                log_character_creation(
+                    stage="portrait_generation", outcome="skipped", **image_context
+                )
             if portrait_bytes is None:
                 portrait_bytes = PLACEHOLDER_PNG
 
@@ -384,15 +462,31 @@ class CharacterCatalogScreen(Screen[LibraryPick | None]):
                 exported_at=datetime.now(UTC),
                 source="created",
             )
-            save_library_character(
-                lib_char, portrait_bytes, reference_bytes=request.reference_image
+            log_character_creation(stage="save", outcome="started", **image_context)
+            try:
+                save_library_character(
+                    lib_char, portrait_bytes, reference_bytes=request.reference_image
+                )
+            except Exception as exc:
+                log_character_creation(stage="save", outcome="failed", error=exc, **image_context)
+                raise
+            log_character_creation(
+                stage="save",
+                outcome="placeholder_saved" if portrait_bytes is PLACEHOLDER_PNG else "succeeded",
+                **image_context,
             )
             if app_state.auto_open_art_enabled() and portrait_bytes is not PLACEHOLDER_PNG:
                 open_in_system_viewer(library_portrait_path(lib_char.id))
             self.notify(f"Created '{lib_char.name}'.", timeout=5)
         finally:
             self._creating = False
-            self._rebuild()
+            try:
+                self._rebuild()
+            except Exception as exc:
+                log_character_creation(
+                    stage="refresh", outcome="failed", error=exc, **image_context
+                )
+                raise
 
     def action_import_from_story(self) -> None:
         """Open the story import modal to pull characters from a saved story."""

@@ -151,6 +151,8 @@ def build_routed_image_provider(
         fallback,
         primary_label=primary_cfg.provider,
         fallback_label=fallback_label,
+        primary_model=primary_cfg.model,
+        fallback_model=fallback_cfg.model if fallback_cfg is not None else "",
         on_fallback=on_fallback,
     )
 

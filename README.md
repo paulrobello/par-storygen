@@ -207,7 +207,7 @@ storygen-api serve --host 127.0.0.1 --port 8101 --no-reload
 * `OPENAI_API_KEY` — OpenAI API key
 * `OPENROUTER_API_KEY` — OpenRouter API key
 * `STORYGEN_TEXT_PROVIDER` — `openai` (default), `openrouter`, or `ollama`
-* `STORYGEN_TEXT_MODEL` — Model identifier (default: `gpt-4o-mini`)
+* `STORYGEN_TEXT_MODEL` — Model identifier (default: `gpt-6-luna`)
 * `STORYGEN_TEXT_BASE_URL` — Override base URL for the text provider
 
 ### Image provider variables
@@ -282,10 +282,10 @@ There are two ways to select the provider and model:
 1. **Environment variables** (best for one-off runs, CI, or temporary overrides) — `STORYGEN_TEXT_PROVIDER`, `STORYGEN_TEXT_MODEL`, and optionally `STORYGEN_TEXT_BASE_URL`. See [`.env.example`](./.env.example) for the full list.
 2. **Settings screen** (persisted across sessions) — open the app, hit `Settings` from the main menu, and edit the "Text provider" block. Saved prefs live in `$XDG_CONFIG_HOME/storygen/state.json`.
 
-**Priority order:** real environment variables > `.env` file > Settings-saved prefs > hardcoded default (`openai` / `gpt-4o-mini`).
+**Priority order:** real environment variables > `.env` file > Settings-saved prefs > hardcoded default (`openai` / `gpt-6-luna`).
 
 ### OpenAI (text)
-Set `OPENAI_API_KEY`. Known-good models: **`gpt-4o-mini`** (default — fast, cheap, reliable structured output), **`gpt-4o`** (higher-quality prose), **`gpt-4.1-mini`** (newer, balanced). Billing runs through api.openai.com.
+Set `OPENAI_API_KEY`. Known-good models: **`gpt-6-luna`** (default). Billing runs through api.openai.com.
 
 ### OpenRouter
 Set `OPENROUTER_API_KEY` and `STORYGEN_TEXT_PROVIDER=openrouter`. OpenRouter routes to dozens of frontier models under a single key. Known-good models: **`anthropic/claude-3.5-sonnet`** (excellent structured output), **`meta-llama/llama-3.3-70b-instruct`** (open-weight, very cheap). Full catalog at [openrouter.ai/models](https://openrouter.ai/models). Keep the `<vendor>/<model>` slash form.

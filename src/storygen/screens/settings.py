@@ -216,7 +216,7 @@ class SettingsScreen(Screen[None]):
         )
         self._model_input = Input(
             value=app_state.DEFAULT_TEXT_MODEL,
-            placeholder="e.g. gpt-4o-mini",
+            placeholder="e.g. gpt-6-luna",
             id="provider-model",
         )
         self._base_url_input = Input(
@@ -631,11 +631,14 @@ class SettingsScreen(Screen[None]):
             return
         persisted = self._text_api_key_input.value.strip()
         present = bool(os.environ.get(env_name))
-        if persisted:
+        if present:
+            self._api_key_status.update(
+                f"API key ({env_name}): present in environment/.env (overrides Settings)"
+            )
+        elif persisted:
             self._api_key_status.update(f"API key ({env_name}): set in settings")
         else:
-            mark = "present" if present else "missing"
-            self._api_key_status.update(f"API key ({env_name}): {mark}")
+            self._api_key_status.update(f"API key ({env_name}): missing")
 
     def _refresh_suggested(self, provider: str) -> None:
         models = app_state.SUGGESTED_MODELS.get(provider, [])
@@ -1031,10 +1034,13 @@ class SettingsScreen(Screen[None]):
             return
         provider = value_obj
         self._refresh_tts_api_key_status(provider)
-        # Clear voices — user must refresh for new provider.
+        # Clear voices — user must refresh for new provider. The player still
+        # holds the previous provider's cached voices, so repopulating from it
+        # would keep showing them; clear the Select instead.
         with self._tts_api_key_input.prevent(Input.Changed):
             self._tts_api_key_input.value = ""
-        self._populate_tts_voices("")
+        with self._tts_voice_select.prevent(Select.Changed):
+            self._tts_voice_select.set_options([])
 
     async def _auto_fetch_tts_voices(self) -> None:
         """Fetch voices on mount so the saved voice can be pre-selected."""
@@ -1077,24 +1083,34 @@ class SettingsScreen(Screen[None]):
         if self._tts_player is None:
             self.notify("TTS player not available.", severity="warning", timeout=3)
             return
+        # Select.NULL (the value after set_options drops a stale selection) is
+        # truthy and str()s to 'Select.NULL' — only a real str is a selection.
         voice = self._tts_voice_select.value
-        if not voice or str(voice) == "":
+        if not isinstance(voice, str) or voice == "":
             self.notify("Select a voice first.", severity="warning", timeout=3)
             return
         provider = cast(str, self._tts_provider_select.value)
         api_key = self._tts_api_key_input.value.strip()
-        self._tts_player.configure(provider, api_key=api_key, voice=str(voice))
+        self._tts_player.configure(provider, api_key=api_key, voice=voice)
         self.notify("Generating voice preview...", timeout=10)
         self.run_worker(self._preview_voice_worker(), exclusive=True, name="tts-preview")
 
     async def _preview_voice_worker(self) -> None:
         assert self._tts_player is not None  # guarded by _on_preview_voice
+        if not self._tts_player.is_configured:
+            self.notify(
+                "TTS provider could not start — check the API key for the selected provider.",
+                severity="error",
+                timeout=10,
+            )
+            return
         ok = await self._tts_player.speak(
             "Hello! This is a preview of the selected voice for your story."
         )
         if not ok:
             self.notify(
-                "Voice preview failed. Check your API key and voice selection.",
+                f"Voice preview failed ({self._tts_player.provider_name}). "
+                "Check that provider's API key and the selected voice.",
                 severity="error",
                 timeout=5,
             )

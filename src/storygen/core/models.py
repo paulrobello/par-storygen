@@ -47,7 +47,7 @@ class TextProviderConfig(BaseModel):
     """Configures which text LLM pydantic-ai routes through."""
 
     provider: Literal["openai", "openrouter", "ollama"] = "openai"
-    model: str = "gpt-4o-mini"
+    model: str = "gpt-6-luna"
     base_url: str | None = None
     api_key: str | None = Field(default=None, exclude=True)
 

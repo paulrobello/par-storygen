@@ -32,7 +32,7 @@ class ProviderInfo:
         key_env_var: Environment variable holding the provider's API key, or
             ``None`` for local / no-auth providers (Ollama).
         default_model: Hardcoded default model for the provider (OpenAI text
-            ``gpt-4o-mini`` and image ``gpt-image-2``), or ``None`` when the
+            ``gpt-6-luna`` and image ``gpt-image-2``), or ``None`` when the
             user must pick one (OpenRouter, Ollama, Gemini, Z.AI images).
         default_base_url: Provider's default OpenAI-compatible base URL, or
             ``None`` when not applicable (Gemini's ``google-genai`` SDK ignores
@@ -80,11 +80,11 @@ TEXT_PROVIDERS: dict[str, ProviderInfo] = {
         label="OpenAI",
         kind=frozenset({"text"}),
         key_env_var="OPENAI_API_KEY",
-        default_model="gpt-4o-mini",
+        default_model="gpt-6-luna",
         default_base_url="https://api.openai.com/v1",
         allows_loopback_base_url=False,
         supports_reference_images=False,
-        suggested_models=("gpt-4o-mini", "gpt-4o", "gpt-4.1-mini"),
+        suggested_models=("gpt-6-luna",),
     ),
     "openrouter": ProviderInfo(
         id="openrouter",
@@ -138,7 +138,7 @@ IMAGE_PROVIDERS: dict[str, ProviderInfo] = {
         default_base_url="https://api.openai.com/v1",
         allows_loopback_base_url=False,
         supports_reference_images=True,
-        suggested_models=("gpt-image-2", "gpt-image-1.5", "gpt-image-1"),
+        suggested_models=("gpt-image-2", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare"),
     ),
     "gemini": ProviderInfo(
         id="gemini",

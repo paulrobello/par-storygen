@@ -259,6 +259,10 @@ class StoryGenApp(App[None]):
                 self._text_model
             ),  # type: ignore[no-untyped-def]
             image_provider=self._image_provider,
+            text_provider_label=self._config.text_config.provider,
+            text_model=self._config.text_config.model,
+            image_provider_label=self._config.character_image_config.provider,
+            image_model=self._config.character_image_config.model,
         )
 
     def _make_wizard(self) -> WizardScreen:

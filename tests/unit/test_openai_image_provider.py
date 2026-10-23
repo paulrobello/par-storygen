@@ -170,6 +170,37 @@ async def test_v15_portrait_supports_transparent_background() -> None:
 
 
 @pytest.mark.asyncio
+async def test_v25_portrait_supports_transparent_background() -> None:
+    """gpt-image-2.5-sunburst passes background='transparent' (native support)."""
+    client = MagicMock()
+    client.images.generate = AsyncMock(return_value=_make_image_response(b"PNG"))
+    provider = OpenAIImageProvider(
+        model="gpt-image-2.5-sunburst", client=cast(AsyncOpenAI, client)
+    )
+    out = await provider.generate_portrait("a tall rogue", transparent=True)
+    assert out == b"PNG"
+    assert client.images.generate.await_args is not None
+    kwargs = client.images.generate.await_args.kwargs
+    assert kwargs["background"] == "transparent"
+    # Prompt asks for transparency directly — not the gpt-image-2 grey fallback.
+    assert "Transparent PNG background" in kwargs["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_v25_edit_passes_transparent_background() -> None:
+    """gpt-image-2.5-flare passes background='transparent' on edit calls when asked."""
+    client = MagicMock()
+    client.images.edit = AsyncMock(return_value=_make_image_response(b"PNG"))
+    provider = OpenAIImageProvider(model="gpt-image-2.5-flare", client=cast(AsyncOpenAI, client))
+    await provider.generate_portrait("a tall rogue", transparent=True, reference_image=b"ref")
+    assert client.images.edit.await_args is not None
+    kwargs = client.images.edit.await_args.kwargs
+    assert kwargs["background"] == "transparent"
+    # input_fidelity is undocumented for 2.5 — must be omitted.
+    assert "input_fidelity" not in kwargs
+
+
+@pytest.mark.asyncio
 async def test_v15_edit_passes_input_fidelity() -> None:
     """gpt-image-1.5 should still pass input_fidelity='high' on edit calls."""
     client = MagicMock()

@@ -1,14 +1,17 @@
-"""OpenAI `gpt-image-2` provider.
+"""OpenAI image provider (gpt-image family).
 
 Uses `images.generate` for zero-reference renders (portraits and scenes with no
 character refs) and `images.edit` when one or more reference portraits are
 supplied so the edit endpoint can lock character appearance.  Model-specific
 quirks are handled transparently:
 
-- gpt-image-2: no ``background="transparent"`` support (falls back to
-  ``"opaque"``), no ``input_fidelity`` param (always high-fidelity).
+- gpt-image-2: ``background="transparent"`` is preview-only (falls back to
+  ``"opaque"`` with prompt-only wording), no ``input_fidelity`` param
+  (always high-fidelity).
 - gpt-image-1 / 1.5: passes ``background="transparent"`` and
   ``input_fidelity="high"`` as before.
+- gpt-image-2.5 (sunburst/flare): native ``background="transparent"``
+  support; ``input_fidelity`` omitted (undocumented for 2.5).
 """
 
 from __future__ import annotations
@@ -30,7 +33,11 @@ from storygen.images.constants import (
     SCENE_QUALITY,
     SCENE_SIZE,
 )
-from storygen.images.prompts import build_portrait_prompt, build_scene_prompt
+from storygen.images.prompts import (
+    build_portrait_prompt,
+    build_scene_prompt,
+    supports_transparent_background_flag,
+)
 
 # Re-export so existing ``from storygen.images.openai_provider import …``
 # call sites continue to work without modification.
@@ -74,6 +81,9 @@ class OpenAIImageProvider:
     ) -> None:
         self._model = model
         self._is_v2 = model.startswith("gpt-image-2")
+        # gpt-image-2.5 (sunburst/flare) supports background="transparent"
+        # natively per the OpenAI API reference; gpt-image-2 only in preview.
+        self._supports_transparent_bg = supports_transparent_background_flag(model)
         if client is not None:
             self._client = client
         else:
@@ -138,7 +148,7 @@ class OpenAIImageProvider:
         if reference_image is not None:
             image_file = ("image", ("reference.png", io.BytesIO(reference_image), "image/png"))
             edit_kwargs = self._edit_kwargs()
-            if transparent and not self._is_v2:
+            if transparent and self._supports_transparent_bg:
                 edit_kwargs["background"] = "transparent"
             resp = await self._client.images.edit(
                 model=self._model,
@@ -151,11 +161,12 @@ class OpenAIImageProvider:
             )
             return _decode_b64(resp)
 
-        # gpt-image-2 does not support background="transparent" — only
-        # "opaque" and "auto" are accepted.  The prompt already asks for a
-        # plain neutral / no-background look so the visual result is similar.
+        # Models without native transparent-background support (gpt-image-2,
+        # where it is preview-only) fall back to "opaque"; the prompt already
+        # asks for a plain neutral / no-background look so the visual result
+        # is similar.
         bg = "opaque"
-        if transparent and not self._is_v2:
+        if transparent and self._supports_transparent_bg:
             bg = "transparent"
 
         resp = await self._client.images.generate(

@@ -9,11 +9,13 @@ Older models (gpt-image-1 / 1.5) and non-OpenAI providers use the classic
 paragraph format with ``Rendered in {style} style.`` appended.
 
 Transparency handling: when ``transparent=True`` we always emit the explicit
-"Transparent PNG background" sentence. OpenAI (gpt-image-1 / 1.5) additionally
-enforces transparency via the ``background="transparent"`` API flag on
-``images.generate`` (set at the call site, not here); the prompt hint is
-harmless alongside the flag. gpt-image-2 does NOT support the transparent
-background flag — the ``openai_provider`` detects this and falls back to
+"Transparent PNG background" sentence, except for gpt-image-2 (where the
+flag is preview-only) which gets a solid-grey fallback instead. OpenAI
+(gpt-image-1 / 1.5, gpt-image-2.5 sunburst/flare) additionally enforces
+transparency via the ``background="transparent"`` API flag on
+``images.generate``/``images.edit`` (set at the call site, not here); the
+prompt hint is harmless alongside the flag. gpt-image-2 does NOT get the
+flag — the ``openai_provider`` detects this and falls back to
 ``background="opaque"``, relying solely on the prompt text. Gemini / Z.AI /
 Ollama have no such flag, so the prompt sentence is the only signal they get.
 """
@@ -47,6 +49,36 @@ def _is_v2_model(model: str | None) -> bool:
     return model is not None and model.startswith("gpt-image-2")
 
 
+def supports_transparent_background_flag(model: str | None) -> bool:
+    """Whether OpenAI's ``background="transparent"`` API flag works for ``model``.
+
+    Native on gpt-image-1 / 1.5 and gpt-image-2.5 (sunburst/flare) per the
+    OpenAI API reference. gpt-image-2 supports it only in preview — treated
+    as unsupported (callers fall back to ``"opaque"`` plus prompt wording).
+    Returns False for ``None`` / non-OpenAI models; their transparency stays
+    prompt-only.
+    """
+    return (
+        model is not None
+        and model.startswith("gpt-image")
+        and (not model.startswith("gpt-image-2") or model.startswith("gpt-image-2.5"))
+    )
+
+
+def _is_transparency_preview_only(model: str | None) -> bool:
+    """Whether ``model`` only supports the transparent flag in preview.
+
+    Just gpt-image-2 (not 2.5): callers use the solid-grey prompt fallback
+    instead of the "Transparent PNG background" sentence. Everything else —
+    including ``None`` / non-OpenAI models — gets the transparent sentence.
+    """
+    return (
+        model is not None
+        and model.startswith("gpt-image-2")
+        and not model.startswith("gpt-image-2.5")
+    )
+
+
 def build_portrait_prompt(
     description: str,
     *,
@@ -71,12 +103,12 @@ def build_portrait_prompt(
     Returns:
         The full user-facing portrait prompt.
     """
-    if transparent and not _is_v2_model(model):
+    if transparent and not _is_transparency_preview_only(model):
         background_rule = (
             "Transparent PNG background, subject only, no background, no scenery, "
             "no shadow on the ground"
         )
-    elif transparent and _is_v2_model(model):
+    elif transparent and _is_transparency_preview_only(model):
         background_rule = (
             "Solid 50% grey (#808080) background, subject only, no scenery, no shadow on the ground"
         )
