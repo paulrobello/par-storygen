@@ -1083,13 +1083,15 @@ class SettingsScreen(Screen[None]):
         if self._tts_player is None:
             self.notify("TTS player not available.", severity="warning", timeout=3)
             return
+        # Select.NULL (the value after set_options drops a stale selection) is
+        # truthy and str()s to 'Select.NULL' — only a real str is a selection.
         voice = self._tts_voice_select.value
-        if not voice or str(voice) == "":
+        if not isinstance(voice, str) or voice == "":
             self.notify("Select a voice first.", severity="warning", timeout=3)
             return
         provider = cast(str, self._tts_provider_select.value)
         api_key = self._tts_api_key_input.value.strip()
-        self._tts_player.configure(provider, api_key=api_key, voice=str(voice))
+        self._tts_player.configure(provider, api_key=api_key, voice=voice)
         self.notify("Generating voice preview...", timeout=10)
         self.run_worker(self._preview_voice_worker(), exclusive=True, name="tts-preview")
 

@@ -1149,3 +1149,55 @@ async def test_escape_with_unsaved_settings_prompts_before_exit(
             if isinstance(app.screen, ConfirmModal):
                 break
         assert isinstance(app.screen, ConfirmModal)
+
+
+@pytest.mark.asyncio
+async def test_preview_with_unselected_voice_does_not_configure_player(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """After a voice-list refresh, an unselected voice must not reach preview.
+
+    Select.set_options resets a stale value to the truthy Select.NULL sentinel;
+    the preview guard must treat it as "no voice selected" instead of passing
+    str(NULL) ('Select.NULL') to the provider as a voice id.
+    """
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+
+    configured: list[tuple[str, str]] = []
+
+    def _rec_configure(self: object, provider: str, **kwargs: object) -> None:
+        configured.append((provider, str(kwargs.get("voice", ""))))
+
+    monkeypatch.setattr("storygen.tts.player.TTSPlayer.configure", _rec_configure)
+
+    class _TtsHarness(App[None]):
+        def on_mount(self) -> None:
+            from storygen.tts.player import TTSPlayer
+
+            self.push_screen(SettingsScreen(_CFG, tts_player=TTSPlayer()))
+
+        def compose(self) -> ComposeResult:
+            yield from []
+
+    app = _TtsHarness()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, SettingsScreen)
+        voice_select: Select[str] = screen.query_one("#tts-voice-select", Select)  # pyright: ignore[reportUnknownVariableType]
+        # Simulate refresh: stale OpenAI value selected, then ElevenLabs options.
+        with voice_select.prevent(Select.Changed):
+            voice_select.set_options([("Alloy", "alloy")])
+            voice_select.value = "alloy"  # type: ignore[assignment]
+            voice_select.set_options([("Sarah", "EXAVITQu4vr4xnSDxMaL")])
+        assert voice_select.value is Select.NULL
+        # The Preview button sits below the test terminal's fold (OutOfBounds),
+        # so post the Button.Pressed directly (vault: modal harness patterns).
+        from textual.widgets import Button as _Button
+
+        screen.query_one("#btn-preview-voice", _Button).post_message(
+            _Button.Pressed(screen.query_one("#btn-preview-voice", _Button))
+        )
+        await pilot.pause()
+
+    assert configured == []
