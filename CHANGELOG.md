@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Identify character text-authentication failures** — A `401` during catalog creation now produces an actionable text-provider toast and explains that portrait generation did not run. Text Settings correctly labels environment/`.env` key overrides instead of claiming the stored Settings key is active. Credential precedence and credentials are unchanged.
+
+- **Character-creation diagnostic coverage** — Expanded the TUI file log to capture errors before portrait rendering, including text-agent exceptions, invalid output, skipped art, persistence and refresh failures. Existing exception reports are sanitized into traceback metadata without copying their messages. Startup records identify diagnostic version 2. The original no-reference failure still needs a captured runtime error.
+
+- **TUI image-failure diagnostics** — The CLI now writes sanitized provider/model, operation, HTTP error metadata and traceback frames to a private rotating file under `$XDG_STATE_HOME/storygen/logs/tui.log`. Console logging handlers are isolated for the TUI session and restored on exit; prompts, credentials, image data, raw exception messages and response bodies are omitted. This adds evidence collection for the unresolved no-reference portrait failure.
+
+- **Character creation with a reference image** — The web character form now uses a multipart upload endpoint that validates and normalizes the reference, passes it to the initial portrait render, and saves it for regeneration. Previously the form sent multipart data to a JSON-only endpoint and failed validation before generation.
+
 - **Graph path highlighting precision** — In the graph view, cyan path highlighting now follows the direct root-to-current lineage only. Path-node rows show cyan on the branch connector (├── / └──), expand icon, and label; ancestor guide columns stay default. "Between" rows (siblings of a path node that come before it, plus their descendants) get only the single T-junction cell highlighted. Rows past where the path branches off and descendants of the current node are no longer highlighted. The internal `_StoryTree` was refactored to compute a single column span per row and split segments at character boundaries for partial cells.
 
 ### Security
