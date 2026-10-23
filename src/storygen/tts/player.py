@@ -23,6 +23,7 @@ from typing import cast
 from par_tts import Voice, get_provider
 from par_tts.providers.base import TTSProvider
 
+from storygen import diagnostics
 from storygen.storage import app_state
 
 _logger = logging.getLogger(__name__)
@@ -203,6 +204,7 @@ class TTSPlayer:
         try:
             return await self._generate_and_write(text, cache_path)
         except Exception as exc:
+            diagnostics.log_tts_failure(exc, provider=self._provider_name, operation="prefetch")
             _logger.warning("TTS generation failed: %s", exc)
             cache_path.unlink(missing_ok=True)
             return False
@@ -265,6 +267,13 @@ class TTSPlayer:
                 raise
             return False
         except Exception as exc:
+            # speak() serves both preview (no cache_path) and narration; the
+            # label is diagnostic only, restart() without a path logs as preview.
+            diagnostics.log_tts_failure(
+                exc,
+                provider=self._provider_name,
+                operation="preview" if cache_path is None else "narration",
+            )
             _logger.warning("TTS generation failed: %s", exc)
             self._state = TTSState.IDLE
             save_path.unlink(missing_ok=True)

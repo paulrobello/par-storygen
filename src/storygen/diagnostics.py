@@ -243,6 +243,31 @@ def log_image_failure(
         )
 
 
+def log_tts_failure(
+    error: BaseException,
+    *,
+    provider: str,
+    operation: Literal["preview", "narration", "prefetch"],
+) -> None:
+    """Record a TTS generation failure without changing generation behavior.
+
+    TTS exceptions are swallowed into logger warnings (messages can contain
+    prompt text), so without this the file log never sees why preview or
+    narration actually failed.
+    """
+    if not _active:
+        return
+    with contextlib.suppress(Exception):
+        _write(
+            {
+                "event": "tts_generation_failed",
+                "provider": _safe_token(provider),
+                "operation": operation,
+                "exceptions": _safe_exception(error),
+            }
+        )
+
+
 def log_character_creation(
     *,
     stage: Literal["dispatch", "text_generation", "portrait_generation", "save", "refresh"],

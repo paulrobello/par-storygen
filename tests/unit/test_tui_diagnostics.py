@@ -375,3 +375,22 @@ async def test_router_logs_configured_model_and_both_failures(
     assert [event["provider"] for event in events] == ["openai", "ollama"]
     assert all(event["reference_count"] == 0 for event in events)
     assert "PRIVATE" not in path.read_text()
+
+
+def test_tts_failure_is_recorded_with_safe_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    with diagnostics.tui_diagnostic_logging() as path:
+        assert path is not None
+        error = _provider_error()
+        diagnostics.log_tts_failure(error, provider="elevenlabs", operation="preview")
+        content = path.read_text()
+    records = [json.loads(line) for line in content.splitlines()]
+    event = next(r for r in records if r["event"] == "tts_generation_failed")
+    assert event["provider"] == "elevenlabs"
+    assert event["operation"] == "preview"
+    assert event["exceptions"][0]["type"] == "PermissionDeniedError"
+    assert event["exceptions"][0]["http_status"] == 403
+    assert "PRIVATE" not in content
