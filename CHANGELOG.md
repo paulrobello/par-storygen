@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **ElevenLabs voice previews failed with a misleading API-key error** — A blank key input in Settings now falls back to the provider's environment variable before constructing the TTS provider. Previously the player passed `api_key=None` explicitly, which suppressed the ElevenLabs SDK's env fallback, so previews and narration 401'd ("Neither authorization header nor xi-api-key received") even with `ELEVENLABS_API_KEY` set. Switching TTS providers in Settings now also clears the stale voice list instead of showing the previous provider's voices, and the preview error names an unconfigured provider instead of always blaming the API key.
+
 - **Identify character text-authentication failures** — A `401` during catalog creation now produces an actionable text-provider toast and explains that portrait generation did not run. Text Settings correctly labels environment/`.env` key overrides instead of claiming the stored Settings key is active. Credential precedence and credentials are unchanged.
 
 - **Character-creation diagnostic coverage** — Expanded the TUI file log to capture errors before portrait rendering, including text-agent exceptions, invalid output, skipped art, persistence and refresh failures. Existing exception reports are sanitized into traceback metadata without copying their messages. Startup records identify diagnostic version 2. The original no-reference failure still needs a captured runtime error.

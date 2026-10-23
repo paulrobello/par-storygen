@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import os
 import shutil
 import signal
 import tempfile
@@ -21,6 +22,8 @@ from typing import cast
 
 from par_tts import Voice, get_provider
 from par_tts.providers.base import TTSProvider
+
+from storygen.storage import app_state
 
 _logger = logging.getLogger(__name__)
 
@@ -140,7 +143,13 @@ class TTSPlayer:
             self._audio_file = None
         try:
             cls = get_provider(provider)
-            resolved_key = api_key or None
+            # A blank key must fall back to the provider's env var here:
+            # several SDKs (e.g. ElevenLabs) read their key via a default
+            # parameter value, so an explicit api_key=None suppresses that
+            # fallback and every request goes out unauthenticated.
+            env_name = app_state.TTS_API_KEY_ENV.get(provider)
+            env_key = os.environ.get(env_name) if env_name else None
+            resolved_key = api_key or env_key or None
             self._provider = cls(api_key=resolved_key)
             _logger.info("TTS provider configured: %s", provider)
         except Exception as exc:

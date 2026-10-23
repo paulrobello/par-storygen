@@ -1034,10 +1034,13 @@ class SettingsScreen(Screen[None]):
             return
         provider = value_obj
         self._refresh_tts_api_key_status(provider)
-        # Clear voices — user must refresh for new provider.
+        # Clear voices — user must refresh for new provider. The player still
+        # holds the previous provider's cached voices, so repopulating from it
+        # would keep showing them; clear the Select instead.
         with self._tts_api_key_input.prevent(Input.Changed):
             self._tts_api_key_input.value = ""
-        self._populate_tts_voices("")
+        with self._tts_voice_select.prevent(Select.Changed):
+            self._tts_voice_select.set_options([])
 
     async def _auto_fetch_tts_voices(self) -> None:
         """Fetch voices on mount so the saved voice can be pre-selected."""
@@ -1092,6 +1095,13 @@ class SettingsScreen(Screen[None]):
 
     async def _preview_voice_worker(self) -> None:
         assert self._tts_player is not None  # guarded by _on_preview_voice
+        if not self._tts_player.is_configured:
+            self.notify(
+                "TTS provider could not start — check the API key for the selected provider.",
+                severity="error",
+                timeout=10,
+            )
+            return
         ok = await self._tts_player.speak(
             "Hello! This is a preview of the selected voice for your story."
         )

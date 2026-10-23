@@ -156,6 +156,83 @@ async def test_refresh_voices_uses_async_provider() -> None:
     assert player.voices == voices
 
 
+class _KeyCapturingProvider(TTSProvider):
+    """Records the api_key it was constructed with."""
+
+    constructed_key: str | None = None
+
+    def __init__(self, api_key: str | None = None) -> None:
+        super().__init__(api_key)
+        _KeyCapturingProvider.constructed_key = api_key
+
+    @property
+    def name(self) -> str:
+        return "fake"
+
+    @property
+    def supported_formats(self) -> list[str]:
+        return ["wav"]
+
+    @property
+    def default_model(self) -> str:
+        return "fake-model"
+
+    @property
+    def default_voice(self) -> str:
+        return "nova"
+
+    def generate_speech(
+        self,
+        text: str,
+        voice: str,
+        model: str | None = None,
+        **kwargs: Any,
+    ) -> bytes:
+        return b"AUDIO"
+
+    def list_voices(self) -> list[Voice]:
+        return []
+
+    def resolve_voice(self, voice_identifier: str) -> str:
+        return voice_identifier
+
+
+def _fake_get_provider(name: str) -> type[_KeyCapturingProvider]:
+    return _KeyCapturingProvider
+
+
+@pytest.mark.asyncio
+async def test_configure_resolves_blank_key_from_provider_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A blank key input must fall back to the provider's env var.
+
+    Passing ``api_key=None`` explicitly suppresses SDK-level env fallbacks
+    (the ElevenLabs SDK reads ELEVENLABS_API_KEY via a default parameter
+    value), so configure() must resolve the env key itself and pass it.
+    """
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "env-key-123")
+    monkeypatch.setattr("storygen.tts.player.get_provider", _fake_get_provider)
+
+    player = TTSPlayer()
+    player.configure("elevenlabs", api_key="")
+
+    assert _KeyCapturingProvider.constructed_key == "env-key-123"
+
+
+@pytest.mark.asyncio
+async def test_configure_prefers_explicit_key_over_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "env-key-123")
+    monkeypatch.setattr("storygen.tts.player.get_provider", _fake_get_provider)
+
+    player = TTSPlayer()
+    player.configure("elevenlabs", api_key="input-key")
+
+    assert _KeyCapturingProvider.constructed_key == "input-key"
+
+
 @pytest.mark.asyncio
 async def test_speak_writes_bytes_to_cache(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     player = TTSPlayer()
