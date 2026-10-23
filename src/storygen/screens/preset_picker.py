@@ -22,12 +22,19 @@ class PresetPickerScreen(Screen[None]):
         Binding("escape", "back", "Back"),
     ]
 
+    def __init__(self) -> None:
+        super().__init__()
+        # Loaded once so card widget ids (built from object identity) match the
+        # objects on_click compares against -- a second load() yields fresh
+        # objects whose id() differs, so card ids built per-call never match.
+        self._presets = load_all_presets()
+
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         with Vertical(id="preset-screen-container"):
             yield Label("Quick Start — Choose a Story", id="preset-screen-title")
             with VerticalScroll(id="preset-screen-list"):
-                for preset in load_all_presets():
+                for preset in self._presets:
                     yield Static(
                         f"[bold]{preset.name}[/bold]\n{preset.description}",
                         id=f"ps-{id(preset)}",
@@ -40,7 +47,7 @@ class PresetPickerScreen(Screen[None]):
         widget, _region = self.get_widget_at(event.screen_x, event.screen_y)
         if not isinstance(widget, Static) or not widget.has_class("preset-card"):
             return
-        for preset in load_all_presets():
+        for preset in self._presets:
             if widget.id == f"ps-{id(preset)}":
                 self._launch(preset)
                 return
