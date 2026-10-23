@@ -1109,7 +1109,8 @@ class SettingsScreen(Screen[None]):
         )
         if not ok:
             self.notify(
-                "Voice preview failed. Check your API key and voice selection.",
+                f"Voice preview failed ({self._tts_player.provider_name}). "
+                "Check that provider's API key and the selected voice.",
                 severity="error",
                 timeout=5,
             )
