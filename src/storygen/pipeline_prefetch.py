@@ -158,9 +158,7 @@ class PrefetchCoordinator:
             # doesn't flood the log on every render.
             if key not in self._failure_logged:
                 self._failure_logged.add(key)
-                _logger.info(
-                    "prefetch failed for (%s, %s): %s", parent_id, choice_id, exc
-                )
+                _logger.info("prefetch failed for (%s, %s): %s", parent_id, choice_id, exc)
             return None
         # Recovered (or first-time success) — clear any prior failure
         # record for this key so the next failure logs again instead of
@@ -198,9 +196,7 @@ class PrefetchCoordinator:
         except Exception as exc:
             # Don't fail the prefetch — the node is already persisted; this
             # only means the user will hear a synth delay on pick.
-            _logger.debug(
-                "TTS pregeneration failed for node %s: %s", node.id, exc
-            )
+            _logger.debug("TTS pregeneration failed for node %s: %s", node.id, exc)
             return
         if cache_path is None:
             _logger.debug("TTS pregeneration skipped (synth returned None) for node %s", node.id)

@@ -18,6 +18,7 @@ Success = a Pydantic field rename breaks `npx tsc --noEmit` in web without any h
 1. **Export the schema deterministically.** Add `scripts/export_openapi.py` (repo root `scripts/`, create if absent):
    ```python
    """Write the FastAPI OpenAPI schema to web/openapi.json (deterministic)."""
+
    import json, pathlib
    from storygen_api.main import app
 

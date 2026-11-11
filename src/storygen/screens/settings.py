@@ -309,9 +309,7 @@ class SettingsScreen(Screen[None]):
             id="character-image-provider-select",
         )
         self._character_image_model_select: Select[str] = Select(
-            image_model_options(
-                app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER, self._CUSTOM_MODEL
-            ),
+            image_model_options(app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER, self._CUSTOM_MODEL),
             value=app_state.DEFAULT_CHARACTER_IMAGE_MODEL,
             allow_blank=False,
             id="character-image-provider-model-select",
@@ -1459,7 +1457,9 @@ class SettingsScreen(Screen[None]):
         self._image_section.sync_model_select(
             app_state.DEFAULT_IMAGE_PROVIDER, app_state.DEFAULT_IMAGE_MODEL
         )
-        self._character_image_section.refresh_api_key_status(app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER)
+        self._character_image_section.refresh_api_key_status(
+            app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER
+        )
         self._character_image_section.refresh_suggested(app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER)
         self._character_image_section.sync_model_select(
             app_state.DEFAULT_CHARACTER_IMAGE_PROVIDER, app_state.DEFAULT_CHARACTER_IMAGE_MODEL

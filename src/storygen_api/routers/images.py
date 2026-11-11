@@ -362,9 +362,7 @@ async def add_outfit(
     except Exception as exc:
         # SEC-004: log server-side; return a generic message (no str(exc)).
         _logger.exception("add_outfit failed for char %s", char_id)
-        raise HTTPException(
-            status_code=500, detail="Outfit portrait generation failed"
-        ) from exc
+        raise HTTPException(status_code=500, detail="Outfit portrait generation failed") from exc
 
     dest = paths.character_outfit_path(game_id, char_id, outfit_id)
     dest.parent.mkdir(parents=True, exist_ok=True)

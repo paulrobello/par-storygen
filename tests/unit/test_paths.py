@@ -126,9 +126,7 @@ def test_ensure_game_dirs_creates_subdirs(monkeypatch: pytest.MonkeyPatch, tmp_p
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     paths.ensure_game_dirs(_GAME_ID)
     assert (tmp_path / "storygen" / "games" / _GAME_ID).is_dir()
-    assert (
-        tmp_path / "storygen" / "games" / _GAME_ID / "images" / "characters"
-    ).is_dir()
+    assert (tmp_path / "storygen" / "games" / _GAME_ID / "images" / "characters").is_dir()
     assert (tmp_path / "storygen" / "games" / _GAME_ID / "images" / "nodes").is_dir()
 
 

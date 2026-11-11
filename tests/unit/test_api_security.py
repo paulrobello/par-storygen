@@ -95,7 +95,9 @@ def test_verify_token_still_enforces_token_on_loopback(
 
 def test_is_loopback_peer_classifies_peers() -> None:
     assert (
-        is_loopback_peer(HTTPConnection({"type": "http", "headers": [], "client": ["127.0.0.1", 1]}))
+        is_loopback_peer(
+            HTTPConnection({"type": "http", "headers": [], "client": ["127.0.0.1", 1]})
+        )
         is True
     )
     assert (
@@ -272,9 +274,7 @@ def test_validate_provider_base_url_rejects_private_ips(url: str) -> None:
 def test_validate_provider_base_url_rejects_unknown_host() -> None:
     """SEC-002: attacker-controlled host must be rejected even if not a private IP."""
     with pytest.raises(ProviderURLError, match="allowlist"):
-        validate_provider_base_url(
-            "https://attacker.example.com/v1", allow_loopback=False
-        )
+        validate_provider_base_url("https://attacker.example.com/v1", allow_loopback=False)
 
 
 def test_validate_provider_base_url_rejects_bad_scheme() -> None:
@@ -350,15 +350,11 @@ def test_presets_router_rejects_without_valid_token(
         r = client.get("/api/presets")
         assert r.status_code == 401
         # Wrong token → 403.
-        r2 = client.get(
-            "/api/presets", headers={"Authorization": "Bearer wrong-token"}
-        )
+        r2 = client.get("/api/presets", headers={"Authorization": "Bearer wrong-token"})
         assert r2.status_code == 403
         # Correct token → 200 (presets dir is empty under xdg_tmp, but the
         # handler tolerates a missing dir and returns empty lists).
-        r3 = client.get(
-            "/api/presets", headers={"Authorization": "Bearer presets-token"}
-        )
+        r3 = client.get("/api/presets", headers={"Authorization": "Bearer presets-token"})
         assert r3.status_code == 200
 
     reset_token_cache()

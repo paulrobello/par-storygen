@@ -54,9 +54,7 @@ class StubBeatPipeline:
         parent = save.nodes.get(from_node_id)
         if parent is not None:
             updated_choices = [
-                c.model_copy(update={"child_node_id": new_node.id})
-                if c.id == choice_id
-                else c
+                c.model_copy(update={"child_node_id": new_node.id}) if c.id == choice_id else c
                 for c in parent.choices
             ]
             save.nodes[from_node_id] = parent.model_copy(update={"choices": updated_choices})

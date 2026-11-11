@@ -31,9 +31,7 @@ _logger = logging.getLogger(__name__)
 _WS_MAX_MESSAGE_BYTES = 64 * 1024
 
 
-async def _receive_json_capped(
-    ws: WebSocket, *, max_bytes: int = _WS_MAX_MESSAGE_BYTES
-) -> Any:
+async def _receive_json_capped(ws: WebSocket, *, max_bytes: int = _WS_MAX_MESSAGE_BYTES) -> Any:
     """Receive one JSON message, rejecting frames larger than ``max_bytes``.
 
     Returns ``Any`` (matching Starlette's ``receive_json``) so callers keep
@@ -197,9 +195,7 @@ async def websocket_endpoint(
                             {
                                 "type": "error",
                                 "code": "bad_request",
-                                "message": (
-                                    f"choice_id {choice_id} is not on node {from_node_id}"
-                                ),
+                                "message": (f"choice_id {choice_id} is not on node {from_node_id}"),
                             }
                         )
                         continue
@@ -235,9 +231,7 @@ async def websocket_endpoint(
                                 "ok": False,
                             },
                         )
-                        _logger.exception(
-                            "WS pipeline.advance failed for game %s", game_id
-                        )
+                        _logger.exception("WS pipeline.advance failed for game %s", game_id)
                         await ws.send_json(
                             {
                                 "type": "error",

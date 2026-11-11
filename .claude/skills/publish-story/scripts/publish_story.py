@@ -92,10 +92,7 @@ def _open_url(url: str, *, dry_run: bool) -> None:
 
 def _html_escape(text: str) -> str:
     return (
-        text.replace("&", "&amp;")
-        .replace('"', "&quot;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
+        text.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
     )
 
 
@@ -124,7 +121,10 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(sys.argv[1:] if argv is None else argv)
     if not args.story_dir:
-        print("Missing story folder path. Ask the user for the exported story folder path.", file=sys.stderr)
+        print(
+            "Missing story folder path. Ask the user for the exported story folder path.",
+            file=sys.stderr,
+        )
         return 2
 
     story_dir = Path(args.story_dir).expanduser().resolve()

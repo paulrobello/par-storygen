@@ -373,14 +373,10 @@ class PlayScreen(Screen[None]):
         handler_name = self._ACTION_CHECKS.get(action)
         if handler_name is None:
             return None
-        handler = cast(
-            "Callable[[StoryNode], bool | None]", getattr(self, handler_name)
-        )
+        handler = cast("Callable[[StoryNode], bool | None]", getattr(self, handler_name))
         return handler(node)
 
-    def _check_pick(
-        self, parameters: tuple[object, ...], node: StoryNode
-    ) -> bool | None:
+    def _check_pick(self, parameters: tuple[object, ...], node: StoryNode) -> bool | None:
         # parameters is (n,) for parameterized action pick(N).
         if not parameters:
             return None
@@ -432,9 +428,7 @@ class PlayScreen(Screen[None]):
             return False
         if self._loading or self._edit_regen_active or self._image_regen_active:
             return False
-        return not (
-            self._tts_player is not None and self._tts_player.state == TTSState.GENERATING
-        )
+        return not (self._tts_player is not None and self._tts_player.state == TTSState.GENERATING)
 
     def _render_image_for(self, status: str, image_path: str | None) -> None:
         # If a partial or final image is on disk, show it regardless of

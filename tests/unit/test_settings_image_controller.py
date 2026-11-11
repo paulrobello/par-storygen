@@ -18,7 +18,12 @@ CUSTOM = "__custom__"
 def test_image_model_options_curated_plus_custom() -> None:
     options = image_model_options("openai", CUSTOM)
     # 3 curated openai models + the Custom entry.
-    assert [v for _, v in options] == ["gpt-image-2", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare", CUSTOM]
+    assert [v for _, v in options] == [
+        "gpt-image-2",
+        "gpt-image-2.5-sunburst",
+        "gpt-image-2.5-flare",
+        CUSTOM,
+    ]
     assert options[-1] == ("Custom (type below)…", CUSTOM)
 
 

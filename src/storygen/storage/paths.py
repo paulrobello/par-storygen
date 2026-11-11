@@ -67,9 +67,7 @@ def _validate_sub_id(value: str, *, kind: str) -> None:
     if value.startswith("-"):
         raise ValueError(f"invalid {kind}: leading '-' disallowed")
     if not _SUB_ID_PATTERN.fullmatch(value):
-        raise ValueError(
-            f"invalid {kind}: only [A-Za-z0-9_.-] allowed, got {value!r}"
-        )
+        raise ValueError(f"invalid {kind}: only [A-Za-z0-9_.-] allowed, got {value!r}")
 
 
 def _validate_node_id(node_id: str) -> None:

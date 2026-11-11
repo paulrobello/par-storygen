@@ -299,9 +299,7 @@ async def test_arc102_advance_lock_serializes_concurrent_advances(xdg_tmp: Any) 
 
     # Both children must exist in the tree (no lost node).
     child_ids = {nid for nid in owned.nodes if nid.startswith("child-")}
-    assert len(child_ids) == 2, (
-        f"expected 2 children after concurrent advances, got {child_ids}"
-    )
+    assert len(child_ids) == 2, f"expected 2 children after concurrent advances, got {child_ids}"
 
 
 # ---------------------------------------------------------------------------

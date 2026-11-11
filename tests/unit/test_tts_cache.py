@@ -71,7 +71,9 @@ class _BlockingRecordingPlayer(_RecordingPlayer):
     ``generate_calls`` stays empty (no second provider call).
     """
 
-    def __init__(self, *, generate_ok: bool, started: asyncio.Event, release: asyncio.Event) -> None:
+    def __init__(
+        self, *, generate_ok: bool, started: asyncio.Event, release: asyncio.Event
+    ) -> None:
         super().__init__(generate_ok=generate_ok)
         self._started = started
         self._release = release
@@ -97,7 +99,9 @@ def _prefs() -> TTSPrefs:
     return TTSPrefs(provider="gemini", voice="Kore")
 
 
-def test_tts_cache_path_pins_expected_layout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_tts_cache_path_pins_expected_layout(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Pin the on-disk path shape so background pregen lands at the same file."""
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     game_id = str(uuid4())
@@ -107,7 +111,10 @@ def test_tts_cache_path_pins_expected_layout(monkeypatch: pytest.MonkeyPatch, tm
     path = tts_cache_path(player, game_id, "node-7", prefs)
     voice_hash = relative_tts_cache_path(player, "node-7", prefs).split("-")[-1].split(".")[0]
 
-    assert path == tmp_path / "storygen" / "games" / game_id / "audio" / f"node-7-gemini-{voice_hash}.wav"
+    assert (
+        path
+        == tmp_path / "storygen" / "games" / game_id / "audio" / f"node-7-gemini-{voice_hash}.wav"
+    )
     assert path.parent == tmp_path / "storygen" / "games" / game_id / "audio"
 
 

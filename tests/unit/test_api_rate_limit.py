@@ -42,7 +42,9 @@ def test_parse_limit_spec_disables_on_zero_count() -> None:
     assert _parse_limit_spec("0/minute") == (0, 60)
 
 
-@pytest.mark.parametrize("spec", ["", "30", "30/", "/minute", "abc/minute", "30/century", "-1/minute"])
+@pytest.mark.parametrize(
+    "spec", ["", "30", "30/", "/minute", "abc/minute", "30/century", "-1/minute"]
+)
 def test_parse_limit_spec_rejects_malformed(spec: str) -> None:
     with pytest.raises(ValueError):
         _parse_limit_spec(spec)
@@ -117,9 +119,7 @@ def _reset_limiter_between_tests() -> Iterator[None]:  # pyright: ignore[reportU
 
 
 @pytest.fixture
-def app_client(
-    xdg_tmp: Any, monkeypatch: pytest.MonkeyPatch
-) -> Iterator[TestClient]:
+def app_client(xdg_tmp: Any, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     """Build a TestClient with auth + a tight 3/min rate limit for fast tests."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setenv("STORYGEN_API_TOKEN", "rate-test-token")

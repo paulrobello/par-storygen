@@ -356,9 +356,7 @@ def _summary_from_save(game_id: str, save: GameSave) -> GameSummaryData:
     current_node = save.nodes.get(save.current_node_id)
     is_ending = current_node.is_ending if current_node is not None else False
     root_node = save.nodes.get(save.root_node_id)
-    has_cover = (
-        root_node is not None and root_node.image_status == "done"
-    )
+    has_cover = root_node is not None and root_node.image_status == "done"
     return GameSummaryData(
         id=game_id,
         title=save.theme.title,

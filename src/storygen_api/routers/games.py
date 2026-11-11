@@ -283,9 +283,7 @@ async def regenerate_node(
         if node.parent_id is None or node.chosen_choice_id is None:
             raise HTTPException(status_code=400, detail="Cannot regenerate root node")
         if any(c.child_node_id for c in node.choices):
-            raise HTTPException(
-                status_code=400, detail="Cannot regenerate — node has descendants"
-            )
+            raise HTTPException(status_code=400, detail="Cannot regenerate — node has descendants")
 
         parent_id = node.parent_id
         choice_id = node.chosen_choice_id
@@ -315,9 +313,7 @@ async def regenerate_node(
             raise HTTPException(status_code=500, detail="internal error") from exc
 
         # ARC-101: no post-advance reload — the owned save was mutated in place.
-        new_char_ids = [
-            c for c in save.characters if c.introduced_at_node_id == new_node.id
-        ]
+        new_char_ids = [c for c in save.characters if c.introduced_at_node_id == new_node.id]
 
     return AdvanceResponse(
         node=_node_to_detail(new_node),

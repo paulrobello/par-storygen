@@ -253,9 +253,7 @@ def build_split_provider(
     on_fallback: Callable[[str, Exception], None] | None = None,
 ) -> SplitImageProvider:
     """Build a split provider with fallback routing applied to both halves."""
-    art_router = build_routed_provider(
-        art_config, on_ref_loss=on_ref_loss, on_fallback=on_fallback
-    )
+    art_router = build_routed_provider(art_config, on_ref_loss=on_ref_loss, on_fallback=on_fallback)
     character_router = build_routed_provider(
         character_config, on_ref_loss=on_ref_loss, on_fallback=on_fallback
     )

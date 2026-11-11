@@ -71,7 +71,9 @@ class _RecordingTTSPlayer(TTSPlayer):
         return True
 
 
-async def _fake_advance(save: GameSave, *, from_node_id: str, choice_id: str, **_: Any) -> StoryNode:
+async def _fake_advance(
+    save: GameSave, *, from_node_id: str, choice_id: str, **_: Any
+) -> StoryNode:
     """Minimal advance: build + attach a fresh node under the picked choice.
 
     The real ``BeatPipeline.advance`` does a lot more (LLM call, image plan,

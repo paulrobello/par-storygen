@@ -567,9 +567,7 @@ async def test_start_game_builds_per_save_routed_provider(
     reset_dotenv_cache_for_tests()
 
     primary_cfgs: list[ImageProviderConfig] = []
-    real = __import__(
-        "storygen.runtime.adapters", fromlist=["build_routed_image_provider"]
-    )
+    real = __import__("storygen.runtime.adapters", fromlist=["build_routed_image_provider"])
     real_fn = real.build_routed_image_provider
 
     def _spy(primary_cfg: ImageProviderConfig, **kwargs: object) -> object:

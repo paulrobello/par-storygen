@@ -344,9 +344,7 @@ async def upload_reference_image(
         except Exception as exc:
             # SEC-004: log server-side; return a generic message (no str(exc)).
             _logger.exception("Style-transfer failed")
-            raise HTTPException(
-                status_code=500, detail="Style-transfer generation failed"
-            ) from exc
+            raise HTTPException(status_code=500, detail="Style-transfer generation failed") from exc
         char = char.model_copy(
             update={
                 "portrait_prompt": char.physical_description,

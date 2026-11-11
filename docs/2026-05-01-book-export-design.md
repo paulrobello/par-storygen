@@ -108,21 +108,22 @@ Add an "Export Book" feature that, when the player reaches a story ending, gener
 ```python
 @dataclass
 class BookPage:
-    chapter: int              # 1-based index
-    narration: str            # HTML-escaped narration text
-    choice_text: str | None   # choice that led here (None for root)
-    image_url: str | None     # relative path "images/node-abc.png"
-    audio_url: str | None     # relative path "audio/node-abc-xxx.mp3"
+    chapter: int  # 1-based index
+    narration: str  # HTML-escaped narration text
+    choice_text: str | None  # choice that led here (None for root)
+    image_url: str | None  # relative path "images/node-abc.png"
+    audio_url: str | None  # relative path "audio/node-abc-xxx.mp3"
     is_ending: bool
     is_major: bool
+
 
 # Template context:
 {
     "title": str,
     "pages": list[BookPage],
     "has_any_audio": bool,
-    "auto_read_delay": int,    # default 3
-    "total": int,              # total number of pages
+    "auto_read_delay": int,  # default 3
+    "total": int,  # total number of pages
 }
 ```
 

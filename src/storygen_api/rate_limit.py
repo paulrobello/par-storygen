@@ -75,8 +75,7 @@ def _parse_limit_spec(spec: str) -> tuple[int, int]:
     period = _WINDOW_SECONDS.get(period_str.lower())
     if period is None:
         raise ValueError(
-            f"invalid rate limit spec {spec!r}: period must be one of "
-            f"{sorted(_WINDOW_SECONDS)}"
+            f"invalid rate limit spec {spec!r}: period must be one of {sorted(_WINDOW_SECONDS)}"
         )
     return count, period
 

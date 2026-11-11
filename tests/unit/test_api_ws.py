@@ -330,9 +330,13 @@ def test_ws_handshake_rejected_with_wrong_token(
 
     app = create_app()
     game_id = str(uuid4()).replace("-", "")
-    with TestClient(app) as client, pytest.raises(WebSocketDisconnect), client.websocket_connect(
-        f"/api/ws/{game_id}",
-        headers=_ws_headers_with_token("wrong-token"),
+    with (
+        TestClient(app) as client,
+        pytest.raises(WebSocketDisconnect),
+        client.websocket_connect(
+            f"/api/ws/{game_id}",
+            headers=_ws_headers_with_token("wrong-token"),
+        ),
     ):
         pass
 
@@ -377,9 +381,7 @@ def test_error_event_broadcast_validates_against_contract() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_ws_advance_frame_is_rate_limited(
-    xdg_tmp: Any, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_ws_advance_frame_is_rate_limited(xdg_tmp: Any, monkeypatch: pytest.MonkeyPatch) -> None:
     """SEC-103: the Nth advance frame gets a ``rate_limited`` error frame and
     the socket stays open. Ping frames are never counted.
 
@@ -484,17 +486,14 @@ def test_ws_advance_frame_is_rate_limited(
     app = create_app()
     headers = {"sec-websocket-protocol": "bearer.ws-rate-token"}
     try:
-        with TestClient(app) as client, client.websocket_connect(
-            f"/api/ws/{game_id}", headers=headers
-        ) as ws:
+        with (
+            TestClient(app) as client,
+            client.websocket_connect(f"/api/ws/{game_id}", headers=headers) as ws,
+        ):
             # Frame 1: consumes the single allowed advance (stub runs silently).
-            ws.send_json(
-                {"type": "advance", "from_node_id": "root", "choice_id": "c1"}
-            )
+            ws.send_json({"type": "advance", "from_node_id": "root", "choice_id": "c1"})
             # Frame 2: over budget → rate_limited error, socket stays open.
-            ws.send_json(
-                {"type": "advance", "from_node_id": "root", "choice_id": "c2"}
-            )
+            ws.send_json({"type": "advance", "from_node_id": "root", "choice_id": "c2"})
             # The stub fires no callbacks, so the first inbound frame is the
             # rate_limited error. Drain a couple of slots defensively.
             rate_limited: dict[str, Any] | None = None
@@ -502,10 +501,7 @@ def test_ws_advance_frame_is_rate_limited(
                 raw: Any = ws.receive_json()
                 if isinstance(raw, dict):
                     frame = cast(dict[str, Any], raw)
-                    if (
-                        frame.get("type") == "error"
-                        and frame.get("code") == "rate_limited"
-                    ):
+                    if frame.get("type") == "error" and frame.get("code") == "rate_limited":
                         rate_limited = frame
                         break
             assert rate_limited is not None, "expected a rate_limited error frame"

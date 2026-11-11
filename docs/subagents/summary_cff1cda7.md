@@ -139,13 +139,16 @@ from storygen.llm.provider_factory import build_text_model
 from storygen.llm import agents as agent_mod
 from storygen_api.session import PipelineSessionManager
 
+
 @lru_cache
 def get_app_config() -> AppConfig:
     return load_config()
 
+
 def get_session_manager() -> PipelineSessionManager:
     """Manages per-game pipeline instances."""
     ...
+
 
 # Per-request FastAPI Depends:
 def get_pipeline(game_id: str) -> BeatPipeline:
@@ -511,11 +514,14 @@ For OpenAI's `partial_images` streaming (which writes intermediate PNGs to disk)
 ```python
 async def on_partial(node_id: str, partial_bytes: bytes):
     import base64
-    await websocket.send_json({
-        "type": "image_partial",
-        "node_id": node_id,
-        "data": base64.b64encode(partial_bytes).decode(),
-    })
+
+    await websocket.send_json(
+        {
+            "type": "image_partial",
+            "node_id": node_id,
+            "data": base64.b64encode(partial_bytes).decode(),
+        }
+    )
 ```
 
 The frontend renders these as progressive `<img>` updates.

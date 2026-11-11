@@ -1,4 +1,5 @@
 """Write the FastAPI OpenAPI schema to web/openapi.json (deterministic)."""
+
 import json
 import pathlib
 

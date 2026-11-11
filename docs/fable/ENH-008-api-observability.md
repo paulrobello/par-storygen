@@ -28,7 +28,9 @@ figures at debug level. Structured `extra={}` fields, stdlib logging only, no ne
            "request",
            extra={
                "method": request.method,
-               "path": getattr(route, "path", request.url.path),  # route template, not raw path (no ids in logs)
+               "path": getattr(
+                   route, "path", request.url.path
+               ),  # route template, not raw path (no ids in logs)
                "status": response.status_code,
                "duration_ms": round(duration_ms, 1),
            },

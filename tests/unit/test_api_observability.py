@@ -23,9 +23,7 @@ from storygen_api.main import (  # tested in isolation; _configure_logging's con
 
 
 @pytest.fixture
-def app_client(
-    xdg_tmp: Any, monkeypatch: pytest.MonkeyPatch
-) -> TestClient:
+def app_client(xdg_tmp: Any, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     """Build a TestClient (no token → loopback trusted)."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.delenv("STORYGEN_API_TOKEN", raising=False)

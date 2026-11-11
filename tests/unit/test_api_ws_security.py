@@ -168,10 +168,13 @@ def test_ws_oversized_message_closes_with_1009(
     from storygen_api.main import create_app
 
     app = create_app()
-    with TestClient(app) as client, client.websocket_connect(
-        f"/api/ws/{game_id}",
-        headers=_auth_headers("size-cap-token"),
-    ) as ws:
+    with (
+        TestClient(app) as client,
+        client.websocket_connect(
+            f"/api/ws/{game_id}",
+            headers=_auth_headers("size-cap-token"),
+        ) as ws,
+    ):
         # Send an oversized text frame (>64 KiB of JSON).
         big_payload = '{"type":"ping","padding":"' + ("x" * (70 * 1024)) + '"}'
         ws.send_text(big_payload)
@@ -206,10 +209,13 @@ def test_ws_invalid_json_returns_bad_request_event(
     from storygen_api.main import create_app
 
     app = create_app()
-    with TestClient(app) as client, client.websocket_connect(
-        f"/api/ws/{game_id}",
-        headers=_auth_headers("json-err-token"),
-    ) as ws:
+    with (
+        TestClient(app) as client,
+        client.websocket_connect(
+            f"/api/ws/{game_id}",
+            headers=_auth_headers("json-err-token"),
+        ) as ws,
+    ):
         ws.send_text("this is not json")
         evt = ws.receive_json()
     assert evt["type"] == "error"

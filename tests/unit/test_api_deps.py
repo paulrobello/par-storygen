@@ -222,9 +222,7 @@ async def test_summary_and_illustration_adapters_read_usage_property() -> None:
         narration = "n"
 
     summary_adapter = SummaryAdapter(_SummaryAgent(), on_usage=summary_captured.append)
-    illustration_adapter = IllustrationAdapter(
-        _IllustrationAgent(), on_usage=illu_captured.append
-    )
+    illustration_adapter = IllustrationAdapter(_IllustrationAgent(), on_usage=illu_captured.append)
     # SummaryAdapter.run / IllustrationAdapter.run carry `# type: ignore[no-untyped-def]`
     # at the definition site (see src/storygen/runtime/adapters.py) to match the loose-typed
     # pydantic-ai adapter style documented in CLAUDE.md. The unknown-member cascade here is

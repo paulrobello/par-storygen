@@ -24,19 +24,22 @@ registry entry (plus its provider class) and every surface picks it up.
 2. **Create `src/storygen/core/providers.py`** (core layer — importable by everything):
    ```python
    """Declarative provider metadata registry — single source for all surfaces."""
+
    from dataclasses import dataclass, field
+
 
    @dataclass(frozen=True)
    class ProviderInfo:
-       id: str                      # "openai", "openrouter", "ollama", "gemini", "zai"
-       label: str                   # display name
-       kind: frozenset[str]         # {"text"}, {"image"}, or both
-       key_env_var: str | None      # None for local providers
+       id: str  # "openai", "openrouter", "ollama", "gemini", "zai"
+       label: str  # display name
+       kind: frozenset[str]  # {"text"}, {"image"}, or both
+       key_env_var: str | None  # None for local providers
        default_model: str | None
        default_base_url: str | None
-       allows_loopback_base_url: bool   # mirrors security.py's per-provider policy
+       allows_loopback_base_url: bool  # mirrors security.py's per-provider policy
        supports_reference_images: bool  # image providers only; mirrors ARC-115
        suggested_models: tuple[str, ...] = ()
+
 
    TEXT_PROVIDERS: dict[str, ProviderInfo] = {...}
    IMAGE_PROVIDERS: dict[str, ProviderInfo] = {...}
