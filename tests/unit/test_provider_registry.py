@@ -195,3 +195,17 @@ def test_ollama_loopback_policy_consistent() -> None:
         assert info.allows_loopback_base_url == (pid == "ollama"), (
             f"image {pid!r} loopback flag {info.allows_loopback_base_url} diverges from security.py"
         )
+
+
+def test_openai_image_defaults_are_current_and_consistent() -> None:
+    from storygen.core.models import ImageProviderConfig
+    from storygen.storage.app_state import DEFAULT_CHARACTER_IMAGE_MODEL, DEFAULT_IMAGE_MODEL
+
+    assert IMAGE_PROVIDERS["openai"].default_model == "gpt-image-2.6-flare"
+    assert (
+        ImageProviderConfig().model
+        == DEFAULT_IMAGE_MODEL
+        == DEFAULT_CHARACTER_IMAGE_MODEL
+        == "gpt-image-2.6-flare"
+    )
+    assert SUGGESTED_IMAGE_MODELS["openai"] == ("gpt-image-2.6-flare", "gpt-image-2.6-sunburst")

@@ -10,8 +10,8 @@ quirks are handled transparently:
   (always high-fidelity).
 - gpt-image-1 / 1.5: passes ``background="transparent"`` and
   ``input_fidelity="high"`` as before.
-- gpt-image-2.5 (sunburst/flare): native ``background="transparent"``
-  support; ``input_fidelity`` omitted (undocumented for 2.5).
+- gpt-image-2.5 / 2.6 (Sunburst/Flare): native ``background="transparent"``
+  support; ``input_fidelity`` omitted (not supported for 2.6).
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ from typing import Literal, TypedDict
 from openai import AsyncOpenAI
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from storygen.core.providers import DEFAULT_OPENAI_IMAGE_MODEL
 from storygen.images.base import ReferencePortrait
 from storygen.images.constants import (
     OPENAI_PARTIAL_IMAGES,
@@ -64,7 +65,7 @@ def _env_or_none(key: str) -> str | None:
 
 
 class OpenAIImageProvider:
-    """Implements the `ImageProvider` protocol against OpenAI `gpt-image-2`."""
+    """Implements the `ImageProvider` protocol against the OpenAI GPT Image family."""
 
     # ARC-115: OpenAI supports reference images via ``images.edit`` (both
     # portraits and scenes). This is a static capability flag; consult it
@@ -73,7 +74,7 @@ class OpenAIImageProvider:
 
     def __init__(
         self,
-        model: str = "gpt-image-2",
+        model: str = DEFAULT_OPENAI_IMAGE_MODEL,
         *,
         base_url: str | None = None,
         api_key: str | None = None,
@@ -81,7 +82,7 @@ class OpenAIImageProvider:
     ) -> None:
         self._model = model
         self._is_v2 = model.startswith("gpt-image-2")
-        # gpt-image-2.5 (sunburst/flare) supports background="transparent"
+        # gpt-image-2.5 / 2.6 supports background="transparent"
         # natively per the OpenAI API reference; gpt-image-2 only in preview.
         self._supports_transparent_bg = supports_transparent_background_flag(model)
         if client is not None:
@@ -100,9 +101,9 @@ class OpenAIImageProvider:
     def _edit_kwargs(self) -> _EditKwargs:
         """Build model-specific kwargs for ``images.edit`` calls.
 
-        gpt-image-2 always processes references at high fidelity — the
-        ``input_fidelity`` parameter is not supported and causes an error
-        if passed.  Older models (gpt-image-1 / gpt-image-1.5) require it.
+        GPT Image 2, 2.5, and 2.6 process reference inputs without the
+        ``input_fidelity`` parameter; omit it for all these models. Older models
+        (gpt-image-1 / gpt-image-1.5) require it.
         """
         if self._is_v2:
             return {}
@@ -206,7 +207,7 @@ class OpenAIImageProvider:
                 low->high resolution preview PNG when streaming is active.
                 Passing a non-None value enables ``stream=True`` and requests
                 ``partial_images=OPENAI_PARTIAL_IMAGES`` from the OpenAI API
-                (gpt-image-2 / gpt-image-1.5 / gpt-image-1 only). The callback is awaited
+                (GPT Image family). The callback is awaited
                 serially per partial event before the next is processed.
 
         Returns:

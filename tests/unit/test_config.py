@@ -31,9 +31,9 @@ def test_loads_defaults_when_no_env(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     assert cfg.text_config.provider == "openai"
     assert cfg.text_config.model == "gpt-6-luna"
     assert cfg.image_config.provider == "openai"
-    assert cfg.image_config.model == "gpt-image-2"
+    assert cfg.image_config.model == "gpt-image-2.6-flare"
     assert cfg.character_image_config.provider == "openai"
-    assert cfg.character_image_config.model == "gpt-image-2"
+    assert cfg.character_image_config.model == "gpt-image-2.6-flare"
     assert cfg.openai_api_key == ""
 
 
@@ -95,7 +95,7 @@ def test_character_image_env_does_not_change_art_config(
     cfg = load_config()
 
     assert cfg.image_config.provider == "openai"
-    assert cfg.image_config.model == "gpt-image-2"
+    assert cfg.image_config.model == "gpt-image-2.6-flare"
     assert cfg.character_image_config.provider == "openai"
     assert cfg.character_image_config.model == "gpt-image-1"
 
@@ -391,7 +391,7 @@ def test_invalid_resolved_image_config_falls_back_to_hardcoded_default(
 
     # Malformed base_url triggered fallback to hardcoded default.
     assert cfg.image_config.provider == "openai"
-    assert cfg.image_config.model == "gpt-image-2"
+    assert cfg.image_config.model == "gpt-image-2.6-flare"
     assert cfg.image_config.base_url is None
 
 
@@ -410,7 +410,7 @@ def test_image_config_falls_back_fully_on_invalid_base_url(
     reset_dotenv_cache_for_tests()
     cfg = load_config().image_config
     assert cfg.provider == "openai"
-    assert cfg.model == "gpt-image-2"
+    assert cfg.model == "gpt-image-2.6-flare"
     assert cfg.base_url is None
     assert cfg.api_key is None, (
         "api_key must be dropped on fallback to avoid cross-provider key leakage"

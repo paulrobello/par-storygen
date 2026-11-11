@@ -101,7 +101,7 @@ the underlying image-provider failure.
 
 **Likely causes:**
 
-- **Wrong model name** — `STORYGEN_IMAGE_MODEL` (scene/cover) or `STORYGEN_CHARACTER_IMAGE_MODEL` (portraits) does not match a valid model id for the provider. OpenAI expects `gpt-image-2` / `gpt-image-1.5` / `gpt-image-1`; Z.AI expects `glm-image`; Gemini expects `gemini-3.1-flash-image-preview` / `gemini-3-pro-image-preview`.
+- **Wrong model name** — `STORYGEN_IMAGE_MODEL` (scene/cover) or `STORYGEN_CHARACTER_IMAGE_MODEL` (portraits) does not match a valid model id for the provider. OpenAI offers `gpt-image-2.6-flare` / `gpt-image-2.6-sunburst`; Z.AI expects `glm-image`; Gemini expects `gemini-3.1-flash-image-preview` / `gemini-3-pro-image-preview`.
 - **Content policy (`400`)** — the prompt was rejected by the provider's safety filter. This is most common with Z.AI and Gemini on violent or adult-themed art styles. Re-run, soften the art style, or switch to OpenAI which is more permissive.
 - **Missing image API key** — each provider needs its own key: `OPENAI_API_KEY`, `GEMINI_API_KEY`, or `ZAI_API_KEY` (or the override `STORYGEN_IMAGE_API_KEY` / `STORYGEN_CHARACTER_IMAGE_API_KEY`).
 

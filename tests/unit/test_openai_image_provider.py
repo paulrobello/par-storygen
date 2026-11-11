@@ -438,3 +438,71 @@ def test_api_key_falls_back_to_openai_when_storygen_image_empty(
     monkeypatch.setattr("storygen.images.openai_provider.AsyncOpenAI", _Stub)
     OpenAIImageProvider(model="gpt-image-2")
     assert captured["api_key"] == "openai-env"
+
+
+@pytest.mark.parametrize("model", ["gpt-image-2.6-flare", "gpt-image-2.6-sunburst"])
+@pytest.mark.parametrize("reference", [None, b"reference"])
+async def test_v26_portrait_transparency_and_fidelity(model: str, reference: bytes | None) -> None:
+    client = MagicMock()
+    client.images.generate = AsyncMock(return_value=_make_image_response(b"PNG"))
+    client.images.edit = AsyncMock(return_value=_make_image_response(b"PNG"))
+    provider = OpenAIImageProvider(model=model, client=cast(AsyncOpenAI, client))
+    assert (
+        await provider.generate_portrait("a rogue", transparent=True, reference_image=reference)
+        == b"PNG"
+    )
+    call = client.images.generate if reference is None else client.images.edit
+    assert call.await_args is not None
+    kwargs = call.await_args.kwargs
+    assert kwargs["model"] == model
+    assert kwargs["background"] == "transparent"
+    assert kwargs["size"] == "1024x1536"
+    assert kwargs["quality"] == "low"
+    assert kwargs["output_format"] == "png"
+    assert "Transparent PNG background" in kwargs["prompt"]
+    assert "input_fidelity" not in kwargs
+
+
+@pytest.mark.parametrize("with_refs", [False, True])
+@pytest.mark.parametrize("streaming", [False, True])
+async def test_v26_scene_defaults_support_refs_and_streaming(
+    with_refs: bool, streaming: bool
+) -> None:
+    client = MagicMock()
+    response = (
+        _AsyncEventStream(
+            [
+                _StreamEvent(
+                    "image_generation.partial_image", base64.b64encode(b"PARTIAL").decode()
+                ),
+                _StreamEvent("image_generation.completed", base64.b64encode(b"FINAL").decode()),
+            ]
+        )
+        if streaming
+        else _make_image_response(b"FINAL")
+    )
+    client.images.generate = AsyncMock(return_value=response)
+    client.images.edit = AsyncMock(return_value=response)
+    provider = OpenAIImageProvider(client=cast(AsyncOpenAI, client))
+    callback = AsyncMock()
+    result = await provider.generate_scene(
+        "a chase",
+        reference_portraits=[ReferencePortrait("Ada", b"REF")] if with_refs else [],
+        on_partial=callback if streaming else None,
+    )
+    assert result == b"FINAL"
+    call = client.images.edit if with_refs else client.images.generate
+    assert call.await_args is not None
+    kwargs = call.await_args.kwargs
+    assert kwargs["model"] == "gpt-image-2.6-flare"
+    assert kwargs["size"] == "1024x1024"
+    assert kwargs["quality"] == "auto"
+    assert kwargs["output_format"] == "png"
+    assert "input_fidelity" not in kwargs
+    assert "Art style:" in kwargs["prompt"]
+    if streaming:
+        assert kwargs["stream"] is True
+        assert kwargs["partial_images"] == 2
+        callback.assert_awaited_once_with(b"PARTIAL")
+    if with_refs:
+        assert len(kwargs["image"]) == 1

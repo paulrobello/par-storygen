@@ -214,11 +214,11 @@ storygen-api serve --host 127.0.0.1 --port 8101 --no-reload
 * `GEMINI_API_KEY` — Google Gemini API key
 * `ZAI_API_KEY` — Z.AI API key
 * `STORYGEN_IMAGE_PROVIDER` — Scene/cover art provider: `openai` (default), `gemini`, `zai`, or `ollama`
-* `STORYGEN_IMAGE_MODEL` — Scene/cover art model identifier (default: `gpt-image-2`)
+* `STORYGEN_IMAGE_MODEL` — Scene/cover art model identifier (default: `gpt-image-2.6-flare`)
 * `STORYGEN_IMAGE_BASE_URL` — Override base URL for the scene/cover art provider
 * `STORYGEN_IMAGE_API_KEY` — Override API key for the scene/cover art provider
 * `STORYGEN_CHARACTER_IMAGE_PROVIDER` — Character portrait provider: `openai` (default), `gemini`, `zai`, or `ollama`
-* `STORYGEN_CHARACTER_IMAGE_MODEL` — Character portrait model identifier (default: `gpt-image-2`)
+* `STORYGEN_CHARACTER_IMAGE_MODEL` — Character portrait model identifier (default: `gpt-image-2.6-flare`)
 * `STORYGEN_CHARACTER_IMAGE_BASE_URL` — Override base URL for the character portrait provider
 * `STORYGEN_CHARACTER_IMAGE_API_KEY` — Override API key for the character portrait provider
 
@@ -301,18 +301,22 @@ par-storygen supports four image-gen providers. Only OpenAI and Gemini support *
 
 Scene/cover art and character portraits are configured separately:
 
-- **Scene/cover art** uses `STORYGEN_IMAGE_PROVIDER`, `STORYGEN_IMAGE_MODEL`, `STORYGEN_IMAGE_BASE_URL`, and `STORYGEN_IMAGE_API_KEY`. The hardcoded default is OpenAI **`gpt-image-2`**.
-- **Character portraits** use `STORYGEN_CHARACTER_IMAGE_PROVIDER`, `STORYGEN_CHARACTER_IMAGE_MODEL`, `STORYGEN_CHARACTER_IMAGE_BASE_URL`, and `STORYGEN_CHARACTER_IMAGE_API_KEY`. The hardcoded default is OpenAI **`gpt-image-2`**. Note: `gpt-image-2` does not accept the transparent-background flag, so portraits render on a solid neutral background; choose **`gpt-image-1.5`** or **`gpt-image-1`** if you need transparent PNG portraits.
+- **Scene/cover art** uses `STORYGEN_IMAGE_PROVIDER`, `STORYGEN_IMAGE_MODEL`, `STORYGEN_IMAGE_BASE_URL`, and `STORYGEN_IMAGE_API_KEY`. The hardcoded default is OpenAI **`gpt-image-2.6-flare`**.
+- **Character portraits** use `STORYGEN_CHARACTER_IMAGE_PROVIDER`, `STORYGEN_CHARACTER_IMAGE_MODEL`, `STORYGEN_CHARACTER_IMAGE_BASE_URL`, and `STORYGEN_CHARACTER_IMAGE_API_KEY`. The hardcoded default is OpenAI **`gpt-image-2.6-flare`**. Both GPT Image 2.6 models support transparent PNG portraits.
 
 There are two ways to select image providers and models:
 
 1. **Environment variables** — use the scene/cover `STORYGEN_IMAGE_*` variables and/or the portrait-specific `STORYGEN_CHARACTER_IMAGE_*` variables. See [`.env.example`](./.env.example).
 2. **Settings screen** (persisted across sessions) — edit the "Image provider" block for scene/cover art and the "Character portrait provider" block for portraits.
 
-**Priority order for each image config:** real environment variables > `.env` file > Settings-saved prefs > hardcoded defaults (`openai` / `gpt-image-2` for scene/cover art, `openai` / `gpt-image-2` for character portraits).
+**Priority order for each image config:** real environment variables > `.env` file > Settings-saved prefs > hardcoded defaults (`openai` / `gpt-image-2.6-flare` for scene/cover art, `openai` / `gpt-image-2.6-flare` for character portraits).
 
 ### OpenAI (image)
-Set `OPENAI_API_KEY`. Supports reference images natively via `images.edit` — each scene folds in the featured characters' portraits so faces stay consistent. Known-good models: **`gpt-image-2`** (default for both scene/cover art and character portraits), **`gpt-image-1.5`** (transparent-background character portraits — `gpt-image-2` cannot produce transparency), **`gpt-image-1`** (older, cheaper — untested with current `gpt-image-2`-tuned scene prompts). Docs: [platform.openai.com/docs/guides/images](https://platform.openai.com/docs/guides/images).
+Set `OPENAI_API_KEY`. The default is **`gpt-image-2.6-flare`**, OpenAI's recommended starting point for existing GPT Image 2 workflows that already meet quality needs. Choose **`gpt-image-2.6-sunburst`** for more demanding detail or precise edits. Both support reference images through `images.edit`, transparent PNG portraits, and streaming previews. Portrait sizes/quality and scene sizes/quality are unchanged. See [OpenAI's model selection guide](https://developers.openai.com/api/docs/guides/image-prompting#choose-a-model).
+
+Existing saves pin their own image models. To update retiring GPT Image 2 / 1.5 configurations safely, follow [the migration guide](docs/IMAGE_MODEL_MIGRATION.md). Explicit environment overrides and custom endpoints are not rewritten.
+
+The in-app image cost counter remains a coarse legacy size/quality estimate, not a bill. GPT Image 2.6 token consumption varies by model and quality; check API usage for actual costs.
 
 ### Google Gemini
 Set `GEMINI_API_KEY` and `STORYGEN_IMAGE_PROVIDER=gemini`. Supports up to 14 reference images per call. Known-good models: **`gemini-3.1-flash-image-preview`** (Nano Banana 2, $0.067/1K image tokens), **`gemini-3-pro-image-preview`** (Nano Banana Pro, $0.134/image). Leave `STORYGEN_IMAGE_BASE_URL` blank for Gemini. Docs: [ai.google.dev/gemini-api/docs/image-generation](https://ai.google.dev/gemini-api/docs/image-generation).

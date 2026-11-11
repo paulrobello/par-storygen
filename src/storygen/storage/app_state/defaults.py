@@ -17,7 +17,7 @@ from types import MappingProxyType
 from typing import get_args
 
 from storygen.core.models import ReaderLevel
-from storygen.core.providers import IMAGE_PROVIDERS, TEXT_PROVIDERS
+from storygen.core.providers import DEFAULT_OPENAI_IMAGE_MODEL, IMAGE_PROVIDERS, TEXT_PROVIDERS
 
 ALLOWED_PACINGS: frozenset[str] = frozenset({"slow", "moderate", "fast"})
 ALLOWED_READER_LEVELS: frozenset[str] = frozenset(get_args(ReaderLevel))
@@ -53,9 +53,9 @@ SUGGESTED_MODELS: MappingProxyType[str, list[str]] = MappingProxyType(
 ALLOWED_PROVIDERS: frozenset[str] = frozenset(TEXT_PROVIDERS.keys())
 
 DEFAULT_IMAGE_PROVIDER: str = "openai"
-DEFAULT_IMAGE_MODEL: str = "gpt-image-2"
+DEFAULT_IMAGE_MODEL: str = DEFAULT_OPENAI_IMAGE_MODEL
 DEFAULT_CHARACTER_IMAGE_PROVIDER: str = "openai"
-DEFAULT_CHARACTER_IMAGE_MODEL: str = "gpt-image-2"
+DEFAULT_CHARACTER_IMAGE_MODEL: str = DEFAULT_OPENAI_IMAGE_MODEL
 
 # UI-facing (label, provider-id) pairs — consumed by the Settings screen Select widget.
 # Order follows IMAGE_PROVIDERS insertion order (openai, gemini, zai, ollama).

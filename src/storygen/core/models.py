@@ -16,6 +16,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from storygen.core.providers import DEFAULT_OPENAI_IMAGE_MODEL
+
 # ---------------------------------------------------------------------------
 # Scalar type aliases
 # ---------------------------------------------------------------------------
@@ -56,7 +58,7 @@ class ImageProviderConfig(BaseModel):
     """Configures which image provider renders scenes and portraits."""
 
     provider: Literal["openai", "gemini", "zai", "ollama"] = "openai"
-    model: str = "gpt-image-2"
+    model: str = DEFAULT_OPENAI_IMAGE_MODEL
     base_url: str | None = None
     api_key: str | None = Field(default=None, exclude=True)
 

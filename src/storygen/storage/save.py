@@ -133,9 +133,7 @@ class GameSave(BaseModel):
     pacing: Pacing = "moderate"
     text_config: TextProviderConfig
     image_config: ImageProviderConfig
-    character_image_config: ImageProviderConfig = Field(
-        default_factory=lambda: ImageProviderConfig(provider="openai", model="gpt-image-2")
-    )
+    character_image_config: ImageProviderConfig = Field(default_factory=ImageProviderConfig)
     characters: list[Character]
     relationships: list[Relationship] = Field(default_factory=list[Relationship])
     nodes: dict[NodeId, StoryNode]

@@ -17,13 +17,8 @@ CUSTOM = "__custom__"
 
 def test_image_model_options_curated_plus_custom() -> None:
     options = image_model_options("openai", CUSTOM)
-    # 3 curated openai models + the Custom entry.
-    assert [v for _, v in options] == [
-        "gpt-image-2",
-        "gpt-image-2.5-sunburst",
-        "gpt-image-2.5-flare",
-        CUSTOM,
-    ]
+    # 2 current OpenAI models + the Custom entry.
+    assert [v for _, v in options] == ["gpt-image-2.6-flare", "gpt-image-2.6-sunburst", CUSTOM]
     assert options[-1] == ("Custom (type below)…", CUSTOM)
 
 
@@ -33,9 +28,9 @@ def test_image_model_options_unknown_provider_is_custom_only() -> None:
 
 
 def test_model_select_state_curated_model_selected_directly() -> None:
-    options, target, show_input = model_select_state("openai", "gpt-image-2.5-sunburst", CUSTOM)
-    assert len(options) == 4
-    assert target == "gpt-image-2.5-sunburst"
+    options, target, show_input = model_select_state("openai", "gpt-image-2.6-sunburst", CUSTOM)
+    assert len(options) == 3
+    assert target == "gpt-image-2.6-sunburst"
     assert show_input is False
 
 

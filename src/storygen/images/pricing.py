@@ -17,11 +17,11 @@ from __future__ import annotations
 # ---------------------------------------------------------------------------
 # OpenAI gpt-image-2 / gpt-image-1.5 / gpt-image-1 Standard pricing (USD per image).
 # ---------------------------------------------------------------------------
-# Based on published Standard pricing as of 2026-04. gpt-image-2 uses token-
-# based pricing ($8/1M image input, $30/1M image output) that maps to very
-# similar per-image costs as gpt-image-1.5. Treat as best-effort estimates —
-# the real charged value is not returned in the response, so we approximate
-# from the request parameters.
+# Legacy size/quality estimates, retained for continuity of the UI counter.
+# These are NOT GPT Image 2.6 per-image prices: 2.6 bills tokens and can use
+# different counts for the same quality. Exact pricing requires response usage
+# ($5/M text input, $8/M image input, $30/M image output as of 2026-11-11).
+# Do not present this estimate as the billed cost.
 _OPENAI_IMAGE_COST_USD: dict[tuple[str, str], float] = {
     ("1024x1024", "low"): 0.011,
     ("1024x1024", "medium"): 0.042,

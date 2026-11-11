@@ -41,7 +41,7 @@ _SCENE_SPATIAL_ORIENTATION_GUIDANCE = (
 
 
 def _is_v2_model(model: str | None) -> bool:
-    """Return True if the model is gpt-image-2 (or a snapshot thereof).
+    """Return True if the model belongs to the GPT Image 2 family.
 
     ``None`` returns False (non-OpenAI providers or callers that don't
     specify a model — they get the classic paragraph format).
@@ -52,7 +52,7 @@ def _is_v2_model(model: str | None) -> bool:
 def supports_transparent_background_flag(model: str | None) -> bool:
     """Whether OpenAI's ``background="transparent"`` API flag works for ``model``.
 
-    Native on gpt-image-1 / 1.5 and gpt-image-2.5 (sunburst/flare) per the
+    Native on gpt-image-1 / 1.5 and gpt-image-2.5 / 2.6 (Sunburst/Flare) per the
     OpenAI API reference. gpt-image-2 supports it only in preview — treated
     as unsupported (callers fall back to ``"opaque"`` plus prompt wording).
     Returns False for ``None`` / non-OpenAI models; their transparency stays
@@ -61,22 +61,21 @@ def supports_transparent_background_flag(model: str | None) -> bool:
     return (
         model is not None
         and model.startswith("gpt-image")
-        and (not model.startswith("gpt-image-2") or model.startswith("gpt-image-2.5"))
+        and (
+            not model.startswith("gpt-image-2")
+            or model.startswith(("gpt-image-2.5-", "gpt-image-2.6-"))
+        )
     )
 
 
 def _is_transparency_preview_only(model: str | None) -> bool:
     """Whether ``model`` only supports the transparent flag in preview.
 
-    Just gpt-image-2 (not 2.5): callers use the solid-grey prompt fallback
+    Just gpt-image-2 (not 2.5 / 2.6): callers use the solid-grey prompt fallback
     instead of the "Transparent PNG background" sentence. Everything else —
     including ``None`` / non-OpenAI models — gets the transparent sentence.
     """
-    return (
-        model is not None
-        and model.startswith("gpt-image-2")
-        and not model.startswith("gpt-image-2.5")
-    )
+    return model is not None and (model == "gpt-image-2" or model.startswith("gpt-image-2-"))
 
 
 def build_portrait_prompt(

@@ -18,6 +18,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+# OpenAI recommends Flare for existing GPT-Image-2 workflows that already
+# meet quality requirements. Keep every new-story default in sync.
+DEFAULT_OPENAI_IMAGE_MODEL = "gpt-image-2.6-flare"
+
 
 @dataclass(frozen=True)
 class ProviderInfo:
@@ -32,7 +36,7 @@ class ProviderInfo:
         key_env_var: Environment variable holding the provider's API key, or
             ``None`` for local / no-auth providers (Ollama).
         default_model: Hardcoded default model for the provider (OpenAI text
-            ``gpt-6-luna`` and image ``gpt-image-2``), or ``None`` when the
+            ``gpt-6-luna`` and image ``gpt-image-2.6-flare``), or ``None`` when the
             user must pick one (OpenRouter, Ollama, Gemini, Z.AI images).
         default_base_url: Provider's default OpenAI-compatible base URL, or
             ``None`` when not applicable (Gemini's ``google-genai`` SDK ignores
@@ -134,11 +138,11 @@ IMAGE_PROVIDERS: dict[str, ProviderInfo] = {
         label="OpenAI gpt-image",
         kind=frozenset({"image"}),
         key_env_var="OPENAI_API_KEY",
-        default_model="gpt-image-2",
+        default_model=DEFAULT_OPENAI_IMAGE_MODEL,
         default_base_url="https://api.openai.com/v1",
         allows_loopback_base_url=False,
         supports_reference_images=True,
-        suggested_models=("gpt-image-2", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare"),
+        suggested_models=(DEFAULT_OPENAI_IMAGE_MODEL, "gpt-image-2.6-sunburst"),
     ),
     "gemini": ProviderInfo(
         id="gemini",

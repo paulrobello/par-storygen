@@ -51,7 +51,7 @@ Configured via environment variables (see `.env.example`) or in-app Settings. **
 
 **Text** (all OpenAI-compatible): OpenAI (`OPENAI_API_KEY`, default `gpt-6-luna`), OpenRouter (`OPENROUTER_API_KEY` + `STORYGEN_TEXT_PROVIDER=openrouter`), Ollama (local, no key). Config via `STORYGEN_TEXT_MODEL` and optional `STORYGEN_TEXT_BASE_URL`.
 
-**Image**: OpenAI (`gpt-image-2`, ref-portrait aware), Gemini (ref-aware), Z.AI (text-to-image only), Ollama (local, no refs). Config via `STORYGEN_IMAGE_MODEL`, `STORYGEN_IMAGE_BASE_URL`, `STORYGEN_IMAGE_API_KEY`. Settings supports a fallback provider. Prompt builders in `images/_prompts.py` use structured 5-part format for gpt-image-2, classic paragraph format for others.
+**Image**: OpenAI (`gpt-image-2.6-flare`, ref-portrait aware), Gemini (ref-aware), Z.AI (text-to-image only), Ollama (local, no refs). Config via `STORYGEN_IMAGE_MODEL`, `STORYGEN_IMAGE_BASE_URL`, `STORYGEN_IMAGE_API_KEY`. Settings supports a fallback provider. Prompt builders in `images/_prompts.py` use structured 5-part format for the GPT Image 2 family, classic paragraph format for others.
 
 ## Architecture
 

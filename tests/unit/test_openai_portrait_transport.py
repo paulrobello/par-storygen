@@ -39,11 +39,11 @@ async def test_no_reference_portrait_sdk_request_and_response() -> None:
     assert request.url.path == "/v1/images/generations"
     body = json.loads(request.content)
     assert body == {
-        "model": "gpt-image-2",
+        "model": "gpt-image-2.6-flare",
         "prompt": body["prompt"],
         "size": "1024x1536",
         "quality": "low",
-        "background": "opaque",
+        "background": "transparent",
         "output_format": "png",
     }
     assert "A scholar" in body["prompt"]
@@ -107,3 +107,37 @@ async def test_no_reference_response_without_base64_is_reported(
         provider = OpenAIImageProvider(client=client)
         with pytest.raises(RuntimeError, match="missing b64_json"):
             await provider.generate_portrait("A scholar", transparent=True)
+
+
+@pytest.mark.asyncio
+async def test_reference_portrait_v26_sdk_multipart_request() -> None:
+    requests: list[httpx.Request] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            200, json={"created": 0, "data": [{"b64_json": base64.b64encode(b"PNG").decode()}]}
+        )
+
+    async with AsyncOpenAI(
+        api_key="unused-local-test-value",
+        base_url="https://api.openai.com/v1",
+        max_retries=0,
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(respond), trust_env=False),
+    ) as client:
+        provider = OpenAIImageProvider(client=client)
+        assert (
+            await provider.generate_portrait(
+                "A scholar", transparent=True, reference_image=b"REFERENCE"
+            )
+            == b"PNG"
+        )
+
+    assert len(requests) == 1
+    request = requests[0]
+    assert request.url.path == "/v1/images/edits"
+    assert "multipart/form-data" in request.headers["content-type"]
+    assert b"gpt-image-2.6-flare" in request.content
+    assert b"REFERENCE" in request.content
+    assert b"transparent" in request.content
+    assert b"input_fidelity" not in request.content

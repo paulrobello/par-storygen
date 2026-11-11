@@ -59,6 +59,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **API + web test layer** — Added Python API/WebSocket/security/rate-limit tests, a vitest layer for the WS contract + config, and a hermetic Playwright e2e that drives the play surface against a mocked backend. (ARC-002/ARC-015)
 - **God-screen targeted extraction** — Separable pure logic pulled out of the four large screens into `src/storygen/screens/controllers/` (portraits outfit bookkeeping, settings image-model select logic, wizard confirm-summary builder), each unit-tested without a Textual `App`. The screens keep their `@work` workers and message handlers, which Textual pins in place by design. (ARC-012/QA-006)
 
+## [0.5.1] - 2026-11-11
+
+### Fixed
+
+- **Image model retirement migration** — New stories now default to GPT Image 2.6 Flare for scenes and portraits; Settings also offers 2.6 Sunburst. Both use native transparent PNG portraits and reference-image edits without `input_fidelity`. An opt-in offline migration updates existing OpenAI GPT Image 2 / 1.5 save configurations and Settings preferences with dry-run, private backups, atomic replacement, and change detection. Existing story content, images, and custom endpoints are preserved. See `docs/IMAGE_MODEL_MIGRATION.md`.
+
+### Added
+
+- **Safe saved-model migration** — `python -m storygen.storage.migrate_image_models` previews affected settings and saves; `--apply` creates private byte-exact backups and atomically changes only supported OpenAI model pins. Existing story content, cached images, and historical costs remain unchanged. Repeated runs make no further changes.
+
+### Verification
+
+- Added migration safety and real-SDK request serialization coverage for GPT Image 2.6, including portrait transparency, references, and streaming. See the migration guide for validation and rollback steps.
+
 ## [0.5.0] - 2026-05-18
 
 ### Fixed
