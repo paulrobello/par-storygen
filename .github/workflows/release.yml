@@ -126,9 +126,8 @@ jobs:
         if: success()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-        uses: Ilshidur/action-discord@d2594079a10f1d6739ee50a2471f0ca57418b554 # 0.4.0
-        with:
-          args: 'The project {{ EVENT_PAYLOAD.repository.full_name }} ${{ env.VERSION }} has been published to TestPyPI.'
+          DISCORD_MESSAGE: 'The project ${{ github.repository }} ${{ env.VERSION }} has been published to TestPyPI.'
+        run: python scripts/notify_discord.py
         continue-on-error: true
 
   github-release:
@@ -186,9 +185,8 @@ jobs:
         if: success()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-        uses: Ilshidur/action-discord@d2594079a10f1d6739ee50a2471f0ca57418b554 # 0.4.0
-        with:
-          args: 'A new release v${{ env.VERSION }} has been created for {{ EVENT_PAYLOAD.repository.full_name }}.'
+          DISCORD_MESSAGE: 'A new release v${{ env.VERSION }} has been created for ${{ github.repository }}.'
+        run: python scripts/notify_discord.py
 
       - name: Cleanup on failure
         if: failure()
@@ -240,7 +238,6 @@ jobs:
         if: success()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-        uses: Ilshidur/action-discord@d2594079a10f1d6739ee50a2471f0ca57418b554 # 0.4.0
-        with:
-          args: 'The project {{ EVENT_PAYLOAD.repository.full_name }} ${{ env.VERSION }} has been published to PyPI.'
+          DISCORD_MESSAGE: 'The project ${{ github.repository }} ${{ env.VERSION }} has been published to PyPI.'
+        run: python scripts/notify_discord.py
         continue-on-error: true
