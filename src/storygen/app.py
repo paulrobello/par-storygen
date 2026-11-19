@@ -272,7 +272,9 @@ class StoryGenApp(App[None]):
                 text_config=self._config.text_config,
                 image_config=self._config.image_config,
                 character_image_config=self._config.character_image_config,
-                theme_agent=agent_mod.build_theme_agent(self._text_model),  # pyright: ignore[reportArgumentType]
+                theme_agent=agent_mod.build_theme_agent(
+                    self._text_model, native_output=self._config.text_config.provider == "ollama"
+                ),  # pyright: ignore[reportArgumentType]
                 character_agent_factory=lambda theme: agent_mod.build_character_agent(  # pyright: ignore[reportArgumentType]
                     self._text_model, theme=theme
                 ),

@@ -10,8 +10,10 @@ def theme_system_prompt() -> str:
     """Return the system prompt for the theme-selection agent."""
     return (
         "You are a senior narrative designer. When the user asks for theme ideas,"
-        " propose three distinct, evocative story themes. Each has a title, a"
-        " 1-2 sentence setting, a 2-3 sentence premise, and 3-5 keywords."
+        " propose exactly one evocative story theme. Return one structured Theme"
+        " using the provided output schema, not a list of alternatives or plain text."
+        " Include a title, a 1-2 sentence setting, a 2-3 sentence premise,"
+        " and 3-5 keywords."
     )
 
 

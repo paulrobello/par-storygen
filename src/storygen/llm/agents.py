@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic_ai import Agent
+from pydantic_ai import Agent, NativeOutput
 from pydantic_ai.models import Model
 
 from storygen.core.models import (
@@ -22,11 +22,11 @@ from storygen.llm import prompts
 from storygen.storage.app_state import DEFAULT_TARGET_MAJOR_BEATS
 
 
-def build_theme_agent(model: Model) -> Agent[None, Theme]:
-    """Build an agent that proposes story themes."""
+def build_theme_agent(model: Model, *, native_output: bool = False) -> Agent[None, Theme]:
+    """Propose one theme; Ollama uses native JSON schema rather than output tools."""
     return Agent(
         model=model,
-        output_type=Theme,
+        output_type=NativeOutput(Theme) if native_output else Theme,
         system_prompt=prompts.theme_system_prompt(),
     )
 

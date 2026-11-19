@@ -291,6 +291,9 @@ Set `OPENAI_API_KEY`. Known-good models: **`gpt-6-luna`** (default). Billing run
 Set `OPENROUTER_API_KEY` and `STORYGEN_TEXT_PROVIDER=openrouter`. OpenRouter routes to dozens of frontier models under a single key. Known-good models: **`anthropic/claude-3.5-sonnet`** (excellent structured output), **`meta-llama/llama-3.3-70b-instruct`** (open-weight, very cheap). Full catalog at [openrouter.ai/models](https://openrouter.ai/models). Keep the `<vendor>/<model>` slash form.
 
 ### Ollama (text)
+
+In **0.5.2**, the Theme step requests exactly one theme and uses Ollama's native JSON-schema output. This avoids the output-tool retry failure reported with `qwen2.5:32b-instruct` ([#23](https://github.com/paulrobello/par-storygen/issues/23)); no special tool-name wording is needed in your prompt. The fix was live-tested with Ollama **0.40.16** on macOS. Other story steps still use tool calling, so choose a model that supports tools; this Theme test does not establish full-story compatibility or Windows verification.
+
 Set `STORYGEN_TEXT_PROVIDER=ollama` and run `ollama serve` locally (default: `http://localhost:11434`). No API key required. Known-good models: **`llama3.3:70b`** (good narration if you have the VRAM), **`qwen2.5:32b-instruct`** (lighter, faster). The model string must match the Ollama tag exactly. For remote Ollama, set `STORYGEN_TEXT_BASE_URL=http://<host>:11434/v1`.
 
 **Note:** Each save pins its own `text_config`. Changing the provider in Settings only affects new stories — existing saves keep what they were created with.

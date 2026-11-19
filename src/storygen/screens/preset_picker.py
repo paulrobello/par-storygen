@@ -78,7 +78,10 @@ class PresetPickerScreen(Screen[None]):
             text_config=config.text_config,  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
             image_config=config.image_config,  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
             character_image_config=config.character_image_config,  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
-            theme_agent=agent_mod.build_theme_agent(text_model),  # pyright: ignore[reportArgumentType]
+            theme_agent=agent_mod.build_theme_agent(  # pyright: ignore[reportArgumentType]
+                text_model,
+                native_output=config.text_config.provider == "ollama",  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+            ),  # pyright: ignore[reportArgumentType]
             character_agent_factory=lambda theme: agent_mod.build_character_agent(  # pyright: ignore[reportArgumentType]
                 text_model, theme=theme
             ),

@@ -13,9 +13,14 @@ from storygen.llm.prompts import (
 )
 
 
-def test_theme_prompt_asks_for_three_options() -> None:
-    out = theme_system_prompt()
-    assert "three" in out.lower()
+def test_theme_prompt_asks_for_one_structured_theme() -> None:
+    out = theme_system_prompt().lower()
+    assert "exactly one" in out
+    assert "one structured theme" in out
+    assert "provided output schema" in out
+    assert "three" not in out
+    for field in ("title", "setting", "premise", "keywords"):
+        assert field in out
 
 
 def test_character_prompt_mentions_physical_description() -> None:

@@ -39,7 +39,9 @@ def _build_flow(config: AppConfig) -> WizardFlow:
         text_config=config.text_config,
         image_config=config.image_config,
         character_image_config=config.character_image_config,
-        theme_agent=agent_mod.build_theme_agent(text_model),  # pyright: ignore[reportArgumentType]
+        theme_agent=agent_mod.build_theme_agent(
+            text_model, native_output=config.text_config.provider == "ollama"
+        ),  # pyright: ignore[reportArgumentType]
         character_agent_factory=lambda theme: agent_mod.build_character_agent(  # pyright: ignore[reportArgumentType]
             text_model, theme=theme
         ),
@@ -102,7 +104,10 @@ async def wizard_confirm(
         text_config=config.text_config,
         image_config=config.image_config,
         character_image_config=config.character_image_config,
-        theme_agent=agent_mod.build_theme_agent(build_text_model(config.text_config)),  # pyright: ignore[reportArgumentType]
+        theme_agent=agent_mod.build_theme_agent(
+            build_text_model(config.text_config),
+            native_output=config.text_config.provider == "ollama",
+        ),  # pyright: ignore[reportArgumentType]
         character_agent_factory=lambda theme: agent_mod.build_character_agent(  # pyright: ignore[reportArgumentType]
             build_text_model(config.text_config), theme=theme
         ),

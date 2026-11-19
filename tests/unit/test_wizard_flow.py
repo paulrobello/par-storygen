@@ -5,11 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pydantic_ai.models.test import TestModel
 
 from storygen.core.models import Character, ImageProviderConfig, TextProviderConfig, Theme
 from storygen.images.base import ReferencePortrait
 from storygen.images.constants import PORTRAIT_QUALITY, PORTRAIT_SIZE, SCENE_QUALITY, SCENE_SIZE
 from storygen.images.pricing import image_cost
+from storygen.llm.agents import build_theme_agent
 from storygen.runtime.wizard_flow import WizardFlow
 from storygen.screens.wizard import WizardStep
 
@@ -119,6 +121,35 @@ async def test_wizard_flow_proposes_theme(monkeypatch: pytest.MonkeyPatch, tmp_p
     )
     theme = await flow.propose_theme("any prompt")
     assert theme.title == "Proposed"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("native_output", [False, True])
+async def test_wizard_flow_uses_structured_theme_agent(xdg_tmp: Path, native_output: bool) -> None:
+    expected = Theme(
+        title="The Lantern Ferry",
+        setting="A river town at dusk.",
+        premise="A ferryman discovers a lost island.",
+        keywords=["river", "mystery", "lantern"],
+    )
+    model = (
+        TestModel(
+            custom_output_text=expected.model_dump_json(),
+            profile={"supports_json_schema_output": True},
+        )
+        if native_output
+        else TestModel(custom_output_args=expected.model_dump())
+    )
+    agent = build_theme_agent(model, native_output=native_output)
+    flow = WizardFlow(
+        text_config=_TEXT_CONFIG,
+        image_config=_IMAGE_CONFIG,
+        theme_agent=agent,  # pyright: ignore[reportArgumentType]
+        character_agent_factory=lambda theme: FakeCharacterAgent(),
+        blurb_agent_factory=_fake_blurb_factory,
+        image_provider=FakeImageProvider(),
+    )
+    assert await flow.propose_theme("Suggest a river adventure") == expected
 
 
 @pytest.mark.asyncio

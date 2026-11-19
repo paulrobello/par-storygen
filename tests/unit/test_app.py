@@ -126,7 +126,7 @@ async def test_make_wizard_uses_app_split_provider_and_current_image_configs(
         spy_build_routed_image_provider,
     )
 
-    def fake_theme_agent(_model: object) -> object:
+    def fake_theme_agent(_model: object, *, native_output: bool = False) -> object:
         return object()
 
     monkeypatch.setattr("storygen.app.agent_mod.build_theme_agent", fake_theme_agent)

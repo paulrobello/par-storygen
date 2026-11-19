@@ -59,6 +59,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **API + web test layer** — Added Python API/WebSocket/security/rate-limit tests, a vitest layer for the WS contract + config, and a hermetic Playwright e2e that drives the play surface against a mocked backend. (ARC-002/ARC-015)
 - **God-screen targeted extraction** — Separable pure logic pulled out of the four large screens into `src/storygen/screens/controllers/` (portraits outfit bookkeeping, settings image-model select logic, wizard confirm-summary builder), each unit-tested without a Textual `App`. The screens keep their `@work` workers and message handlers, which Textual pins in place by design. (ARC-012/QA-006)
 
+## [0.5.2] - 2026-11-19
+
+### Fixed
+
+- **Theme generation output contract** — Ask for exactly one structured Theme instead of three alternatives, matching the shared TUI/API wizard agent schema. Ollama theme generation uses native JSON-schema output rather than output-tool calls, which still failed with `qwen2.5:32b-instruct` after the prompt correction; other providers retain their existing output mode (issue #23).
+
+### Verification
+
+- Reproduced the Theme retry failure with Ollama 0.40.16 and `qwen2.5:32b-instruct` on macOS. The corrected native-output path returned a validated Theme in one request on two consecutive runs. Windows and later story-generation steps were not live-tested.
+
 ## [0.5.1] - 2026-11-11
 
 ### Fixed
@@ -277,11 +287,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings screen** — persisted in-app configuration for provider defaults, art toggle, streaming, prefetch options, and wizard defaults
 - **Save/resume** — `--resume` flag re-opens the last-played save; full game state persistence
 
-<!-- NOTE: tags v0.2.0–v0.5.0 are not yet pushed; the compare links below
+<!-- NOTE: version tags may not yet be pushed; the compare links below
      will 404 until those tags exist on the remote. Do not push tags from
      docs work — tagging is a release-time, owner decision. -->
 
-[Unreleased]: https://github.com/paulrobello/par-storygen/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/paulrobello/par-storygen/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/paulrobello/par-storygen/compare/v0.5.1...v0.5.2
+[0.5.1]: https://github.com/paulrobello/par-storygen/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/paulrobello/par-storygen/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/paulrobello/par-storygen/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/paulrobello/par-storygen/compare/v0.3.0...v0.3.1

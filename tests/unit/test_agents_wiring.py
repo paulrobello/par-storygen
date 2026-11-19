@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from pydantic_ai import Agent
+from pydantic_ai import Agent, NativeOutput
+from pydantic_ai.messages import SystemPromptPart
 from pydantic_ai.models.test import TestModel
 
 from storygen.core.models import (
@@ -28,11 +29,33 @@ from storygen.llm.provider_factory import build_text_model
 
 
 @pytest.mark.asyncio
-async def test_theme_agent_returns_theme() -> None:
-    model = TestModel()
-    agent = build_theme_agent(model)
+@pytest.mark.parametrize("native_output", [False, True])
+async def test_theme_agent_returns_theme(native_output: bool) -> None:
+    model = (
+        TestModel(
+            custom_output_text=Theme(
+                title="t", setting="s", premise="p", keywords=[]
+            ).model_dump_json(),
+            profile={"supports_json_schema_output": True},
+        )
+        if native_output
+        else TestModel()
+    )
+    agent = build_theme_agent(model, native_output=native_output)
     result = await agent.run("propose a theme")
     assert isinstance(result.output, Theme)
+    assert (
+        isinstance(agent.output_type, NativeOutput) if native_output else agent.output_type is Theme
+    )
+    system_prompts = [
+        part.content
+        for message in result.all_messages()
+        for part in message.parts
+        if isinstance(part, SystemPromptPart)
+    ]
+    assert any(
+        "exactly one" in prompt and "structured Theme" in prompt for prompt in system_prompts
+    )
 
 
 @pytest.mark.asyncio
