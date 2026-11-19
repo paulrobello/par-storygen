@@ -43,7 +43,7 @@ def _build_flow(config: AppConfig) -> WizardFlow:
             text_model, native_output=config.text_config.provider == "ollama"
         ),  # pyright: ignore[reportArgumentType]
         character_agent_factory=lambda theme: agent_mod.build_character_agent(  # pyright: ignore[reportArgumentType]
-            text_model, theme=theme
+            text_model, theme=theme, native_output=config.text_config.provider == "ollama"
         ),
         blurb_agent_factory=lambda theme, characters, narration_style: agent_mod.build_blurb_agent(  # pyright: ignore[reportArgumentType]
             text_model,
@@ -52,7 +52,7 @@ def _build_flow(config: AppConfig) -> WizardFlow:
             narration_style=narration_style,
         ),
         adapt_agent_factory=lambda theme: agent_mod.build_adapt_backstory_agent(  # pyright: ignore[reportArgumentType]
-            text_model, theme=theme
+            text_model, theme=theme, native_output=config.text_config.provider == "ollama"
         ),
         image_provider=None,  # type: ignore[arg-type]  # built on-demand in build_initial_save
     )
@@ -109,13 +109,17 @@ async def wizard_confirm(
             native_output=config.text_config.provider == "ollama",
         ),  # pyright: ignore[reportArgumentType]
         character_agent_factory=lambda theme: agent_mod.build_character_agent(  # pyright: ignore[reportArgumentType]
-            build_text_model(config.text_config), theme=theme
+            build_text_model(config.text_config),
+            theme=theme,
+            native_output=config.text_config.provider == "ollama",
         ),
         blurb_agent_factory=lambda t, c, n: agent_mod.build_blurb_agent(  # pyright: ignore[reportArgumentType]
             build_text_model(config.text_config), theme=t, characters=c, narration_style=n
         ),
         adapt_agent_factory=lambda theme: agent_mod.build_adapt_backstory_agent(  # pyright: ignore[reportArgumentType]
-            build_text_model(config.text_config), theme=theme
+            build_text_model(config.text_config),
+            theme=theme,
+            native_output=config.text_config.provider == "ollama",
         ),
         image_provider=build_split_image_provider_for_wizard(config),
     )

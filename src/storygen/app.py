@@ -256,7 +256,7 @@ class StoryGenApp(App[None]):
         return CharacterCatalogScreen(
             browse=True,
             character_agent_factory=lambda: agent_mod.build_catalog_character_agent(
-                self._text_model
+                self._text_model, native_output=self._config.text_config.provider == "ollama"
             ),  # type: ignore[no-untyped-def]
             image_provider=self._image_provider,
             text_provider_label=self._config.text_config.provider,
@@ -276,7 +276,9 @@ class StoryGenApp(App[None]):
                     self._text_model, native_output=self._config.text_config.provider == "ollama"
                 ),  # pyright: ignore[reportArgumentType]
                 character_agent_factory=lambda theme: agent_mod.build_character_agent(  # pyright: ignore[reportArgumentType]
-                    self._text_model, theme=theme
+                    self._text_model,
+                    theme=theme,
+                    native_output=self._config.text_config.provider == "ollama",
                 ),
                 blurb_agent_factory=lambda theme, characters, narration_style: (
                     agent_mod.build_blurb_agent(  # pyright: ignore[reportArgumentType]
@@ -287,7 +289,9 @@ class StoryGenApp(App[None]):
                     )
                 ),
                 adapt_agent_factory=lambda theme: agent_mod.build_adapt_backstory_agent(  # pyright: ignore[reportArgumentType]
-                    self._text_model, theme=theme
+                    self._text_model,
+                    theme=theme,
+                    native_output=self._config.text_config.provider == "ollama",
                 ),
                 image_provider=self._image_provider,
             ),
@@ -440,15 +444,20 @@ class StoryGenApp(App[None]):
                 target_major_beats=save.target_major_beats,
                 reader_level=save.reader_level,
                 pacing=save.pacing,
+                native_output=save.text_config.provider == "ollama",
             ),
             on_usage=_on_usage,
         )
         illustration_agent = IllustrationAdapter(
-            agent_mod.build_illustration_agent(text_model),
+            agent_mod.build_illustration_agent(
+                text_model, native_output=save.text_config.provider == "ollama"
+            ),
             on_usage=_on_usage,
         )
         summary_agent = SummaryAdapter(
-            agent_mod.build_summary_agent(text_model),
+            agent_mod.build_summary_agent(
+                text_model, native_output=save.text_config.provider == "ollama"
+            ),
             on_usage=_on_usage,
         )
         # Each save pins its own image configs — build per-save routers so

@@ -62,15 +62,20 @@ def build_pipeline(
             target_major_beats=save.target_major_beats,
             reader_level=save.reader_level,
             pacing=save.pacing,
+            native_output=save.text_config.provider == "ollama",
         ),
         on_usage=_on_usage,
     )
     illustration_agent = IllustrationAdapter(
-        agent_mod.build_illustration_agent(text_model),
+        agent_mod.build_illustration_agent(
+            text_model, native_output=save.text_config.provider == "ollama"
+        ),
         on_usage=_on_usage,
     )
     summary_agent = SummaryAdapter(
-        agent_mod.build_summary_agent(text_model),
+        agent_mod.build_summary_agent(
+            text_model, native_output=save.text_config.provider == "ollama"
+        ),
         on_usage=_on_usage,
     )
 

@@ -434,7 +434,9 @@ async def _create_character(
     config = get_app_config()
     text_model = build_text_model(config.text_config)
 
-    agent = agent_mod.build_catalog_character_agent(text_model)
+    agent = agent_mod.build_catalog_character_agent(
+        text_model, native_output=config.text_config.provider == "ollama"
+    )
 
     prompt = body.concept
     if body.name:

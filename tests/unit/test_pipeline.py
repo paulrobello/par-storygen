@@ -2594,3 +2594,104 @@ async def test_pipeline_illustration_failure_raises_but_summary_still_lands(
 
     new_node_id = next(iter(set(save.nodes) - before_ids))
     assert save.nodes[new_node_id].summary_to_here == "recap text"
+
+
+@pytest.mark.parametrize(
+    ("native_output", "retry_dead_end"), [(False, False), (True, False), (True, True)]
+)
+async def test_real_beat_adapter_validates_then_emits_and_commits(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, native_output: bool, retry_dead_end: bool
+) -> None:
+    """The real structured agent feeds the app's delta/commit lifecycle, not JSON text."""
+    from pydantic_ai.messages import ModelMessage, ModelResponse, RetryPromptPart, TextPart
+    from pydantic_ai.models.function import AgentInfo, FunctionModel
+    from pydantic_ai.models.test import TestModel
+    from pydantic_ai.profiles import ModelProfile
+
+    from storygen.llm.agents import build_beat_agent
+    from storygen.runtime.adapters import BeatAgentAdapter
+
+    save = _bootstrap_save(tmp_path, monkeypatch)
+    beat = StoryBeat(
+        narration="The journey continues." if retry_dead_end else "The journey ends.",
+        choices=[Choice(id="onward", text="Continue")] if retry_dead_end else [],
+        is_major=False,
+        is_ending=not retry_dead_end,
+    )
+    events: list[tuple[str, str]] = []
+    requests = 0
+
+    def reply(messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
+        nonlocal requests
+        requests += 1
+        if requests == 1:
+            return ModelResponse(
+                parts=[
+                    TextPart(
+                        '{"narration":"Invalid dead end", "choices":[], "is_major":false, "is_ending":false}'
+                    )
+                ]
+            )
+        assert requests == 2
+        assert events == [] and set(save.nodes) == {"root"}
+        assert any(
+            isinstance(part, RetryPromptPart)
+            and "requires at least one choice" in part.model_response()
+            for message in messages
+            for part in message.parts
+        )
+        return ModelResponse(parts=[TextPart(beat.model_dump_json())])
+
+    profile = ModelProfile(supports_json_schema_output=True)
+    model = (
+        FunctionModel(reply, profile=profile)
+        if retry_dead_end
+        else TestModel(custom_output_text=beat.model_dump_json(), profile=profile)
+        if native_output
+        else TestModel(custom_output_args=beat.model_dump())
+    )
+    usage: list[object] = []
+
+    async def delta(text: str) -> None:
+        assert len(save.nodes) == 1  # validated narration precedes persistence
+        events.append(("delta", text))
+
+    async def committed(node: StoryNode) -> None:
+        assert save.nodes[node.id] is node
+        events.append(("commit", node.narration))
+
+    pipeline = BeatPipeline(
+        beat_agent=BeatAgentAdapter(
+            build_beat_agent(
+                model,
+                theme=save.theme,
+                tone=save.tone,
+                narration_style=save.narration_style,
+                native_output=native_output,
+            ),
+            on_usage=usage.append,
+        ),
+        illustration_agent=FakeIllustrationAgent(
+            IllustrationPlan(
+                should_illustrate=False,
+                image_prompt="",
+                featured_character_ids=[],
+                reasoning="quiet",
+            )
+        ),
+        summary_agent=None,
+        image_provider=FakeImageProvider(),
+        callbacks=PipelineCallbacks(on_narration_delta=delta, on_beat_committed=committed),
+    )
+    node = await pipeline.advance(save, from_node_id="root", choice_id="c1")
+    assert events == [("delta", beat.narration), ("commit", beat.narration)]
+    assert node.is_ending == beat.is_ending
+    assert [choice.id for choice in node.choices] == [choice.id for choice in beat.choices]
+    assert requests == (2 if retry_dead_end else 0)
+    assert usage
+    # Revisiting the committed choice is a cache replay, not another model call/delta.
+    events.clear()
+    replay = await pipeline.advance(save, from_node_id="root", choice_id="c1")
+    assert replay.id == node.id
+    assert events == [("commit", beat.narration)]
+    assert len(usage) == 1

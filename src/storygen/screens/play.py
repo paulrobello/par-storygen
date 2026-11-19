@@ -774,7 +774,9 @@ class PlayScreen(Screen[None]):
         from storygen.storage.tree import path_from_root
 
         text_model = build_text_model(self._save.text_config)
-        agent = build_recap_agent(text_model)
+        agent = build_recap_agent(
+            text_model, native_output=self._save.text_config.provider == "ollama"
+        )
 
         chain = path_from_root(self._save, self._save.current_node_id)
         parts: list[str] = [f"Story title: {self._save.theme.title}"]

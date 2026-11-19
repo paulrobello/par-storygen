@@ -83,7 +83,9 @@ class PresetPickerScreen(Screen[None]):
                 native_output=config.text_config.provider == "ollama",  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
             ),  # pyright: ignore[reportArgumentType]
             character_agent_factory=lambda theme: agent_mod.build_character_agent(  # pyright: ignore[reportArgumentType]
-                text_model, theme=theme
+                text_model,
+                theme=theme,
+                native_output=config.text_config.provider == "ollama",  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
             ),
             blurb_agent_factory=lambda theme, characters, narration_style: (
                 agent_mod.build_blurb_agent(  # pyright: ignore[reportArgumentType]
@@ -94,7 +96,9 @@ class PresetPickerScreen(Screen[None]):
                 )
             ),
             adapt_agent_factory=lambda theme: agent_mod.build_adapt_backstory_agent(  # pyright: ignore[reportArgumentType]
-                text_model, theme=theme
+                text_model,
+                theme=theme,
+                native_output=config.text_config.provider == "ollama",  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
             ),
             image_provider=app._image_provider,  # type: ignore[attr-defined]
         )

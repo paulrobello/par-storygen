@@ -61,6 +61,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **API + web test layer** — Added Python API/WebSocket/security/rate-limit tests, a vitest layer for the WS contract + config, and a hermetic Playwright e2e that drives the play surface against a mocked backend. (ARC-002/ARC-015)
 - **God-screen targeted extraction** — Separable pure logic pulled out of the four large screens into `src/storygen/screens/controllers/` (portraits outfit bookkeeping, settings image-model select logic, wizard confirm-summary builder), each unit-tested without a Textual `App`. The screens keep their `@work` workers and message handlers, which Textual pins in place by design. (ARC-012/QA-006)
 
+## [0.5.3] - 2026-11-19
+
+### Fixed
+
+- **Ollama structured story steps** — Extended native JSON-schema output beyond Theme to cast/catalog characters, backstory adaptation, beats, illustration plans, summaries, and recaps. Plain-text blurbs and other providers are unchanged; beat narration is still emitted only after validation and before the committed-beat callback.
+- **Prevent new non-ending beats without choices** — Reject and retry model output that would leave the reader without a next choice. Existing saves and valid endings are unchanged.
+
+### Verification
+
+- With Ollama 0.40.16 and `qwen2.5:32b-instruct` on macOS, verified Theme, cast, plain-text blurb, three persisted beats, rolling summary, catalog character, backstory adaptation, and illustration planning. That run exposed a non-ending beat with no choices and did not reach an ending; recap did not finish before the test cutoff. The subsequent validation fix is covered by an automated retry regression, not a follow-up live playthrough.
+
 ## [0.5.2] - 2026-11-19
 
 ### Fixed
@@ -293,7 +304,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
      will 404 until those tags exist on the remote. Do not push tags from
      docs work — tagging is a release-time, owner decision. -->
 
-[Unreleased]: https://github.com/paulrobello/par-storygen/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/paulrobello/par-storygen/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/paulrobello/par-storygen/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/paulrobello/par-storygen/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/paulrobello/par-storygen/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/paulrobello/par-storygen/compare/v0.4.0...v0.5.0

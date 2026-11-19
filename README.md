@@ -292,7 +292,9 @@ Set `OPENROUTER_API_KEY` and `STORYGEN_TEXT_PROVIDER=openrouter`. OpenRouter rou
 
 ### Ollama (text)
 
-In **0.5.2**, the Theme step requests exactly one theme and uses Ollama's native JSON-schema output. This avoids the output-tool retry failure reported with `qwen2.5:32b-instruct` ([#23](https://github.com/paulrobello/par-storygen/issues/23)); no special tool-name wording is needed in your prompt. The fix was live-tested with Ollama **0.40.16** on macOS. Other story steps still use tool calling, so choose a model that supports tools; this Theme test does not establish full-story compatibility or Windows verification.
+Starting in **0.5.3**, the Ollama provider uses native JSON-schema output for every structured story step: theme, cast and catalog characters, backstory adaptation, beats, illustration plans, summaries, and recaps. Plain-text blurbs remain plain text; OpenAI and OpenRouter keep their existing output-tool mode. This targets local or self-hosted Ollama instances, not Ollama Cloud.
+
+The initial Theme fix shipped in **0.5.2** and was live-tested with `qwen2.5:32b-instruct` on Ollama **0.40.16** on macOS; the reporter also confirmed that step on Windows ([#23](https://github.com/paulrobello/par-storygen/issues/23)). The 0.5.3 extension was tested with the same model on macOS through cast generation and three saved beats. A separate no-choice dead end from that run is covered by an automated regression; a full live playthrough and the 0.5.3 extension on Windows have not been verified.
 
 Set `STORYGEN_TEXT_PROVIDER=ollama` and run `ollama serve` locally (default: `http://localhost:11434`). No API key required. Known-good models: **`llama3.3:70b`** (good narration if you have the VRAM), **`qwen2.5:32b-instruct`** (lighter, faster). The model string must match the Ollama tag exactly. For remote Ollama, set `STORYGEN_TEXT_BASE_URL=http://<host>:11434/v1`.
 

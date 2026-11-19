@@ -224,15 +224,18 @@ class _FlakyRecapAgent:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("ollama", [False, True])
 async def test_generate_recap_retries_transient_network_error(
     monkeypatch: pytest.MonkeyPatch,
+    ollama: bool,
 ) -> None:
     agent = _FlakyRecapAgent()
 
     def _fake_text_model(_config: object) -> object:
         return object()
 
-    def _fake_recap_agent(_model: object) -> _FlakyRecapAgent:
+    def _fake_recap_agent(_model: object, *, native_output: bool) -> _FlakyRecapAgent:
+        assert native_output is ollama
         return agent
 
     monkeypatch.setattr("storygen.llm.provider_factory.build_text_model", _fake_text_model)
@@ -242,7 +245,10 @@ async def test_generate_recap_retries_transient_network_error(
         return None
 
     monkeypatch.setattr("storygen.screens.play.asyncio.sleep", _no_sleep)
-    screen = PlayScreen(_minimal_save(), pipeline=None, image_provider=None)  # type: ignore[arg-type]
+    save = _minimal_save()
+    if ollama:
+        save.text_config = TextProviderConfig(provider="ollama", model="qwen2.5:32b-instruct")
+    screen = PlayScreen(save, pipeline=None, image_provider=None)  # type: ignore[arg-type]
 
     recap = await screen._generate_recap()  # pyright: ignore[reportPrivateUsage]
 

@@ -31,11 +31,13 @@ def build_theme_agent(model: Model, *, native_output: bool = False) -> Agent[Non
     )
 
 
-def build_character_agent(model: Model, *, theme: Theme) -> Agent[None, list[Character]]:
+def build_character_agent(
+    model: Model, *, theme: Theme, native_output: bool = False
+) -> Agent[None, list[Character]]:
     """Build an agent that generates a character cast for the given theme."""
     return Agent(
         model=model,
-        output_type=list[Character],
+        output_type=NativeOutput(list[Character]) if native_output else list[Character],
         system_prompt=prompts.character_system_prompt(theme),
     )
 
@@ -49,11 +51,12 @@ def build_beat_agent(
     target_major_beats: int = DEFAULT_TARGET_MAJOR_BEATS,
     reader_level: ReaderLevel = "ages_11_15",
     pacing: Pacing = "moderate",
+    native_output: bool = False,
 ) -> Agent[None, StoryBeat]:
     """Build an agent that writes a single story beat."""
     return Agent(
         model=model,
-        output_type=StoryBeat,
+        output_type=NativeOutput(StoryBeat) if native_output else StoryBeat,
         system_prompt=prompts.beat_system_prompt(
             theme=theme,
             tone=tone,
@@ -65,11 +68,13 @@ def build_beat_agent(
     )
 
 
-def build_illustration_agent(model: Model) -> Agent[None, IllustrationPlan]:
+def build_illustration_agent(
+    model: Model, *, native_output: bool = False
+) -> Agent[None, IllustrationPlan]:
     """Build an agent that decides whether and how to illustrate a beat."""
     return Agent(
         model=model,
-        output_type=IllustrationPlan,
+        output_type=NativeOutput(IllustrationPlan) if native_output else IllustrationPlan,
         system_prompt=prompts.illustration_system_prompt(),
     )
 
@@ -89,7 +94,9 @@ def build_blurb_agent(
     )
 
 
-def build_adapt_backstory_agent(model: Model, *, theme: Theme) -> Agent[None, AdaptedBackstory]:
+def build_adapt_backstory_agent(
+    model: Model, *, theme: Theme, native_output: bool = False
+) -> Agent[None, AdaptedBackstory]:
     """Build an agent that rewrites a character's backstory for a new theme.
 
     The system prompt forbids changes to ``name``, ``personality``, or
@@ -99,34 +106,36 @@ def build_adapt_backstory_agent(model: Model, *, theme: Theme) -> Agent[None, Ad
     """
     return Agent(
         model=model,
-        output_type=AdaptedBackstory,
+        output_type=NativeOutput(AdaptedBackstory) if native_output else AdaptedBackstory,
         system_prompt=prompts.adapt_backstory_system_prompt(theme),
     )
 
 
-def build_summary_agent(model: Model) -> Agent[None, Summary]:
+def build_summary_agent(model: Model, *, native_output: bool = False) -> Agent[None, Summary]:
     """Build an agent that summarises the story so far."""
     return Agent(
         model=model,
-        output_type=Summary,
+        output_type=NativeOutput(Summary) if native_output else Summary,
         system_prompt=prompts.summary_system_prompt(),
     )
 
 
-def build_recap_agent(model: Model) -> Agent[None, Recap]:
+def build_recap_agent(model: Model, *, native_output: bool = False) -> Agent[None, Recap]:
     """Build an agent that writes a 'Previously on...' recap."""
     return Agent(
         model=model,
-        output_type=Recap,
+        output_type=NativeOutput(Recap) if native_output else Recap,
         system_prompt=prompts.recap_system_prompt(),
     )
 
 
-def build_catalog_character_agent(model: Model) -> Agent[None, list[Character]]:
+def build_catalog_character_agent(
+    model: Model, *, native_output: bool = False
+) -> Agent[None, list[Character]]:
     """Build an agent that generates a single character from a concept description."""
     return Agent(
         model=model,
-        output_type=list[Character],
+        output_type=NativeOutput(list[Character]) if native_output else list[Character],
         system_prompt=(
             "You are a character designer. Given a concept, create exactly ONE "
             "detailed character with: name, backstory (one paragraph), personality "

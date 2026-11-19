@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from storygen.core.models import Character
+from storygen.core.models import Character, TextProviderConfig
 from storygen.storage.library import library_reference_path
 from storygen_api.deps import get_wizard_image_provider
 from storygen_api.main import create_app
@@ -49,7 +49,13 @@ def test_create_character(
             ]
         )
     )
-    monkeypatch.setattr(characters, "get_app_config", lambda: SimpleNamespace(text_config=None))
+    monkeypatch.setattr(
+        characters,
+        "get_app_config",
+        lambda: SimpleNamespace(
+            text_config=TextProviderConfig(provider="ollama", model="qwen2.5:32b-instruct")
+        ),
+    )
     monkeypatch.setattr(characters, "build_text_model", MagicMock(return_value=None))
     factory = MagicMock(return_value=SimpleNamespace(run=run))
     monkeypatch.setattr(characters.agent_mod, "build_catalog_character_agent", factory)
@@ -72,6 +78,7 @@ def test_create_character(
     assert entry["name"] == "Alyx"
     assert entry["has_reference_image"] is with_reference
     run.assert_awaited_once_with("Create a character named 'Alyx'. a scholar")
+    factory.assert_called_once_with(None, native_output=True)
     portrait.assert_awaited_once()
     assert portrait.await_args is not None
     assert portrait.await_args.kwargs.get("reference_image") == (_png() if with_reference else None)

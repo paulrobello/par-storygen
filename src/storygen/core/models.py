@@ -214,9 +214,11 @@ class StoryBeat(BaseModel):
     relationship_updates: list[Relationship] = Field(default_factory=list[Relationship])
 
     @model_validator(mode="after")
-    def _ending_has_no_choices(self) -> StoryBeat:
+    def _validate_ending_choices(self) -> StoryBeat:
         if self.is_ending and self.choices:
             raise ValueError("is_ending=True forbids choices")
+        if not self.is_ending and not self.choices:
+            raise ValueError("is_ending=False requires at least one choice")
         return self
 
 
