@@ -7,9 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-11-20
+
 <!-- 2026-07-16 audit remediation (SEC-101..107, ARC-101..116, QA-001..019, DOC-001..015) -->
 
 ### Fixed
+
+- **Branch prefetch preserves generated choices** when sibling choices finish together. If a branch is pruned while work is pending, late results are discarded and the branch stays deleted. (#25)
 
 - **Windows correctness verified on a live Windows 11 ARM64 VM** — The full suite now passes on Windows (1162 passed, 1 intentionally skipped symlink test; was 43-44 failures on 0.5.3). Fixes the live run surfaced: persisted relative asset paths (portraits, scenes, covers) were written with `\` separators on Windows via `str(Path.relative_to())`, corrupting paths stored in `game.json` — all 16 producers now go through `paths.game_relative()`, which always stores forward slashes (legacy backslash paths still load: `Path` parses both separators on Windows); the offline image-model migration crashed applying on Windows because fsyncing a directory fd is POSIX-only; and the app-state cache key now includes file size beside mtime, since Windows mtime granularity collapsed same-tick rewrites into stale cache hits (the intermittently failing wizard-clamps test). (#23)
 
@@ -21,11 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Provider dependency updates** — Updated the OpenAI SDK to 3.57, Pydantic AI to 2.71, and `par-cli-tts` to 0.7.0 to pick up current dependency fixes. Google GenAI and Tenacity stay on their compatible release lines.
+
 - **Static-asset side-door closed + client auth wired** — Removed the unauthenticated `games_root` static mount that served `game.json` and the LLM cache over `/api/images/*`; every image/audio asset now flows through an existing token-gated router route. The web frontend can now present the bearer token (`NEXT_PUBLIC_API_TOKEN`) on REST calls and the WebSocket `bearer.<token>` subprotocol; WebSocket `advance` frames are rate-limited like REST; `/api/presets` is token-gated; preset-name slugs are sanitized; CORS `allow_credentials` is `False`. (SEC-101…107)
 
 ### Changed
 
-- **Dependency refresh** — Updated the Python and web dependency graphs to current compatible releases, including Next.js 16.4.6, FastAPI 0.165, Vitest 5.1, and jsdom 31. OpenAI stays on 2.x because `par-cli-tts` requires it, which also constrains Pydantic AI and Google GenAI; Textual-pyfiglet stays on 1.0 for Textual 8 compatibility. TypeScript stays on 6.0 because the lint stack does not support TypeScript 7 yet. Removed the stale global Babel pin so consumers resolve their supported Babel 7 release.
+- **Dependency refresh** — Updated the Python and web dependency graphs to current compatible releases, including Next.js 16.4.6, FastAPI 0.165, Vitest 5.1, and jsdom 31. Textual-pyfiglet stays on 1.0 for Textual 8 compatibility. TypeScript stays on 6.0 because the lint stack does not support TypeScript 7 yet. Removed the stale global Babel pin so consumers resolve their supported Babel 7 release.
 
 - **OpenAI model retirement migration** — Default text model is now `gpt-6-luna` (was `gpt-4o-mini`); OpenAI's recommended replacement ahead of the January 14, 2027 retirement of `gpt-4o` / `gpt-4o-mini` / `gpt-4.1` / `gpt-4.1-mini`. Image suggestions drop the retiring `gpt-image-1` (October 23, 2026) and `gpt-image-1.5` (December 1, 2026) for `gpt-image-2.5-sunburst` / `gpt-image-2.5-flare`; the `gpt-image-2` default is unaffected. Registry, app-state defaults, docs, and pinned tests updated.
 - **Story-quality prompt overhaul** — The beat system prompt now anchors on the theme's premise (previously the model was told to resolve "the central conflict" without ever being told what it is); pacing guidance states explicit major-beat progress units and fixes the short-story tighten-threshold floor so short stories no longer overrun before tightening; a runaway pacing guard force-advances the climax/resolve tier from raw beat count if the model under-marks `is_major`; choice-design rules require distinct directions with a ~12-word cap and no filler; continuation rules require enacting the chosen action and honoring established facts; the running summary is restructured into plot/decisions, character changes, current situation, open threads, and established facts; new-character introductions are capped at one per beat; the CAST prompt no longer duplicates a character's backstory-summary sentence when the full backstory is included; and the root node's opening blurb is explicitly labeled as marketing copy rather than in-story narration.
@@ -314,7 +320,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
      will 404 until those tags exist on the remote. Do not push tags from
      docs work — tagging is a release-time, owner decision. -->
 
-[Unreleased]: https://github.com/paulrobello/par-storygen/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/paulrobello/par-storygen/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/paulrobello/par-storygen/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/paulrobello/par-storygen/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/paulrobello/par-storygen/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/paulrobello/par-storygen/compare/v0.5.0...v0.5.1

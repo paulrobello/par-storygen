@@ -6,7 +6,7 @@ import base64
 import json
 from unittest.mock import AsyncMock
 
-import httpx
+import httpx2
 import pytest
 from openai import APIStatusError, AsyncOpenAI
 
@@ -15,11 +15,11 @@ from storygen.images.openai_provider import OpenAIImageProvider
 
 @pytest.mark.asyncio
 async def test_no_reference_portrait_sdk_request_and_response() -> None:
-    requests: list[httpx.Request] = []
+    requests: list[httpx2.Request] = []
 
-    def respond(request: httpx.Request) -> httpx.Response:
+    def respond(request: httpx2.Request) -> httpx2.Response:
         requests.append(request)
-        return httpx.Response(
+        return httpx2.Response(
             200,
             json={"created": 0, "data": [{"b64_json": base64.b64encode(b"PNG").decode()}]},
         )
@@ -28,7 +28,7 @@ async def test_no_reference_portrait_sdk_request_and_response() -> None:
         api_key="unused-local-test-value",
         base_url="https://api.openai.com/v1",
         max_retries=0,
-        http_client=httpx.AsyncClient(transport=httpx.MockTransport(respond)),
+        http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(respond)),
     ) as client:
         provider = OpenAIImageProvider(client=client)
         assert await provider.generate_portrait("A scholar", transparent=True) == b"PNG"
@@ -58,11 +58,11 @@ async def test_no_reference_sdk_error_survives_provider_retries(
     monkeypatch: pytest.MonkeyPatch, status: int, code: str
 ) -> None:
     monkeypatch.setattr("asyncio.sleep", AsyncMock())
-    requests: list[httpx.Request] = []
+    requests: list[httpx2.Request] = []
 
-    def respond(request: httpx.Request) -> httpx.Response:
+    def respond(request: httpx2.Request) -> httpx2.Response:
         requests.append(request)
-        return httpx.Response(
+        return httpx2.Response(
             status,
             headers={"x-request-id": "local-test-request"},
             json={
@@ -78,7 +78,7 @@ async def test_no_reference_sdk_error_survives_provider_retries(
         api_key="unused-local-test-value",
         base_url="https://api.openai.com/v1",
         max_retries=0,
-        http_client=httpx.AsyncClient(transport=httpx.MockTransport(respond)),
+        http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(respond)),
     ) as client:
         provider = OpenAIImageProvider(client=client)
         with pytest.raises(APIStatusError) as raised:
@@ -98,9 +98,9 @@ async def test_no_reference_response_without_base64_is_reported(
         api_key="unused-local-test-value",
         base_url="https://api.openai.com/v1",
         max_retries=0,
-        http_client=httpx.AsyncClient(
-            transport=httpx.MockTransport(
-                lambda _: httpx.Response(200, json={"created": 0, "data": [{}]})
+        http_client=httpx2.AsyncClient(
+            transport=httpx2.MockTransport(
+                lambda _: httpx2.Response(200, json={"created": 0, "data": [{}]})
             )
         ),
     ) as client:
@@ -111,11 +111,11 @@ async def test_no_reference_response_without_base64_is_reported(
 
 @pytest.mark.asyncio
 async def test_reference_portrait_v26_sdk_multipart_request() -> None:
-    requests: list[httpx.Request] = []
+    requests: list[httpx2.Request] = []
 
-    def respond(request: httpx.Request) -> httpx.Response:
+    def respond(request: httpx2.Request) -> httpx2.Response:
         requests.append(request)
-        return httpx.Response(
+        return httpx2.Response(
             200, json={"created": 0, "data": [{"b64_json": base64.b64encode(b"PNG").decode()}]}
         )
 
@@ -123,7 +123,7 @@ async def test_reference_portrait_v26_sdk_multipart_request() -> None:
         api_key="unused-local-test-value",
         base_url="https://api.openai.com/v1",
         max_retries=0,
-        http_client=httpx.AsyncClient(transport=httpx.MockTransport(respond), trust_env=False),
+        http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(respond), trust_env=False),
     ) as client:
         provider = OpenAIImageProvider(client=client)
         assert (

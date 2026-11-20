@@ -30,7 +30,7 @@ from storygen.pipeline_prefetch import _PREFETCH_CONCURRENCY  # pyright: ignore[
 from storygen.pipeline_prompts import (
     pacing_hint_for_depth as _pacing_hint_for_depth,
 )
-from storygen.storage.save import GameSave, save_game
+from storygen.storage.save import GameSave, load_game, prune_subtree, save_game
 
 
 class FakeBeatAgent:
@@ -299,6 +299,151 @@ async def test_concurrent_sibling_advances_keep_every_parent_link(
     assert links == {f"c{i}": nodes[i].id for i in range(3)}
 
 
+@pytest.mark.parametrize("remove_parent", [False, True])
+async def test_prefetch_discards_beat_if_target_is_removed_during_model_call(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, remove_parent: bool
+) -> None:
+    save = _bootstrap_save(tmp_path, monkeypatch)
+    beat = StoryBeat(
+        narration="A traveler arrives.",
+        choices=[Choice(id="next", text="continue")],
+        is_major=False,
+        is_ending=False,
+        new_characters=[_char("new", "New traveler")],
+    )
+    plan = IllustrationPlan(
+        should_illustrate=False, image_prompt="", featured_character_ids=[], reasoning=""
+    )
+    pending = asyncio.Event()
+    finish = asyncio.Event()
+
+    class BlockingBeatAgent:
+        async def run(
+            self, prompt: str, on_narration_delta: Any, raw_sink: Any = None
+        ) -> StoryBeat:
+            pending.set()
+            await finish.wait()
+            return beat
+
+    initializer = BeatPipeline(
+        beat_agent=FakeBeatAgent(beat.model_copy(update={"new_characters": []})),
+        illustration_agent=FakeIllustrationAgent(plan),
+        summary_agent=None,
+        image_provider=FakeImageProvider(),
+    )
+    parent = await initializer.advance(save, from_node_id="root", choice_id="c1")
+    illustration = FakeIllustrationAgent(plan)
+    pipeline = BeatPipeline(
+        beat_agent=BlockingBeatAgent(),
+        illustration_agent=illustration,
+        summary_agent=None,
+        image_provider=FakeImageProvider(),
+    )
+    pipeline.start_prefetch(save, from_node_id=parent.id, with_images=False)
+    try:
+        await pending.wait()
+        if remove_parent:
+            prune_subtree(save, node_id=parent.id)
+        else:
+            # Keep the parent but replace the choice selected by the in-flight task.
+            save.nodes[parent.id] = parent.model_copy(
+                update={"choices": [StoredChoice(id="other", text="Another way")]}
+            )
+            save_game(save)
+        before = save.model_dump()
+        finish.set()
+        assert (
+            await pipeline.await_prefetched(save, from_node_id=parent.id, choice_id="next") is None
+        )
+        assert save.model_dump() == before
+        assert load_game(str(save.id)).model_dump() == before
+        assert illustration.calls == 0
+    finally:
+        await pipeline.cancel_all_prefetches()
+
+
+async def test_pruned_cached_prefetch_is_not_returned_to_live_picker(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    save = _bootstrap_save(tmp_path, monkeypatch)
+    beat_agent = FakeBeatAgent(
+        StoryBeat(narration="The end.", choices=[], is_major=False, is_ending=True)
+    )
+    pipeline = BeatPipeline(
+        beat_agent=beat_agent,
+        illustration_agent=FakeIllustrationAgent(
+            IllustrationPlan(
+                should_illustrate=False, image_prompt="", featured_character_ids=[], reasoning=""
+            )
+        ),
+        summary_agent=None,
+        image_provider=FakeImageProvider(),
+    )
+    # Wait on the background task without consuming its cached result.
+    pipeline.start_prefetch(save, from_node_id="root", with_images=False)
+    cached = await pipeline._prefetch._tasks[("root", "c1")]  # pyright: ignore[reportPrivateUsage]
+    assert cached is not None
+    prune_subtree(save, node_id=cached.id)
+    fresh = await pipeline.advance(save, from_node_id="root", choice_id="c1")
+    assert fresh.id != cached.id
+    assert cached.id not in save.nodes
+    assert save.current_node_id == fresh.id
+    assert save.nodes["root"].choices[0].child_node_id == fresh.id
+    assert beat_agent.calls == 2
+
+
+async def test_prefetch_drops_late_summary_and_art_after_committed_node_is_pruned(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    save = _bootstrap_save(tmp_path, monkeypatch)
+    started_summary = asyncio.Event()
+    started_plan = asyncio.Event()
+    release = asyncio.Event()
+
+    class BlockingSummaryAgent:
+        async def run(self, path_summary_prompt: str, raw_sink: Any = None) -> Summary:
+            started_summary.set()
+            await release.wait()
+            return Summary(text="A late summary.")
+
+    class BlockingIllustrationAgent:
+        async def run(
+            self, beat: StoryBeat, characters: list[Character], raw_sink: Any = None
+        ) -> IllustrationPlan:
+            started_plan.set()
+            await release.wait()
+            return IllustrationPlan(
+                should_illustrate=True,
+                image_prompt="A late scene.",
+                featured_character_ids=[],
+                reasoning="",
+            )
+
+    provider = FakeImageProvider()
+    pipeline = BeatPipeline(
+        beat_agent=FakeBeatAgent(
+            StoryBeat(narration="The end.", choices=[], is_major=True, is_ending=True)
+        ),
+        illustration_agent=BlockingIllustrationAgent(),
+        summary_agent=BlockingSummaryAgent(),
+        image_provider=provider,
+    )
+    pipeline.start_prefetch(save, from_node_id="root", with_images=True)
+    try:
+        await asyncio.gather(started_summary.wait(), started_plan.wait())
+        cached_id = save.nodes["root"].choices[0].child_node_id
+        assert cached_id is not None
+        prune_subtree(save, node_id=cached_id)
+        before = save.model_dump()
+        release.set()
+        assert await pipeline.await_prefetched(save, from_node_id="root", choice_id="c1") is None
+        assert save.model_dump() == before
+        assert load_game(str(save.id)).model_dump() == before
+        assert provider.scenes == []
+    finally:
+        await pipeline.cancel_all_prefetches()
+
+
 @pytest.mark.asyncio
 async def test_pipeline_triggers_scene_image_when_planned(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -459,7 +604,7 @@ async def test_pipeline_new_character_portrait_cost_uses_character_config(
         callbacks=PipelineCallbacks(),
     )
 
-    await pipeline._portraits(save, [new_char])  # pyright: ignore[reportPrivateUsage]
+    await pipeline._portraits(save, [new_char], node_id="root")  # pyright: ignore[reportPrivateUsage]
 
     assert save.total_image_cost_usd == pytest.approx(0.067)  # pyright: ignore[reportUnknownMemberType]
 
@@ -2648,7 +2793,14 @@ async def test_real_beat_adapter_validates_then_emits_and_commits(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, native_output: bool, retry_dead_end: bool
 ) -> None:
     """The real structured agent feeds the app's delta/commit lifecycle, not JSON text."""
-    from pydantic_ai.messages import ModelMessage, ModelResponse, RetryPromptPart, TextPart
+    from pydantic_ai import capture_run_messages
+    from pydantic_ai.messages import (
+        ModelMessage,
+        ModelResponse,
+        RetryFeedbackPart,
+        TextPart,
+        UserPromptPart,
+    )
     from pydantic_ai.models.function import AgentInfo, FunctionModel
     from pydantic_ai.models.test import TestModel
     from pydantic_ai.profiles import ModelProfile
@@ -2680,8 +2832,9 @@ async def test_real_beat_adapter_validates_then_emits_and_commits(
         assert requests == 2
         assert events == [] and set(save.nodes) == {"root"}
         assert any(
-            isinstance(part, RetryPromptPart)
-            and "requires at least one choice" in part.model_response()
+            isinstance(part, UserPromptPart)
+            and isinstance(part.content, str)
+            and "requires at least one choice" in part.content
             for message in messages
             for part in message.parts
         )
@@ -2728,7 +2881,18 @@ async def test_real_beat_adapter_validates_then_emits_and_commits(
         image_provider=FakeImageProvider(),
         callbacks=PipelineCallbacks(on_narration_delta=delta, on_beat_committed=committed),
     )
-    node = await pipeline.advance(save, from_node_id="root", choice_id="c1")
+    with capture_run_messages() as history:
+        node = await pipeline.advance(save, from_node_id="root", choice_id="c1")
+    feedback = [
+        part for message in history for part in message.parts if isinstance(part, RetryFeedbackPart)
+    ]
+    if retry_dead_end:
+        assert len(feedback) == 1
+        retry = feedback[0].retry
+        assert retry.cause == "validation_error"
+        assert retry.attempt == 1
+    else:
+        assert feedback == []
     assert events == [("delta", beat.narration), ("commit", beat.narration)]
     assert node.is_ending == beat.is_ending
     assert [choice.id for choice in node.choices] == [choice.id for choice in beat.choices]

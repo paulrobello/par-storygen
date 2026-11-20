@@ -52,15 +52,14 @@ dependencies = [
     # intentional bump here. uv.lock pins the exact resolved version.
     "textual>=8.2.8,<9",
     "pydantic>=2.14.4",
-    # Newer pydantic-ai requires OpenAI 3.x, blocked by par-cli-tts.
-    "pydantic-ai>=2.31.1,<3",
-    # par-cli-tts 0.6.1 requires OpenAI 2.x.
-    "openai>=2.54.0,<3",
+    "pydantic-ai>=2.71.0,<3",
+    "openai>=3.57.0,<4",
     "rich>=15.0.0",
     "par-textual-image>=0.1.0",
     "typer>=0.29.2",
     "xdg-base-dirs>=6.1.0",
-    "httpx>=0.28.1",
+    # Share SOCKS transport support with the OpenAI SDK's HTTPX2 client.
+    "httpx[socks]>=0.28.1",
     "pillow>=13.0.0",
     # Google GenAI requires tenacity<9.2; keep the latest compatible release.
     "tenacity>=9.1.4,<9.2",
@@ -70,7 +69,7 @@ dependencies = [
     "google-genai>=2.34.0,<3",
     # textual-pyfiglet 1.1 requires Textual<6; retain the compatible widget release.
     "textual-pyfiglet>=1.0.0,<1.1",
-    "par-cli-tts>=0.6.1",
+    "par-cli-tts>=0.7.0",
 ]
 packages = [
     "src/storygen",
@@ -110,6 +109,7 @@ dev = [
     "pytest-asyncio>=1.5.0",
     "pytest-cov>=7.1.0",
     "pytest-mock>=3.17.0",
+    "httpx2>=2.12.0,<3",
     "pytest-timeout>=2.4.0",
     "ruff>=0.17.6",
     "pyright>=1.1.414",

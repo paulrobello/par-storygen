@@ -14,7 +14,7 @@ from types import SimpleNamespace
 from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
-import httpx
+import httpx2
 import pytest
 from openai import PermissionDeniedError
 from pydantic_ai.exceptions import ModelHTTPError
@@ -29,13 +29,13 @@ from storygen.screens.library_browser import CharacterCatalogScreen
 
 
 def _provider_error() -> PermissionDeniedError:
-    request = httpx.Request(
+    request = httpx2.Request(
         "POST",
         "https://api.openai.com/v1/images/generations",
         headers={"Authorization": "Bearer sk-PRIVATE-TEST"},
         json={"prompt": "PRIVATE PROMPT", "image": "PRIVATE IMAGE DATA"},
     )
-    response = httpx.Response(403, request=request, headers={"x-request-id": "req_local_test"})
+    response = httpx2.Response(403, request=request, headers={"x-request-id": "req_local_test"})
     return PermissionDeniedError(
         "PRIVATE PROMPT Bearer sk-PRIVATE-TEST PRIVATE IMAGE DATA",
         response=response,

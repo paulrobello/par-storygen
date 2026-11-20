@@ -46,6 +46,10 @@ _logger = logging.getLogger(__name__)
 _PREFETCH_CONCURRENCY: int = 3
 
 
+class AdvanceDiscarded(ValueError):
+    """The branch changed while a generation task was awaiting its result."""
+
+
 class PrefetchCoordinator:
     """Background prefetch lifecycle for :class:`storygen.pipeline.BeatPipeline`.
 
@@ -151,6 +155,8 @@ class PrefetchCoordinator:
                     skip_image=not with_images,
                     suppress_side_effects=True,
                 )
+        except AdvanceDiscarded:
+            return None  # Pruned work is not a provider failure.
         except Exception as exc:
             # Silent failure is the contract — prefetch must NEVER surface
             # errors to the UI; the caller falls through to a normal
@@ -173,7 +179,7 @@ class PrefetchCoordinator:
         # a missed audio synth just means the user hears a brief generate
         # delay on pick.
         await self._maybe_pregenerate_tts(save, result)
-        return result
+        return save.nodes.get(result.id)
 
     async def _maybe_pregenerate_tts(self, save: GameSave, node: StoryNode) -> None:
         """Synthesize ``node.narration`` into the cache when the user has opted in.
@@ -183,7 +189,12 @@ class PrefetchCoordinator:
         are caught and logged at debug — prefetch never surfaces failures.
         """
         player = self._tts_player
-        if player is None or not player.is_configured or not node.narration:
+        if (
+            player is None
+            or not player.is_configured
+            or not node.narration
+            or node.id not in save.nodes
+        ):
             return
         tts_prefs = app_state.read_tts_prefs()
         if not tts_prefs.pregenerate_prefetch_audio:
@@ -201,6 +212,14 @@ class PrefetchCoordinator:
         if cache_path is None:
             _logger.debug("TTS pregeneration skipped (synth returned None) for node %s", node.id)
             return
+        current_node = save.nodes.get(node.id)
+        if current_node is None:
+            # Prune already cleaned old audio; this synth may have just written
+            # a fresh cache file for the removed node.
+            with contextlib.suppress(OSError):
+                cache_path.unlink(missing_ok=True)
+            return
+        node = current_node
         relative = relative_tts_cache_path(player, node.id, tts_prefs)
         if node.tts_audio_path != relative:
             node.tts_audio_path = relative
@@ -231,7 +250,7 @@ class PrefetchCoordinator:
         if task is None:
             return None
         try:
-            return await task
+            result = await task
         except Exception:
             # ``_prefetch_one`` already swallows + dedup-logs the normal
             # failure path; reaching here means the task was cancelled or
@@ -245,6 +264,15 @@ class PrefetchCoordinator:
                 exc_info=True,
             )
             return None
+        parent = save.nodes.get(from_node_id)
+        # A task may have finished, but pruning can occur before it is picked.
+        if (
+            result is None
+            or parent is None
+            or not any(c.id == choice_id and c.child_node_id == result.id for c in parent.choices)
+        ):
+            return None
+        return save.nodes.get(result.id)
 
     async def cancel_all(self) -> None:
         """Cancel any in-flight prefetch tasks and await their cleanup.

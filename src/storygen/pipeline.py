@@ -41,7 +41,7 @@ from storygen.images.constants import (
     SCENE_SIZE,
 )
 from storygen.images.pricing import image_cost
-from storygen.pipeline_prefetch import PrefetchCoordinator
+from storygen.pipeline_prefetch import AdvanceDiscarded, PrefetchCoordinator
 from storygen.pipeline_prompts import build_beat_prompt as _build_beat_prompt
 from storygen.pipeline_prompts import hard_ending_due
 from storygen.storage import app_state, paths
@@ -230,7 +230,7 @@ class BeatPipeline:
                 shared pipeline object.
 
         Raises:
-            ValueError: if `choice_id` is not found on the `from_node_id` node.
+            ValueError: if the requested branch is missing or changes during generation.
 
         Note on concurrency: callers must serialize live `advance` calls for the
         same (from_node_id, choice_id) pair — typically via PlayScreen's
@@ -261,10 +261,7 @@ class BeatPipeline:
                 await self._maybe_deferred_illustration(save, prefetched, callbacks=cb)
                 return prefetched
 
-        parent = save.nodes[from_node_id]
-        choice = next((c for c in parent.choices if c.id == choice_id), None)
-        if choice is None:
-            raise ValueError(f"choice {choice_id!r} not found on node {from_node_id!r}")
+        _, choice = _current_choice(save, from_node_id, choice_id)
 
         # --- Cache hit ---
         # Use .get() because the LLM occasionally fills in child_node_id with
@@ -280,9 +277,7 @@ class BeatPipeline:
                     await cb.on_beat_committed(existing)
                     await self._maybe_deferred_illustration(save, existing, callbacks=cb)
                 return existing
-            # Bogus link — clear it so we don't repeatedly hit the same miss
-            # and persist the cleanup once we re-write the parent below.
-            choice.child_node_id = None
+            # A dangling link is replaced only if generation can commit.
 
         # --- Stage 1: stream beat ---
         # Allocate the new node id BEFORE the LLM call so the raw-exchange
@@ -291,15 +286,36 @@ class BeatPipeline:
         # filesystem or LLM dependency. All downstream code that previously
         # referenced ``new_node_id`` continues to work unchanged.
         new_node_id = uuid.uuid4().hex
-        beat_prompt = _build_beat_prompt(save, from_node_id, choice.text)
+        choice_text = choice.text
+        beat_prompt = _build_beat_prompt(save, from_node_id, choice_text)
         narration_cb: Callable[[str], Awaitable[None]] = (
             (lambda _d: _noop()) if suppress_side_effects else cb.on_narration_delta
         )
+        raw_sink = self._maybe_build_raw_sink(str(save.id), new_node_id, "beat")
+
+        def record_beat_exchange(raw: bytes) -> None:
+            # The adapter reports raw output before returning to this coroutine.
+            # Avoid writing a debug sidecar if its target was already pruned.
+            parent = save.nodes.get(from_node_id)
+            if (
+                raw_sink is not None
+                and parent is not None
+                and any(c.id == choice_id and c.text == choice_text for c in parent.choices)
+            ):
+                raw_sink(raw)
+
         beat = await self._beat.run(
             beat_prompt,
             narration_cb,
-            raw_sink=self._maybe_build_raw_sink(str(save.id), new_node_id, "beat"),
+            raw_sink=record_beat_exchange if raw_sink is not None else None,
         )
+        # Awaiting the model gives another action time to prune the parent or
+        # replace its choices. Re-read before pacing or mutating any save state.
+        parent, live_choice = _current_choice(save, from_node_id, choice_id)
+        if live_choice.text != choice_text or (
+            live_choice.child_node_id is not None and live_choice.child_node_id in save.nodes
+        ):
+            raise AdvanceDiscarded(f"choice {choice_id!r} changed during generation")
         # Hard ending cap (issue #23): local models ignore the escalating
         # ending pressure and can run for dozens of beats past target. Past
         # the cap the beat prompt already demanded a final beat; if the model
@@ -330,11 +346,7 @@ class BeatPipeline:
             created_at=datetime.now(UTC),
         )
         save.nodes[new_node_id] = new_node
-        # Update the parent choice to point at the new node. Re-read the parent:
-        # prefetches for sibling choices run concurrently and may have linked
-        # their children while this beat was generating. Writing back the copy
-        # read before the await would drop those links and orphan the nodes.
-        parent = save.nodes[from_node_id]
+        # Use the latest parent to preserve concurrent sibling links.
         updated_choices = [
             c.model_copy(update={"child_node_id": new_node_id}) if c.id == choice_id else c
             for c in parent.choices
@@ -370,6 +382,9 @@ class BeatPipeline:
             self._maybe_generate_summary(save, beat, new_node_id),
             return_exceptions=True,
         )
+        committed = save.nodes.get(new_node_id)
+        if committed is None:
+            raise AdvanceDiscarded(f"node {new_node_id!r} was pruned during generation")
         for result in results:
             if isinstance(result, BaseException):
                 # _maybe_generate_summary swallows its own agent failures, so
@@ -377,7 +392,7 @@ class BeatPipeline:
                 # keep prior error-surfacing semantics regardless of source.
                 raise result
 
-        return save.nodes[new_node_id]
+        return committed
 
     def _merge_new_characters(self, save: GameSave, beat: StoryBeat, new_node_id: str) -> None:
         """Introduce new characters from the beat and merge relationship updates.
@@ -410,7 +425,7 @@ class BeatPipeline:
         a recap, and stores it on the node. Failures are logged and swallowed
         — the story continues without a recap anchor rather than crashing.
         """
-        if not beat.is_major or self._summary is None:
+        if not beat.is_major or self._summary is None or new_node_id not in save.nodes:
             return
         prev_summary, segment = segment_since_last_summary(save, new_node_id)
         parts: list[str] = []
@@ -438,7 +453,10 @@ class BeatPipeline:
                 exc_info=True,
             )
         else:
-            updated = save.nodes[new_node_id].model_copy(update={"summary_to_here": summary.text})
+            node = save.nodes.get(new_node_id)
+            if node is None:
+                return
+            updated = node.model_copy(update={"summary_to_here": summary.text})
             save.nodes[new_node_id] = updated
             save.updated_at = datetime.now(UTC)
             save_game(save)
@@ -607,7 +625,9 @@ class BeatPipeline:
             # call (saves tokens) and any portrait generation; leave the node's
             # image_* fields at their initial "not_planned" defaults.
             return
-        portrait_task = asyncio.create_task(self._portraits(save, new_characters))
+        if node.id not in save.nodes:
+            return
+        portrait_task = asyncio.create_task(self._portraits(save, new_characters, node_id=node.id))
         try:
             plan = await self._illustration.run(
                 StoryBeat(
@@ -623,7 +643,10 @@ class BeatPipeline:
         finally:
             await portrait_task
 
-        updated = save.nodes[node.id].model_copy(
+        current_node = save.nodes.get(node.id)
+        if current_node is None:
+            return
+        updated = current_node.model_copy(
             update={
                 "image_prompt": plan.image_prompt or None,
                 "illustration_reasoning": plan.reasoning,
@@ -670,6 +693,10 @@ class BeatPipeline:
         """
         if not app_state.art_enabled():
             return
+        current_node = save.nodes.get(node.id)
+        if current_node is None:
+            return
+        node = current_node
         if node.image_status != "not_planned" or not node.image_prompt:
             return
         plan = IllustrationPlan(
@@ -688,7 +715,9 @@ class BeatPipeline:
         _background_tasks.add(task)
         task.add_done_callback(_background_tasks.discard)
 
-    async def _portraits(self, save: GameSave, new_characters: list[Character]) -> None:
+    async def _portraits(
+        self, save: GameSave, new_characters: list[Character], *, node_id: str
+    ) -> None:
         """Generate reference portraits for newly introduced characters.
 
         Mid-story characters are persisted with the same shape as wizard-time
@@ -710,6 +739,8 @@ class BeatPipeline:
             return
         save_id = str(save.id)
         for char in new_characters:
+            if node_id not in save.nodes:
+                return
             try:
                 portrait_bytes = await self._image.generate_portrait(
                     char.physical_description,
@@ -729,6 +760,8 @@ class BeatPipeline:
                     exc_info=True,
                 )
                 continue
+            if node_id not in save.nodes:
+                return
             save.total_image_cost_usd += image_cost(
                 save.character_image_config.provider,
                 model=save.character_image_config.model,
@@ -781,8 +814,11 @@ class BeatPipeline:
         )
 
         async def _on_partial(partial_bytes: bytes) -> None:
+            node = save.nodes.get(node_id)
+            if node is None:
+                return
             _atomic_write_png(dest, partial_bytes)
-            await cb.on_image_committed(save.nodes[node_id])
+            await cb.on_image_committed(node)
 
         try:
             refs: list[ReferencePortrait] = []
@@ -823,6 +859,9 @@ class BeatPipeline:
                 art_style=save.art_style,
                 on_partial=_on_partial if stream_partials else None,
             )
+            node = save.nodes.get(node_id)
+            if node is None:
+                raise AdvanceDiscarded(f"node {node_id!r} was pruned during illustration")
             _atomic_write_png(dest, scene_bytes)
             save.total_image_cost_usd += image_cost(
                 save.image_config.provider,
@@ -832,7 +871,7 @@ class BeatPipeline:
                 num_input_refs=len(refs),
                 partial_images=OPENAI_PARTIAL_IMAGES if stream_partials else 0,
             )
-            done = save.nodes[node_id].model_copy(
+            done = node.model_copy(
                 update={
                     "image_status": "done",
                     "image_path": rel_path,
@@ -842,7 +881,12 @@ class BeatPipeline:
             save_game(save)
             await cb.on_image_committed(done)
             return done
+        except AdvanceDiscarded:
+            raise
         except Exception:
+            node = save.nodes.get(node_id)
+            if node is None:
+                raise AdvanceDiscarded(f"node {node_id!r} was pruned during illustration") from None
             # Mark the node's image as failed and notify the UI, but log the
             # underlying cause so operators can diagnose silent blank-scene
             # bugs (provider outage, prompt policy refusal, etc.). The
@@ -854,7 +898,7 @@ class BeatPipeline:
                 save.id,
                 exc_info=True,
             )
-            failed = save.nodes[node_id].model_copy(update={"image_status": "failed"})
+            failed = node.model_copy(update={"image_status": "failed"})
             save.nodes[node_id] = failed
             save_game(save)
             await cb.on_image_failed(failed)
@@ -884,13 +928,30 @@ class BeatPipeline:
         rel_path = paths.game_relative(save_id, dest)
         # Pre-assign image_path so partial writes have a known target; status
         # stays "generating" until the final lands.
-        pre = save.nodes[node_id].model_copy(update={"image_path": rel_path})
+        node = save.nodes.get(node_id)
+        if node is None:
+            return
+        pre = node.model_copy(update={"image_path": rel_path})
         save.nodes[node_id] = pre
         save_game(save)
 
-        await self._render_scene(
-            save, node_id, plan.image_prompt, list(plan.featured_character_ids), cb=cb
-        )
+        try:
+            await self._render_scene(
+                save, node_id, plan.image_prompt, list(plan.featured_character_ids), cb=cb
+            )
+        except AdvanceDiscarded:
+            return  # Pruning is normal; do not resurrect the node or report an image failure.
+
+
+def _current_choice(save: GameSave, node_id: str, choice_id: str) -> tuple[StoryNode, StoredChoice]:
+    """Resolve a choice against current save state, not a snapshot held over an await."""
+    parent = save.nodes.get(node_id)
+    if parent is None:
+        raise AdvanceDiscarded(f"node {node_id!r} no longer exists")
+    for choice in parent.choices:
+        if choice.id == choice_id:
+            return parent, choice
+    raise AdvanceDiscarded(f"choice {choice_id!r} not found on node {node_id!r}")
 
 
 # --- Beat prompt construction --------------------------------------------------
