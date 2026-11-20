@@ -255,6 +255,51 @@ async def test_pipeline_stage1_commits_node_before_illustration(
 
 
 @pytest.mark.asyncio
+async def test_concurrent_sibling_advances_keep_every_parent_link(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Prefetches for sibling choices must not overwrite each other's links.
+
+    Each advance used to write back the parent it read before awaiting the
+    beat, so only the last sibling to finish stayed linked and the others
+    became orphaned nodes.
+    """
+    save = _bootstrap_save(tmp_path, monkeypatch)
+    root = save.nodes["root"]
+    save.nodes["root"] = root.model_copy(
+        update={"choices": [StoredChoice(id=f"c{i}", text=f"option {i}") for i in range(3)]}
+    )
+    beat = StoryBeat(
+        narration="One two three four five.",
+        choices=[Choice(id="next", text="continue")],
+        is_major=False,
+        is_ending=False,
+    )
+    plan = IllustrationPlan(
+        should_illustrate=False, image_prompt="", featured_character_ids=[], reasoning=""
+    )
+    pipeline = BeatPipeline(
+        beat_agent=FakeBeatAgent(beat),
+        illustration_agent=FakeIllustrationAgent(plan),
+        summary_agent=None,
+        image_provider=FakeImageProvider(),
+        callbacks=PipelineCallbacks(),
+    )
+
+    nodes = await asyncio.gather(
+        *(
+            pipeline.advance(
+                save, from_node_id="root", choice_id=f"c{i}", suppress_side_effects=True
+            )
+            for i in range(3)
+        )
+    )
+
+    links = {c.id: c.child_node_id for c in save.nodes["root"].choices}
+    assert links == {f"c{i}": nodes[i].id for i in range(3)}
+
+
+@pytest.mark.asyncio
 async def test_pipeline_triggers_scene_image_when_planned(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

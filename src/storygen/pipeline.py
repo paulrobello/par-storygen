@@ -330,7 +330,11 @@ class BeatPipeline:
             created_at=datetime.now(UTC),
         )
         save.nodes[new_node_id] = new_node
-        # Update the parent choice to point at the new node.
+        # Update the parent choice to point at the new node. Re-read the parent:
+        # prefetches for sibling choices run concurrently and may have linked
+        # their children while this beat was generating. Writing back the copy
+        # read before the await would drop those links and orphan the nodes.
+        parent = save.nodes[from_node_id]
         updated_choices = [
             c.model_copy(update={"child_node_id": new_node_id}) if c.id == choice_id else c
             for c in parent.choices
