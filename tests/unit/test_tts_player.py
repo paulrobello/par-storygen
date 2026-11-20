@@ -364,6 +364,43 @@ async def test_speak_reuses_existing_cache(monkeypatch: pytest.MonkeyPatch, tmp_
     assert played == [cache]
 
 
+def _raise_file_in_use(self: Path, missing_ok: bool = False) -> None:
+    raise PermissionError(32, "The process cannot access the file because it is in use")
+
+
+@pytest.mark.asyncio
+async def test_configure_survives_audio_file_held_open(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Windows can't delete a file the player still has open (WinError 32)."""
+    monkeypatch.setattr("storygen.tts.player.get_provider", _fake_get_provider)
+    player = TTSPlayer()
+    audio = tmp_path / "playing.wav"
+    audio.write_bytes(b"AUDIO")
+    player._audio_file = audio  # pyright: ignore[reportPrivateUsage]
+    monkeypatch.setattr(Path, "unlink", _raise_file_in_use)
+
+    player.configure("elevenlabs", api_key="key")
+
+    assert player._audio_file is None  # pyright: ignore[reportPrivateUsage]
+    assert player.is_configured
+
+
+@pytest.mark.asyncio
+async def test_cleanup_survives_audio_file_held_open(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    player = TTSPlayer()
+    audio = tmp_path / "playing.wav"
+    audio.write_bytes(b"AUDIO")
+    player._audio_file = audio  # pyright: ignore[reportPrivateUsage]
+    monkeypatch.setattr(Path, "unlink", _raise_file_in_use)
+
+    await player.cleanup()
+
+    assert player._audio_file is None  # pyright: ignore[reportPrivateUsage]
+
+
 def test_preferred_extension_uses_first_provider_format() -> None:
     player = TTSPlayer()
     player._provider = _FakeProvider()  # pyright: ignore[reportPrivateUsage]

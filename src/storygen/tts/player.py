@@ -42,6 +42,17 @@ def _detect_player() -> str:
     return ""
 
 
+def _unlink_quietly(path: Path) -> None:
+    """Delete *path*, ignoring OS errors.
+
+    On Windows a file still held open by the player subprocess cannot be
+    deleted (``PermissionError`` / WinError 32). Leaving a stale audio file
+    behind is preferable to crashing the app.
+    """
+    with contextlib.suppress(OSError):
+        path.unlink(missing_ok=True)
+
+
 class TTSState(Enum):
     """Playback state machine."""
 
@@ -140,7 +151,7 @@ class TTSPlayer:
         if self._audio_file and not self._audio_file.exists():
             self._audio_file = None
         elif self._audio_file:
-            self._audio_file.unlink(missing_ok=True)
+            _unlink_quietly(self._audio_file)
             self._audio_file = None
         try:
             cls = get_provider(provider)
@@ -289,7 +300,7 @@ class TTSPlayer:
 
         # Clean up previous temp file (not persistent cache).
         if self._audio_file and self._audio_file != save_path and not cache_path:
-            self._audio_file.unlink(missing_ok=True)
+            _unlink_quietly(self._audio_file)
 
         self._audio_file = save_path
         await self._play_file(save_path)
@@ -364,7 +375,7 @@ class TTSPlayer:
         """Stop playback and remove temp files."""
         await self.stop()
         if self._audio_file:
-            self._audio_file.unlink(missing_ok=True)
+            _unlink_quietly(self._audio_file)
             self._audio_file = None
 
     # ------------------------------------------------------------------
