@@ -51,6 +51,37 @@ jobs:
       - name: Run read-only gate (lint + typecheck + test)
         run: make checkall
 
+  # Platform-sensitive leg: paths, permissions, signals, and file locking
+  # behave differently on Windows (issue #23). Lint/typecheck are
+  # platform-independent and stay on the Linux gate; `make` is not reliably
+  # present on Windows runners, so this job invokes the tools directly.
+  python-tests-windows:
+    name: Python tests (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+
+      - name: Sync dependencies (with api extra)
+        run: uv sync --extra api --dev
+
+      # --timeout 60: the configured 10s per-test budget is tight on Windows
+      # under real-time AV scanning of a fresh venv (measured on the Windows
+      # 11 ARM64 VM, 2026-11-19: two test_app.py tests exceeded 10s on cold
+      # I/O and passed in 14s total once warmed).
+      - name: Run tests
+        run: uv run pytest tests -q --timeout 60
+
   web-build:
     name: Web (vitest + next build)
     runs-on: ubuntu-latest
