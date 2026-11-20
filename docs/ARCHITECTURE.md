@@ -241,7 +241,7 @@ Characters accept an optional `reference_image_path: str | None` (relative to th
 `TTSPlayer` wraps the `par_tts` library for async use inside Textual's event loop. A four-state machine (`IDLE → GENERATING → PLAYING → PAUSED → PLAYING → IDLE`) drives all controls:
 
 - **`speak(text, *, cache_path=None)`** — uses the configured `par_tts` provider's async generation API when available (with a sync fallback), then plays the completed file through `asyncio.create_subprocess_exec` (`afplay` on macOS). If `cache_path` is given and the file exists, skips generation and plays the cached file directly. If the file doesn't exist, writes generated audio to a temporary sibling file and atomically replaces `cache_path` only after the full byte stream is written. Returns `bool` indicating success.
-- **`pause()` / `resume()`** — sends `SIGSTOP` / `SIGCONT` to the `afplay` subprocess.
+- **`pause()` / `resume()`** — sends `SIGSTOP` / `SIGCONT` to the player subprocess. Windows has no `SIGSTOP`, so there the process is suspended / resumed with `NtSuspendProcess` / `NtResumeProcess`.
 - **`stop()`** — cancels in-flight generation/write work, sends `SIGTERM` to active playback, and removes partial temporary output without deleting valid persistent cache paths.
 - **`restart()`** — convenience: `stop()` then re-speak.
 

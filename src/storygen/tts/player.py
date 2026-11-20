@@ -3,7 +3,8 @@
 Wraps the synchronous ``par_tts`` library so it works inside Textual's async
 event loop. Audio playback uses ``asyncio.create_subprocess_exec`` with a
 runtime-detected backend (``ffplay`` or ``afplay``) so the caller retains
-control via SIGSTOP / SIGCONT / SIGTERM.
+control via SIGSTOP / SIGCONT / SIGTERM (NtSuspendProcess / NtResumeProcess
+on Windows, which has no SIGSTOP).
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ import contextlib
 import logging
 import os
 import shutil
-import signal
+import sys
 import tempfile
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from enum import Enum
@@ -51,6 +52,40 @@ def _unlink_quietly(path: Path) -> None:
     """
     with contextlib.suppress(OSError):
         path.unlink(missing_ok=True)
+
+
+if sys.platform == "win32":
+    import ctypes
+    from ctypes import wintypes
+
+    _PROCESS_SUSPEND_RESUME = 0x0800
+
+    def _set_process_suspended(process: asyncio.subprocess.Process, suspended: bool) -> None:
+        """Suspend or resume every thread of *process* via ntdll."""
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        ntdll = ctypes.WinDLL("ntdll")
+        kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        nt_call = ntdll.NtSuspendProcess if suspended else ntdll.NtResumeProcess
+        nt_call.argtypes = [wintypes.HANDLE]
+        nt_call.restype = wintypes.LONG
+
+        handle = kernel32.OpenProcess(_PROCESS_SUSPEND_RESUME, False, process.pid)
+        if not handle:
+            raise ProcessLookupError(process.pid)
+        try:
+            if nt_call(handle) != 0:
+                raise ProcessLookupError(process.pid)
+        finally:
+            kernel32.CloseHandle(handle)
+
+else:
+    import signal
+
+    def _set_process_suspended(process: asyncio.subprocess.Process, suspended: bool) -> None:
+        """Suspend or resume *process* with SIGSTOP / SIGCONT."""
+        process.send_signal(signal.SIGSTOP if suspended else signal.SIGCONT)
 
 
 class TTSState(Enum):
@@ -310,7 +345,7 @@ class TTSPlayer:
         """Pause the audio subprocess (SIGSTOP)."""
         if self._state == TTSState.PLAYING and self._process and self._process.returncode is None:
             try:
-                self._process.send_signal(signal.SIGSTOP)
+                _set_process_suspended(self._process, True)
                 self._state = TTSState.PAUSED
             except ProcessLookupError:
                 pass
@@ -319,7 +354,7 @@ class TTSPlayer:
         """Resume a paused audio subprocess (SIGCONT)."""
         if self._state == TTSState.PAUSED and self._process and self._process.returncode is None:
             try:
-                self._process.send_signal(signal.SIGCONT)
+                _set_process_suspended(self._process, False)
                 self._state = TTSState.PLAYING
             except ProcessLookupError:
                 pass
