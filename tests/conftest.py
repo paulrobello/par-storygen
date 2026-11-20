@@ -31,6 +31,22 @@ def _scrub_storygen_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _isolate_xdg_dirs(  # pyright: ignore[reportUnusedFunction]
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Point XDG data and config dirs at per-test temp dirs.
+
+    Many tests only set ``XDG_DATA_HOME``, so they still read the developer's
+    real ``XDG_CONFIG_HOME``. With art turned off in Settings, ``art_enabled()``
+    is False and the image-pipeline, wizard, portrait and load-screen tests
+    fail because no image is ever requested. Tests that set their own XDG
+    paths via monkeypatch still win.
+    """
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg-data"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg-config"))
+
+
+@pytest.fixture(autouse=True)
 def _reset_api_rate_limiter() -> None:  # pyright: ignore[reportUnusedFunction]
     """Clear per-IP rate-limit counters before each test (SEC-007 isolation).
 
