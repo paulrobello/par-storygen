@@ -34,6 +34,7 @@ from storygen.screens._character_edit_modal import (
 )
 from storygen.screens._outfit_modals import OutfitCreateRequest
 from storygen.screens._ref_image_modals import ReferenceImageResult
+from storygen.screens._widget_ids import encode_id_part
 from storygen.screens.portraits import (
     PortraitsScreen,
     _OutfitThumbHB,  # pyright: ignore[reportPrivateUsage]
@@ -824,6 +825,28 @@ async def test_edit_button_renders_per_character(
         assert btn is not None
         # Always enabled — text-only, no image generation.
         assert btn.disabled is False
+
+
+@pytest.mark.asyncio
+async def test_character_id_with_spaces_renders_and_routes_buttons(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """LLM-chosen ids like "Jane Doe" are not valid Textual ids as-is."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    save = _save_with_one_character()
+    save.characters[0].id = "Jane Doe"
+    save_game(save)
+    provider = FakeImageProvider()
+
+    app = _Harness(save, provider)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        from textual.widgets import Button
+
+        btn = app.screen.query_one(f"#edit-bio-{encode_id_part('Jane Doe')}", Button)
+        btn.press()
+        await pilot.pause()
+        assert isinstance(app.screen, CharacterEditModal)
 
 
 @pytest.mark.asyncio
