@@ -1,11 +1,17 @@
 # ARC-006: continuous integration gate for push and pull_request.
 #
-# `make checkall` is the authoritative read-only gate (ARC-008 split `fmt`
-# out so formatting drift surfaces instead of being auto-fixed mid-run).
+# Job-per-concern shape (the standard in ~/.claude/guides/git-ci.md): lint and
+# typecheck are platform-independent and run once on ubuntu; only the test job
+# carries the OS matrix (ubuntu + windows — paths, permissions, signals, and
+# file locking behave differently on Windows; issue #23). `os-scope` dispatch
+# re-runs a single OS's tests without a push.
+#
 # We `uv sync --extra api` because the FastAPI / WebSocket tests in
 # tests/unit/test_api_*.py and tests/integration/test_api_full_flow.py
 # import fastapi / starlette / websockets from the optional `[api]` extra.
-# `make web-build` type-checks the Next.js frontend (pyright excludes web/).
+# The jobs compose the same commands as `make checkall` (lint + typecheck +
+# test + web checks) — restructuring CI never changes what the local gate
+# owes.
 #
 # Matrix is Python 3.13 only — pyproject.toml's `requires-python = ">=3.13"`
 # allows 3.14 and the classifier lists it, but the toolchain (ruff
@@ -19,17 +25,98 @@ on:
     branches: ["**"]
   pull_request:
     branches: ["**"]
+  workflow_dispatch:
+    inputs:
+      os-scope:
+        description: "Runner scope for the test matrix; 'all' runs both OSes."
+        type: choice
+        default: all
+        options: [all, ubuntu-latest, windows-latest]
 
-# Cancel in-flight runs for the same ref when a new commit lands.
+# Cancel in-flight runs for the same PR when a new commit lands; pushes to a
+# branch run to completion.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
 
 jobs:
-  python-gate:
-    name: Python (lint + typecheck + test)
+  resolve-scope:
+    name: Resolve scope
     runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      os-matrix: ${{ steps.os-scope.outputs.os-matrix }}
+    steps:
+      - name: Resolve os scope
+        id: os-scope
+        run: |
+          SCOPE="${{ github.event.inputs.os-scope }}"
+          case "$SCOPE" in
+            ubuntu-latest|windows-latest) MATRIX="[\"$SCOPE\"]" ;;
+            all|"") MATRIX='["ubuntu-latest", "windows-latest"]' ;;
+            *) echo "unknown os-scope: $SCOPE" >&2; exit 1 ;;
+          esac
+          echo "os-matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "os-matrix=$MATRIX"
+
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+
+      - name: Sync dependencies (with api extra)
+        run: uv sync --extra api --dev
+
+      - name: Lint
+        run: make lint
+
+  typecheck:
+    name: Typecheck (pyright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+
+      - name: Sync dependencies (with api extra)
+        run: uv sync --extra api --dev
+
+      - name: Typecheck
+        run: make typecheck
+
+  test:
+    name: Test (${{ matrix.os }})
+    needs: [resolve-scope]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.resolve-scope.outputs.os-matrix) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -48,39 +135,19 @@ jobs:
       - name: Sync dependencies (with api extra)
         run: uv sync --extra api --dev
 
-      - name: Run read-only gate (lint + typecheck + test)
-        run: make checkall
-
-  # Platform-sensitive leg: paths, permissions, signals, and file locking
-  # behave differently on Windows (issue #23). Lint/typecheck are
-  # platform-independent and stay on the Linux gate; `make` is not reliably
-  # present on Windows runners, so this job invokes the tools directly.
-  python-tests-windows:
-    name: Python tests (Windows)
-    runs-on: windows-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          enable-cache: true
-
-      - name: Set up Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: "3.13"
-
-      - name: Sync dependencies (with api extra)
-        run: uv sync --extra api --dev
-
-      # --timeout 60: the configured 10s per-test budget is tight on Windows
-      # under real-time AV scanning of a fresh venv (measured on the Windows
-      # 11 ARM64 VM, 2026-11-19: two test_app.py tests exceeded 10s on cold
-      # I/O and passed in 14s total once warmed).
+      # Windows invokes pytest directly (make is not reliably present on
+      # Windows runners) with a 60s per-test budget: the configured 10s is
+      # tight under Windows real-time AV scanning of a fresh venv (measured on
+      # the Windows 11 ARM64 VM, 2026-11-19: two test_app.py tests exceeded
+      # 10s cold and passed once warmed).
       - name: Run tests
-        run: uv run pytest tests -q --timeout 60
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            uv run pytest tests -q --timeout 60
+          else
+            make test
+          fi
 
   web-build:
     name: Web (vitest + next build)
