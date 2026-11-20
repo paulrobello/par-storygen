@@ -293,7 +293,7 @@ class WizardFlow:
                 dest = paths.character_portrait_path(str(game_id), char.id, version=1)
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy(src, dest)
-                rel_import: str = str(dest.relative_to(paths.game_dir(str(game_id))))
+                rel_import: str = paths.game_relative(str(game_id), dest)
                 # Copy reference image if the library entry has one.
                 lib_char_meta = _load_lib_char_if_exists(library_id)
                 if lib_char_meta is not None and lib_char_meta.reference_image_path:
@@ -361,7 +361,7 @@ class WizardFlow:
                 dest = paths.character_portrait_path(str(game_id), char.id, version=1)
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.write_bytes(png_bytes)
-                rel: str | None = str(dest.relative_to(paths.game_dir(str(game_id))))
+                rel: str | None = paths.game_relative(str(game_id), dest)
             else:
                 rel = None
             enriched.append(
@@ -442,7 +442,7 @@ class WizardFlow:
             cover_path = paths.node_image_path(str(game_id), "root")
             cover_path.parent.mkdir(parents=True, exist_ok=True)
             cover_path.write_bytes(cast(bytes, cover_bytes))
-            cover_rel = str(cover_path.relative_to(paths.game_dir(str(game_id))))
+            cover_rel = paths.game_relative(str(game_id), cover_path)
             if app_state.auto_open_art_enabled():
                 from storygen.util import open_in_system_viewer
 

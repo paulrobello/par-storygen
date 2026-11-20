@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import stat
 import sys
 from datetime import datetime
@@ -266,8 +267,10 @@ def test_rotation_is_bounded_and_files_are_private(
     files = list(path.parent.glob("tui.log*"))
     assert len(files) == 4
     assert all(file.stat().st_size <= 500 for file in files)
-    assert all(stat.S_IMODE(file.stat().st_mode) == 0o600 for file in files)
-    assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+    if os.name == "posix":
+        # Windows does not honor the write bits of the requested mode.
+        assert all(stat.S_IMODE(file.stat().st_mode) == 0o600 for file in files)
+        assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
 
 
 def test_log_write_failure_never_prints_or_replaces_provider_error(

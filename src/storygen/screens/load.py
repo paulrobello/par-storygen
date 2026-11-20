@@ -504,7 +504,7 @@ class LoadGameScreen(Screen[None]):
         cover_path = paths.node_image_path(str(save.id), save.root_node_id)
         cover_path.parent.mkdir(parents=True, exist_ok=True)
         cover_path.write_bytes(cover_bytes)
-        cover_rel = str(cover_path.relative_to(paths.game_dir(str(save.id))))
+        cover_rel = paths.game_relative(str(save.id), cover_path)
         save.nodes[save.root_node_id] = root.model_copy(
             update={
                 "image_prompt": cover_prompt,

@@ -393,7 +393,7 @@ class StoryGenApp(App[None]):
         cover_path = paths.node_image_path(str(save.id), save.root_node_id)
         cover_path.parent.mkdir(parents=True, exist_ok=True)
         cover_path.write_bytes(cover_bytes)
-        cover_rel = str(cover_path.relative_to(paths.game_dir(str(save.id))))
+        cover_rel = paths.game_relative(str(save.id), cover_path)
         cost = _image_cost(
             save.image_config.provider,
             model=save.image_config.model,

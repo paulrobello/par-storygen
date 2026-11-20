@@ -519,7 +519,7 @@ class BeatPipeline:
 
         save_id = str(save.id)
         dest = paths.node_image_path(save_id, node_id)
-        rel_path = str(dest.relative_to(paths.game_dir(save_id)))
+        rel_path = paths.game_relative(save_id, dest)
         # Pre-assign image_path and status so partial writes have a known target.
         # Mirrors _stage_3_scene's pre-assignment pattern.
         updated = node.model_copy(update={"image_status": "generating", "image_path": rel_path})
@@ -557,7 +557,7 @@ class BeatPipeline:
 
         save_id = str(save.id)
         dest = paths.node_image_path(save_id, node_id)
-        rel_path = str(dest.relative_to(paths.game_dir(save_id)))
+        rel_path = paths.game_relative(save_id, dest)
 
         # Update the stored prompt before rendering.
         updated = node.model_copy(
@@ -735,7 +735,7 @@ class BeatPipeline:
             # uses next_portrait_version for subsequent regenerations.
             dest = paths.character_portrait_path(save_id, char.id, version=1)
             _atomic_write_png(dest, portrait_bytes)
-            rel_path = str(dest.relative_to(paths.game_dir(save_id)))
+            rel_path = paths.game_relative(save_id, dest)
             for idx, c in enumerate(save.characters):
                 if c.id == char.id:
                     save.characters[idx] = c.model_copy(
@@ -770,7 +770,7 @@ class BeatPipeline:
         """
         save_id = str(save.id)
         dest = paths.node_image_path(save_id, node_id)
-        rel_path = str(dest.relative_to(paths.game_dir(save_id)))
+        rel_path = paths.game_relative(save_id, dest)
 
         stream_partials = (
             app_state.image_streaming_enabled() and save.image_config.provider == "openai"
@@ -877,7 +877,7 @@ class BeatPipeline:
         cb = callbacks if callbacks is not None else self._callbacks
         save_id = str(save.id)
         dest = paths.node_image_path(save_id, node_id)
-        rel_path = str(dest.relative_to(paths.game_dir(save_id)))
+        rel_path = paths.game_relative(save_id, dest)
         # Pre-assign image_path so partial writes have a known target; status
         # stays "generating" until the final lands.
         pre = save.nodes[node_id].model_copy(update={"image_path": rel_path})

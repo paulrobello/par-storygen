@@ -655,7 +655,7 @@ class PortraitsScreen(Screen[None]):
             dest = paths.character_portrait_path(save_id, char.id, version=version)
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(png_bytes)
-            new_rel = str(dest.relative_to(paths.game_dir(save_id)))
+            new_rel = paths.game_relative(save_id, dest)
             updated = char.model_copy(update={"portrait_path": new_rel})
             self._save.characters = [
                 updated if c.id == char.id else c for c in self._save.characters
@@ -745,7 +745,7 @@ class PortraitsScreen(Screen[None]):
             dest = paths.character_portrait_path(save_id, char.id, version=version)
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(png_bytes)
-            new_rel = str(dest.relative_to(paths.game_dir(save_id)))
+            new_rel = paths.game_relative(save_id, dest)
             updated = char.model_copy(
                 update={
                     "portrait_path": new_rel,

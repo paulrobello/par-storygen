@@ -82,13 +82,16 @@ def read_app_state() -> dict[str, Any]:
     """
     now = time.monotonic()
     path = state_file_path()
-    # Include file mtime in cache key so direct writes (e.g. tests) that bypass
-    # write_app_state() are detected without waiting for the TTL to expire.
+    # Include file mtime + size in cache key so direct writes (e.g. tests)
+    # that bypass write_app_state() are detected without waiting for the TTL
+    # to expire. Size matters on Windows, where mtime granularity can round
+    # two same-tick rewrites to one timestamp and serve a stale cached state.
     try:
-        mtime = path.stat().st_mtime
+        st = path.stat()
+        mtime, size = st.st_mtime, st.st_size
     except OSError:
-        mtime = 0.0
-    cache_key = f"{path!s}:{mtime}"
+        mtime, size = 0.0, 0
+    cache_key = f"{path!s}:{mtime}:{size}"
     cached = STATE_CACHE.get(cache_key)
     if cached is not None:
         ts, value = cached

@@ -189,12 +189,16 @@ def apply_migration(plans: Sequence[FilePlan]) -> list[Path]:
             try:
                 _check_unchanged(plan)
                 os.replace(temporary, plan.path)
-                # Persist the backup and replacement directory entries as well.
-                fd = os.open(plan.path.parent, os.O_RDONLY)
-                try:
-                    os.fsync(fd)
-                finally:
-                    os.close(fd)
+                # Persist the backup and replacement directory entries as
+                # well. Opening a directory for fsync is a POSIX idiom;
+                # Windows cannot open directories this way (PermissionError)
+                # and relies on NTFS metadata journaling instead.
+                if os.name == "posix":
+                    fd = os.open(plan.path.parent, os.O_RDONLY)
+                    try:
+                        os.fsync(fd)
+                    finally:
+                        os.close(fd)
             finally:
                 temporary.unlink(missing_ok=True)
     return backups

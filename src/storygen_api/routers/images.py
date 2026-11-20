@@ -187,7 +187,7 @@ async def retry_portrait(
     os.replace(tmp, dest)
 
     # Update character's portrait_path
-    rel_path = str(dest.relative_to(paths.game_dir(game_id)))
+    rel_path = paths.game_relative(game_id, dest)
     save.characters[char_idx] = char.model_copy(update={"portrait_path": rel_path})
     save_game(save)
 
@@ -268,7 +268,7 @@ async def edit_portrait(
     os.replace(tmp, dest)
 
     # Update character's portrait_path and portrait_prompt
-    rel_path = str(dest.relative_to(paths.game_dir(game_id)))
+    rel_path = paths.game_relative(game_id, dest)
     save.characters[char_idx] = char.model_copy(
         update={"portrait_path": rel_path, "portrait_prompt": description}
     )
@@ -452,7 +452,7 @@ async def delete_outfit(
         if version is not None:
             base_path = paths.character_portrait_path(game_id, char_id, version)
             if base_path.exists():
-                updates["portrait_path"] = str(base_path.relative_to(paths.game_dir(game_id)))
+                updates["portrait_path"] = paths.game_relative(game_id, base_path)
         updates["current_outfit_id"] = None
 
     save.characters[char_idx] = char.model_copy(update=updates)
@@ -482,7 +482,7 @@ async def revert_outfit(
     if version is not None:
         base_path = paths.character_portrait_path(game_id, char_id, version)
         if base_path.exists():
-            base_rel = str(base_path.relative_to(paths.game_dir(game_id)))
+            base_rel = paths.game_relative(game_id, base_path)
 
     updates: dict[str, object] = {"current_outfit_id": None}
     if base_rel is not None:

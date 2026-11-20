@@ -104,6 +104,16 @@ def safe_join(base: Path, relative: str) -> Path:
     return joined
 
 
+def game_relative(game_id: str, path: Path) -> str:
+    """Return ``path`` relative to the game dir as a forward-slash string.
+
+    Persisted save JSON stores relative paths with ``/`` separators; calling
+    ``str()`` on a Windows :class:`~pathlib.Path` would emit backslashes and
+    break the storage contract (issue #23).
+    """
+    return path.relative_to(game_dir(game_id)).as_posix()
+
+
 def data_root() -> Path:
     """Root directory for saves — respects $XDG_DATA_HOME."""
     return xdg_data_home() / _APP
