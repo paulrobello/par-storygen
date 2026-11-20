@@ -21,6 +21,8 @@ from storygen.storage.tree import path_from_root, segment_since_last_summary
 
 __all__ = [
     "build_beat_prompt",
+    "hard_cap_for",
+    "hard_ending_due",
     "pacing_hint_for_depth",
     "resolve_chosen_text",
 ]
@@ -120,6 +122,32 @@ def build_beat_prompt(save: GameSave, from_node_id: str, choice_text: str) -> st
     return "\n\n".join(sections)
 
 
+#: Total-beat multiple of ``target_major_beats`` past which the story must
+#: end: the beat prompt orders a final beat and the pipeline commits the
+#: model's output as an ending even if the model keeps proposing choices
+#: (local models reliably ignore softer ending pressure; see issue #23).
+HARD_ENDING_MULTIPLIER = 5
+
+
+def _pacing_multiplier(pacing: str) -> float:
+    return {"slow": 1.4, "fast": 0.7}.get(pacing, 1.0)
+
+
+def hard_cap_for(target: int, pacing: str = "moderate") -> int:
+    """Total-beat count at which the hard ending cap fires."""
+    return max(int(target * HARD_ENDING_MULTIPLIER * _pacing_multiplier(pacing)), 1)
+
+
+def hard_ending_due(save: GameSave, from_node_id: str) -> bool:
+    """True when the beat generated from ``from_node_id`` must be the last.
+
+    Counts total beats (root-excluded) along the ancestor path, so a model
+    that under-marks ``is_major`` still hits the cap.
+    """
+    total_beats = max(len(path_from_root(save, from_node_id)) - 1, 0)
+    return total_beats >= hard_cap_for(save.target_major_beats, save.pacing)
+
+
 def pacing_hint_for_depth(
     depth: int, target: int, pacing: str = "moderate", *, total_beats: int = 0
 ) -> str:
@@ -134,16 +162,29 @@ def pacing_hint_for_depth(
     least the climax tier (past ``guard_climax``) or the resolve tier (past
     ``guard_resolve``) regardless of ``depth``.
 
+    Past ``hard_cap_for(target, pacing)`` total beats the hint stops
+    suggesting and demands a final beat — the caller force-commits an ending
+    there anyway (see :func:`hard_ending_due`).
+
     Uses ratios of the per-save ``target`` so very short stories don't get a
     "tighten" prod at beat 5 of 5 and very long stories don't get told to
     "resolve now" at beat 11 of 30.
     """
-    multiplier = {"slow": 1.4, "fast": 0.7}.get(pacing, 1.0)
+    multiplier = _pacing_multiplier(pacing)
     silent_threshold = max(int(target * 0.3 * multiplier), 1)
     tension_threshold = max(int(target * 0.6 * multiplier), 1)
     climax_threshold = max(int(target * 0.9 * multiplier), 1)
     guard_climax = int(target * 3 * multiplier)
     guard_resolve = int(target * 4 * multiplier)
+    hard_cap = hard_cap_for(target, pacing)
+
+    if total_beats >= hard_cap:
+        return (
+            f" Progress: {total_beats} beats total — this story has far outrun its"
+            f" target of ~{target} major beats. THIS IS THE FINAL BEAT: resolve the"
+            " central conflict in this beat's narration and set is_ending=true"
+            " with choices=[]. Do not introduce new plot threads."
+        )
 
     if depth <= silent_threshold:
         tier = 0

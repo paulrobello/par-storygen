@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import stat
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -103,8 +104,11 @@ def test_apply_backups_permissions_idempotence_and_scope(tmp_path: Path) -> None
     backups = migration.apply_migration(plans)
     assert len(backups) == 2
     assert [p.read_bytes() for p in backups] == [state_original, game_original]
-    for path in [*backups, state, game]:
-        assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    if os.name == "posix":
+        # Windows os.open ignores the write bits of the mode argument, so the
+        # 0o600 assertion is POSIX-only.
+        for path in [*backups, state, game]:
+            assert stat.S_IMODE(path.stat().st_mode) == 0o600
     assert ignored.read_bytes() == ignored_original
     assert migration.plan_migration(state, games) == []
     assert not list(tmp_path.rglob("*.tmp"))
@@ -154,7 +158,7 @@ def test_change_during_backup_caught(tmp_path: Path, monkeypatch: pytest.MonkeyP
     assert not list(tmp_path.glob("*.tmp"))
 
 
-def test_existing_lock_and_symlink_refused(tmp_path: Path) -> None:
+def test_existing_lock_refused(tmp_path: Path) -> None:
     path = tmp_path / "game.json"
     _write(path, {"image_config": _config()})
     plan = migration.plan_file(path, state=False)
@@ -164,6 +168,14 @@ def test_existing_lock_and_symlink_refused(tmp_path: Path) -> None:
     with pytest.raises(migration.MigrationError, match="lock exists"):
         migration.apply_migration([plan])
     assert lock.read_text() == "active"
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="creating symlinks on Windows needs privileges"
+)
+def test_symlink_refused(tmp_path: Path) -> None:
+    path = tmp_path / "game.json"
+    _write(path, {"image_config": _config()})
     link = tmp_path / "link.json"
     link.symlink_to(path)
     with pytest.raises(migration.MigrationError, match="non-regular"):

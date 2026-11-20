@@ -2695,3 +2695,138 @@ async def test_real_beat_adapter_validates_then_emits_and_commits(
     assert replay.id == node.id
     assert events == [("commit", beat.narration)]
     assert len(usage) == 1
+
+
+# --- hard ending cap (issue #23: local models never reach an ending) ---
+
+
+def _extend_chain(save: GameSave, beats: int) -> str:
+    """Append `beats` linear nodes to the save; return the last node id."""
+    from datetime import datetime
+
+    prev = "root"
+    for i in range(beats):
+        nid = f"cap{i}"
+        save.nodes[nid] = StoryNode(
+            id=nid,
+            parent_id=prev,
+            chosen_choice_id="c1",
+            chosen_at=datetime.now(UTC),
+            narration="chain beat.",
+            choices=[StoredChoice(id="c1", text="next")],
+            is_major=False,
+            is_ending=False,
+            image_prompt=None,
+            image_path=None,
+            image_status="not_planned",
+            illustration_reasoning=None,
+            featured_character_ids=[],
+            summary_to_here=None,
+            created_at=save.created_at,
+        )
+        prev = nid
+    save.current_node_id = prev
+    return prev
+
+
+def _quiet_illustration_agent() -> FakeIllustrationAgent:
+    return FakeIllustrationAgent(
+        IllustrationPlan(
+            should_illustrate=False,
+            image_prompt="",
+            featured_character_ids=[],
+            reasoning="",
+        )
+    )
+
+
+@pytest.mark.asyncio
+async def test_advance_forces_ending_at_hard_cap(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Past the hard cap a non-ending model beat is committed as the ending."""
+    save = _bootstrap_save(tmp_path, monkeypatch)
+    save.target_major_beats = 5  # moderate -> hard cap = 25 total beats
+    last = _extend_chain(save, 25)
+
+    beat_agent = FakeBeatAgent(
+        StoryBeat(
+            narration="The model wants to keep going.",
+            choices=[Choice(id="more", text="Continue onward")],
+            is_major=False,
+            is_ending=False,
+        )
+    )
+    pipeline = BeatPipeline(
+        beat_agent=beat_agent,
+        illustration_agent=_quiet_illustration_agent(),
+        summary_agent=None,
+        image_provider=FakeImageProvider(),
+        callbacks=PipelineCallbacks(),
+    )
+    node = await pipeline.advance(save, from_node_id=last, choice_id="c1")
+    assert node.is_ending is True
+    assert node.choices == []
+    # The forced ending is durable: replaying the same choice is a cache hit.
+    replay = await pipeline.advance(save, from_node_id=last, choice_id="c1")
+    assert replay.id == node.id
+    assert replay.is_ending is True
+
+
+@pytest.mark.asyncio
+async def test_advance_does_not_force_ending_below_hard_cap(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """One beat short of the cap the model's non-ending beat stands."""
+    save = _bootstrap_save(tmp_path, monkeypatch)
+    save.target_major_beats = 5
+    last = _extend_chain(save, 24)
+
+    beat_agent = FakeBeatAgent(
+        StoryBeat(
+            narration="The story continues.",
+            choices=[Choice(id="more", text="Continue onward")],
+            is_major=False,
+            is_ending=False,
+        )
+    )
+    pipeline = BeatPipeline(
+        beat_agent=beat_agent,
+        illustration_agent=_quiet_illustration_agent(),
+        summary_agent=None,
+        image_provider=FakeImageProvider(),
+        callbacks=PipelineCallbacks(),
+    )
+    node = await pipeline.advance(save, from_node_id=last, choice_id="c1")
+    assert node.is_ending is False
+    assert [c.id for c in node.choices] == ["more"]
+
+
+@pytest.mark.asyncio
+async def test_advance_prompt_at_hard_cap_demands_final_beat(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The beat prompt sent to the model at the cap orders a final beat."""
+
+    class PromptSpy(FakeBeatAgent):
+        async def run(self, prompt: str, on_narration_delta: Any, raw_sink: Any = None) -> StoryBeat:
+            self.prompt = prompt  # pyright: ignore[reportAttributeAccessIssue]
+            return await super().run(prompt, on_narration_delta, raw_sink)
+
+    save = _bootstrap_save(tmp_path, monkeypatch)
+    save.target_major_beats = 5
+    last = _extend_chain(save, 25)
+
+    spy = PromptSpy(
+        StoryBeat(narration="It ends here.", choices=[], is_major=False, is_ending=True)
+    )
+    pipeline = BeatPipeline(
+        beat_agent=spy,
+        illustration_agent=_quiet_illustration_agent(),
+        summary_agent=None,
+        image_provider=FakeImageProvider(),
+        callbacks=PipelineCallbacks(),
+    )
+    await pipeline.advance(save, from_node_id=last, choice_id="c1")
+    assert "FINAL BEAT" in spy.prompt  # pyright: ignore[reportAttributeAccessIssue]
+    assert "is_ending=true" in spy.prompt  # pyright: ignore[reportAttributeAccessIssue]

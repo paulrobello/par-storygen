@@ -43,6 +43,7 @@ from storygen.images.constants import (
 from storygen.images.pricing import image_cost
 from storygen.pipeline_prefetch import PrefetchCoordinator
 from storygen.pipeline_prompts import build_beat_prompt as _build_beat_prompt
+from storygen.pipeline_prompts import hard_ending_due
 from storygen.storage import app_state, paths
 from storygen.storage.llm_cache import dump_llm_exchange
 from storygen.storage.save import GameSave, save_game
@@ -299,6 +300,12 @@ class BeatPipeline:
             narration_cb,
             raw_sink=self._maybe_build_raw_sink(str(save.id), new_node_id, "beat"),
         )
+        # Hard ending cap (issue #23): local models ignore the escalating
+        # ending pressure and can run for dozens of beats past target. Past
+        # the cap the beat prompt already demanded a final beat; if the model
+        # still refuses, commit its output as the ending regardless.
+        if not beat.is_ending and hard_ending_due(save, from_node_id):
+            beat = beat.model_copy(update={"is_ending": True, "choices": []})
         # Lift each LLM-side Choice (id + text) to a StoredChoice with no
         # child link. The link is the pipeline's bookkeeping; only we set it.
         stored_choices = [StoredChoice(id=c.id, text=c.text) for c in beat.choices]

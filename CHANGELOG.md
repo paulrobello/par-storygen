@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- 2026-07-16 audit remediation (SEC-101..107, ARC-101..116, QA-001..019, DOC-001..015) -->
 
+### Fixed
+
+- **Local models no longer run stories past every ending cue** — Added a hard ending cap at 5× the target major-beat count (scaled by pacing): past the cap the beat prompt orders a final beat (`is_ending=true`, no choices) and, if the model still returns a non-ending beat, the pipeline commits it as the ending anyway. Smaller models (e.g. `qwen2.5:32b-instruct` via Ollama) reliably ignore the escalating ending-pressure tiers and previously ran 60+ beats without ever setting `is_ending`. (#23)
+
+- **`safe_join` path-traversal guard now works on Windows** — The containment check compared resolved path strings with a hardcoded `/` separator, so every legitimate relative asset path raised "path traversal detected" once `Path.resolve()` produced backslash-separated Windows paths. The check now uses `Path.is_relative_to`, which is separator-agnostic and also rejects sibling directories sharing a name prefix. (#23)
+
+- **Windows crash fixes from PR #24** — `TTSPlayer` no longer crashes with `PermissionError [WinError 32]` when deleting an audio file the player still holds open; TTS pause/resume works on Windows (process suspension via `NtSuspendProcess`/`NtResumeProcess` instead of the nonexistent `SIGSTOP`/`SIGCONT`); and LLM-chosen character ids that aren't valid Textual widget ids (e.g. `"Jane Doe"`) no longer crash the portraits screen or story import. Test-suite Windows portability: ambient `STORYGEN_*` env vars are scrubbed per test, and POSIX-only permission/symlink assertions are guarded. (#23, #24)
+
 ### Security
 
 - **Static-asset side-door closed + client auth wired** — Removed the unauthenticated `games_root` static mount that served `game.json` and the LLM cache over `/api/images/*`; every image/audio asset now flows through an existing token-gated router route. The web frontend can now present the bearer token (`NEXT_PUBLIC_API_TOKEN`) on REST calls and the WebSocket `bearer.<token>` subprotocol; WebSocket `advance` frames are rate-limited like REST; `/api/presets` is token-gated; preset-name slugs are sanitized; CORS `allow_credentials` is `False`. (SEC-101…107)

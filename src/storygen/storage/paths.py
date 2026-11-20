@@ -97,7 +97,9 @@ def safe_join(base: Path, relative: str) -> Path:
     """
     joined = (base / relative).resolve()
     base_resolved = base.resolve()
-    if not str(joined).startswith(str(base_resolved) + "/") and joined != base_resolved:
+    # is_relative_to is separator-agnostic (Windows resolves to "\"), unlike a
+    # string startswith check, and rejects sibling dirs sharing a prefix.
+    if not joined.is_relative_to(base_resolved):
         raise ValueError(f"path traversal detected: {relative!r} resolves outside {base_resolved}")
     return joined
 

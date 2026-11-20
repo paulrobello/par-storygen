@@ -18,6 +18,9 @@ from storygen.pipeline_prompts import (
     build_beat_prompt as _build_beat_prompt,
 )
 from storygen.pipeline_prompts import (
+    hard_ending_due as _hard_ending_due,
+)
+from storygen.pipeline_prompts import (
     pacing_hint_for_depth as _pacing_hint_for_depth,
 )
 from storygen.pipeline_prompts import (
@@ -281,6 +284,74 @@ def test_pacing_hint_runaway_guard_forces_at_least_climax_tier() -> None:
     # would be silent.
     result = _pacing_hint_for_depth(1, 5, "moderate", total_beats=16)
     assert "drive directly at the central conflict" in result
+
+
+# --- hard ending cap ---
+
+
+def test_pacing_hint_hard_cap_demands_final_beat() -> None:
+    # target=5, moderate -> hard cap = 5*5 = 25 total beats; at the cap the
+    # hint stops suggesting and demands a final beat.
+    result = _pacing_hint_for_depth(1, 5, "moderate", total_beats=25)
+    assert "FINAL BEAT" in result
+    assert "is_ending=true" in result
+
+
+def test_pacing_hint_hard_cap_respects_pacing_multiplier() -> None:
+    # target=5, slow (x1.4) -> hard cap = 35 total beats. (The resolve tier's
+    # softer text also mentions is_ending=true, so discriminate on the
+    # mandatory FINAL BEAT directive.)
+    below = _pacing_hint_for_depth(1, 5, "slow", total_beats=30)
+    assert "FINAL BEAT" not in below
+    at_cap = _pacing_hint_for_depth(1, 5, "slow", total_beats=35)
+    assert "FINAL BEAT" in at_cap
+
+
+def test_pacing_hint_below_hard_cap_stays_resolve_tier() -> None:
+    # One beat short of the cap the hint still only suggests resolution.
+    result = _pacing_hint_for_depth(1, 5, "moderate", total_beats=24)
+    assert "FINAL BEAT" not in result
+    assert "strongly consider" in result.lower()
+
+
+def _chain_save(total_beats: int, *, target: int = 5, pacing: str = "moderate") -> GameSave:
+    """Save whose current node sits at the end of a `total_beats`-long chain."""
+    root = _node("root", None)
+    root.is_major = True  # root is_major marks the blurb; excluded from counts
+    nodes: dict[str, StoryNode] = {"root": root}
+    prev = "root"
+    for i in range(total_beats):
+        nid = f"n{i}"
+        nodes[nid] = _node(nid, prev, chose="c1")
+        prev = nid
+    save = _empty_save(nodes)
+    save.target_major_beats = target
+    save.pacing = pacing  # type: ignore[assignment]
+    return save
+
+
+def test_hard_ending_due_true_at_cap() -> None:
+    # 25 total beats, moderate target 5 -> cap 25.
+    assert _hard_ending_due(_chain_save(25), "n24") is True
+
+
+def test_hard_ending_due_false_below_cap() -> None:
+    assert _hard_ending_due(_chain_save(24), "n23") is False
+
+
+def test_hard_ending_due_ignores_major_flagging() -> None:
+    # Model under-marks is_major (depth stays 0); the cap keys on total beats.
+    save = _chain_save(25)
+    for n in save.nodes.values():
+        n.is_major = False
+    assert _hard_ending_due(save, "n24") is True
+
+
+def test_build_beat_prompt_carries_final_beat_directive_at_cap() -> None:
+    save = _chain_save(25)
+    prompt = _build_beat_prompt(save, "n24", "keep going")
+    assert "FINAL BEAT" in prompt
+    assert "is_ending=true" in prompt
 
 
 # --- _build_beat_prompt with relationships ---

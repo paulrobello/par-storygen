@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -13,6 +14,20 @@ from storygen.config import reset_dotenv_cache_for_tests
 @pytest.fixture(autouse=True)
 def reset_dotenv_cache() -> None:
     reset_dotenv_cache_for_tests()
+
+
+@pytest.fixture(autouse=True)
+def _scrub_storygen_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Drop ambient ``STORYGEN_*`` env vars before each test.
+
+    Config-defaults tests failed on machines that had provider overrides
+    exported in the shell (issue #23, reported on Windows). Tests that need a
+    ``STORYGEN_*`` var set their own via monkeypatch, which wins over this
+    scrub.
+    """
+    for name in list(os.environ):
+        if name.startswith("STORYGEN_"):
+            monkeypatch.delenv(name, raising=False)
 
 
 @pytest.fixture(autouse=True)

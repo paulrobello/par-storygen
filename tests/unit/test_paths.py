@@ -257,3 +257,46 @@ def test_node_id_accepts_short_ids() -> None:
     paths.node_image_path(gid, "a1")
     paths.character_portrait_path(gid, "alyx")
     paths.character_outfit_path(gid, "alyx", "out123")
+
+
+# --- safe_join (issue #23: separator-agnostic containment check) ---
+
+
+def test_safe_join_accepts_nested_relative(tmp_path: Path) -> None:
+    joined = paths.safe_join(tmp_path, "audio/node-1.mp3")
+    assert joined == (tmp_path / "audio" / "node-1.mp3").resolve()
+
+
+def test_safe_join_accepts_base_itself(tmp_path: Path) -> None:
+    assert paths.safe_join(tmp_path, ".") == tmp_path.resolve()
+
+
+def test_safe_join_rejects_escape(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="path traversal"):
+        paths.safe_join(tmp_path, "../outside.txt")
+
+
+def test_safe_join_rejects_sibling_sharing_prefix(tmp_path: Path) -> None:
+    sibling = tmp_path.name + "-evil"
+    with pytest.raises(ValueError, match="path traversal"):
+        paths.safe_join(tmp_path, f"../{sibling}/x.txt")
+
+
+def test_containment_predicate_holds_for_windows_separators() -> None:
+    """The is_relative_to containment check works with backslash resolution.
+
+    Regression proof for the Windows failure in issue #23: the old
+    ``str(joined).startswith(str(base) + "/")`` rejected every in-base path
+    once ``Path.resolve()`` produced backslash-separated strings.
+    """
+    from pathlib import PureWindowsPath
+
+    base = PureWindowsPath("C:/Data/storygen/games")
+    inside = base / "audio/node-1.mp3"
+    assert inside.is_relative_to(base)
+    # PureWindowsPath does not collapse ".." — stand in for what resolve()
+    # would produce for an escape attempt.
+    escape = PureWindowsPath("C:/Data/evil.txt")
+    assert not escape.is_relative_to(base)
+    sibling = PureWindowsPath("C:/Data/storygen/games-evil")
+    assert not sibling.is_relative_to(base)
