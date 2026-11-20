@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import sys
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from typing import Any
@@ -362,6 +363,104 @@ async def test_speak_reuses_existing_cache(monkeypatch: pytest.MonkeyPatch, tmp_
     assert cache.read_bytes() == b"CACHED"
     assert provider.generated == []
     assert played == [cache]
+
+
+def _raise_file_in_use(self: Path, missing_ok: bool = False) -> None:
+    raise PermissionError(32, "The process cannot access the file because it is in use")
+
+
+@pytest.mark.asyncio
+async def test_configure_survives_audio_file_held_open(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Windows can't delete a file the player still has open (WinError 32)."""
+    monkeypatch.setattr("storygen.tts.player.get_provider", _fake_get_provider)
+    player = TTSPlayer()
+    audio = tmp_path / "playing.wav"
+    audio.write_bytes(b"AUDIO")
+    player._audio_file = audio  # pyright: ignore[reportPrivateUsage]
+    monkeypatch.setattr(Path, "unlink", _raise_file_in_use)
+
+    player.configure("elevenlabs", api_key="key")
+
+    assert player._audio_file is None  # pyright: ignore[reportPrivateUsage]
+    assert player.is_configured
+
+
+@pytest.mark.asyncio
+async def test_cleanup_survives_audio_file_held_open(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    player = TTSPlayer()
+    audio = tmp_path / "playing.wav"
+    audio.write_bytes(b"AUDIO")
+    player._audio_file = audio  # pyright: ignore[reportPrivateUsage]
+    monkeypatch.setattr(Path, "unlink", _raise_file_in_use)
+
+    await player.cleanup()
+
+    assert player._audio_file is None  # pyright: ignore[reportPrivateUsage]
+
+
+@pytest.mark.asyncio
+async def test_pause_and_resume_suspend_the_player_process(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[bool] = []
+
+    def fake_set_suspended(process: asyncio.subprocess.Process, suspended: bool) -> None:
+        calls.append(suspended)
+
+    monkeypatch.setattr("storygen.tts.player._set_process_suspended", fake_set_suspended)
+    process = await asyncio.create_subprocess_exec(
+        sys.executable, "-c", "import time; time.sleep(30)"
+    )
+    player = TTSPlayer()
+    player._process = process  # pyright: ignore[reportPrivateUsage]
+    player._state = TTSState.PLAYING  # pyright: ignore[reportPrivateUsage]
+    try:
+        await player.pause()
+        assert player.state == TTSState.PAUSED
+        await player.resume()
+        assert player.state == TTSState.PLAYING
+        assert calls == [True, False]
+    finally:
+        await player.stop()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only suspend path")
+@pytest.mark.asyncio
+async def test_windows_suspend_stops_process_progress(tmp_path: Path) -> None:
+    """NtSuspendProcess must actually freeze the child (Windows has no SIGSTOP)."""
+    counter = tmp_path / "counter"
+    script = (
+        "import sys, time\n"
+        "with open(sys.argv[1], 'w') as f:\n"
+        "    while True:\n"
+        "        f.write('x'); f.flush(); time.sleep(0.01)\n"
+    )
+    # A venv's python.exe on Windows is a launcher that runs the real interpreter
+    # as a child; suspending the launcher would not freeze the script.
+    python = getattr(sys, "_base_executable", sys.executable)
+    process = await asyncio.create_subprocess_exec(python, "-c", script, str(counter))
+    player = TTSPlayer()
+    player._process = process  # pyright: ignore[reportPrivateUsage]
+    player._state = TTSState.PLAYING  # pyright: ignore[reportPrivateUsage]
+    try:
+        await asyncio.sleep(0.5)
+        await player.pause()
+        assert player.state == TTSState.PAUSED
+        await asyncio.sleep(0.1)
+        frozen = counter.stat().st_size
+        await asyncio.sleep(0.3)
+        assert counter.stat().st_size == frozen
+
+        await player.resume()
+        assert player.state == TTSState.PLAYING
+        await asyncio.sleep(0.3)
+        assert counter.stat().st_size > frozen
+    finally:
+        await player.stop()
 
 
 def test_preferred_extension_uses_first_provider_format() -> None:

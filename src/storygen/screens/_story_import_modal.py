@@ -10,6 +10,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Checkbox, Footer, Header, Static
 
+from storygen.screens._widget_ids import decode_id_part, encode_id_part
 from storygen.storage import paths
 from storygen.storage.save import GameSave, load_game
 
@@ -130,7 +131,7 @@ class StoryImportModal(Screen[list[StoryImportResult] | None]):
             cb = Checkbox(
                 char.name,
                 value=False,
-                id=f"charcb-{save_id}__{char.id}",
+                id=f"charcb-{save_id}__{encode_id_part(char.id)}",
             )
             section.mount(cb)
 
@@ -155,7 +156,7 @@ class StoryImportModal(Screen[list[StoryImportResult] | None]):
                     else:
                         self._checked[save_id].discard(char.id)
                     # Update the per-character checkbox widget to match.
-                    cb = self.query_one(f"#charcb-{save_id}__{char.id}", Checkbox)
+                    cb = self.query_one(f"#charcb-{save_id}__{encode_id_part(char.id)}", Checkbox)
                     cb.value = checked
             finally:
                 self._updating_checkboxes = False
@@ -164,7 +165,7 @@ class StoryImportModal(Screen[list[StoryImportResult] | None]):
             parts = remainder.split("__", 1)
             if len(parts) != 2:
                 return
-            save_id, char_id = parts
+            save_id, char_id = parts[0], decode_id_part(parts[1])
             self._checked.setdefault(save_id, set())
             if event.value:
                 self._checked[save_id].add(char_id)

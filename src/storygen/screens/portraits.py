@@ -40,6 +40,7 @@ from storygen.screens._outfit_modals import (
     OutfitCreateRequest,
 )
 from storygen.screens._ref_image_modals import ReferenceImageModal, ReferenceImageResult
+from storygen.screens._widget_ids import decode_id_part, encode_id_part
 from storygen.screens.controllers.portraits_outfits import (
     append_outfit,
     delete_outfit,
@@ -372,25 +373,25 @@ class PortraitsScreen(Screen[None]):
             meta.mount(Static(char.name, classes="portrait-name"))
             first_line_personality = char.personality.split(".", 1)[0]
             meta.mount(Static(first_line_personality))
-            regen_button = Button("Regenerate", id=f"regen-{char.id}")
+            regen_button = Button("Regenerate", id=f"regen-{encode_id_part(char.id)}")
             regen_button.disabled = art_disabled or bool(self._regen_busy)
             meta.mount(regen_button)
-            edit_regen_button = Button("Edit regen", id=f"edit-regen-{char.id}")
+            edit_regen_button = Button("Edit regen", id=f"edit-regen-{encode_id_part(char.id)}")
             edit_regen_button.disabled = art_disabled or char.portrait_path is None
             meta.mount(edit_regen_button)
-            export_button = Button("Export", id=f"export-{char.id}")
+            export_button = Button("Export", id=f"export-{encode_id_part(char.id)}")
             # Export is a file copy — keep it enabled even when art is off.
             # It can only run when there's something to copy.
             export_button.disabled = char.portrait_path is None
             meta.mount(export_button)
             # Edit bio (name / personality / physical / backstory) — always
             # enabled; text-only, no image generation.
-            meta.mount(Button("Edit", id=f"edit-bio-{char.id}"))
+            meta.mount(Button("Edit", id=f"edit-bio-{encode_id_part(char.id)}"))
             # Reference image button — label changes if ref already set.
             ref_label = "Change Ref" if char.reference_image_path else "Ref Image"
-            meta.mount(Button(ref_label, id=f"ref-image-{char.id}"))
+            meta.mount(Button(ref_label, id=f"ref-image-{encode_id_part(char.id)}"))
             if char.reference_image_path is not None:
-                meta.mount(Button("Rm Ref", id=f"rm-ref-{char.id}"))
+                meta.mount(Button("Rm Ref", id=f"rm-ref-{encode_id_part(char.id)}"))
             self._render_outfits_row(row, char, art_disabled=art_disabled)
         if art_disabled:
             self._scroll.mount(
@@ -486,11 +487,13 @@ class PortraitsScreen(Screen[None]):
         # Action buttons row beneath the outfits.
         button_row = Horizontal(classes="outfit-buttons")
         row.mount(button_row)
-        add_btn = Button("Add outfit", id=f"add-outfit-{char.id}")
+        add_btn = Button("Add outfit", id=f"add-outfit-{encode_id_part(char.id)}")
         add_btn.disabled = art_disabled or char.id in self._outfit_create_busy
         button_row.mount(add_btn)
         if char.current_outfit_id is not None:
-            button_row.mount(Button("Revert to base", id=f"revert-outfit-{char.id}"))
+            button_row.mount(
+                Button("Revert to base", id=f"revert-outfit-{encode_id_part(char.id)}")
+            )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Dispatch per-character button presses by their ``<prefix>-<char_id>`` id.
@@ -513,7 +516,7 @@ class PortraitsScreen(Screen[None]):
         ]
         for prefix, handler in handlers:
             if button_id.startswith(prefix):
-                handler(button_id[len(prefix) :], event.button)
+                handler(decode_id_part(button_id[len(prefix) :]), event.button)
                 return
 
     def _find_char(self, char_id: str) -> Character | None:

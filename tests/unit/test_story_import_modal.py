@@ -208,6 +208,34 @@ async def test_do_import_with_one_character_dismisses_with_result(
 
 
 @pytest.mark.asyncio
+async def test_character_ids_with_spaces_and_underscores_import(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """LLM-chosen ids like "Jane Doe" must not crash the modal (BadIdentifier)."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    save = _make_save(title="Test Story", char_names=["Jane Doe", "John Smith"])
+    save.characters[0].id = "Jane Doe"
+    save.characters[1].id = "john_smith"
+    paths.ensure_game_dirs(str(save.id))
+    save_game(save)
+
+    save_id = str(save.id)
+    app = _ModalHarness()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.screen.query_one(f"#selall-{save_id}", Checkbox).value = True
+        await pilot.pause()
+        app.screen.query_one("#btn-do-import", Button).press()
+        await pilot.pause()
+
+    assert isinstance(app.result, list)
+    result_list: list[object] = list(app.result)  # type: ignore[arg-type]
+    results = [r for r in result_list if isinstance(r, StoryImportResult)]
+    assert len(results) == 1
+    assert sorted(results[0].character_ids) == ["Jane Doe", "john_smith"]
+
+
+@pytest.mark.asyncio
 async def test_do_import_with_nothing_checked_shows_warning(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
